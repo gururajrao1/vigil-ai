@@ -4,13 +4,6 @@
 > Social listening → clinical NLP → explainable AE gates → regulator-shaped signal detection → workflow → export  
 > **Offline-first · zero required API keys · drugs, vaccines, and devices**
 
-| | |
-|---|---|
-| **UI** | http://localhost:5173 |
-| **API (local)** | http://127.0.0.1:8010 |
-| **API docs** | http://127.0.0.1:8010/docs |
-| **Login** | `admin@vigilai.dev` / `admin123` |
-
 **This README is the single knowledge-transfer (KT) + GitHub entrypoint.**  
 Sections are **slide-sized** — each `##` heading ≈ one slide; tables copy cleanly into decks.
 
