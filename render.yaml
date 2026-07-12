@@ -36,6 +36,10 @@ services:
         value: "true"
       - key: PYTHONUNBUFFERED
         value: "1"
-      # Auto-fill empty workspaces after free-tier sleep wipe so demos aren't blank
       - key: AUTO_SEED_DEMO
         value: "true"
+      # Optional Pathfinder SaaS search (set in Render dashboard / API — never commit)
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: EXA_API_KEY
+        sync: false
