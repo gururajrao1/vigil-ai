@@ -1,0 +1,38 @@
+# Free-tier Blueprint: Render Web Service for VigilAI API
+# Deploy: https://dashboard.render.com/select-repo?type=blueprint
+# Or connect GitHub → New → Blueprint → this file
+#
+# Notes:
+# - Free instances sleep after ~15 min idle (cold start 30–60s)
+# - Prefer Neon/Supabase DATABASE_URL; SQLite on free disk is ephemeral
+
+services:
+  - type: web
+    name: vigil-ai-api
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false   # set manually to Neon/Supabase URL, or leave unset for SQLite
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SEED_ADMIN_EMAIL
+        value: admin@vigilai.dev
+      - key: SEED_ADMIN_PASSWORD
+        value: admin123
+      - key: USE_TRANSFORMER_NER
+        value: "false"
+      - key: USE_PRESIDIO
+        value: "false"
+      - key: USE_ONLINE_TRANSLATION
+        value: "true"
+      - key: USE_LLM
+        value: "true"
+      - key: USE_RXNORM
+        value: "true"
+      - key: PYTHONUNBUFFERED
+        value: "1"
