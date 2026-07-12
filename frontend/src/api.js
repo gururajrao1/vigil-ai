@@ -1,5 +1,8 @@
 // Thin API client for the VigilAI backend (worldwide).
-const BASE = import.meta.env.VITE_API_BASE || '';
+// Production (Vercel): leave VITE_API_BASE empty so /api is same-origin and
+// vercel.json proxies to Render — works on networks that block onrender.com.
+// Local Vite: empty BASE uses the dev proxy → 127.0.0.1:8010.
+const BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
 
 let _token = localStorage.getItem('vigilai_token') || '';
 let _projectId = localStorage.getItem('vigilai_project_id') || '';
@@ -38,8 +41,8 @@ async function req(path, opts = {}, _attempt = 1) {
       return req(path, opts, _attempt + 1);
     }
     const hint = BASE
-      ? `Network error talking to API (${BASE}). Wake ${BASE}/api/health then retry.`
-      : 'Network error (no VITE_API_BASE — local proxy may be down).';
+      ? `Network error talking to API (${BASE}). Wake the API / check firewall, then retry.`
+      : 'Network error reaching /api (Vercel→Render proxy). Wake https://vigil-ai-api.onrender.com/api/health then retry.';
     throw new Error(err?.message ? `${hint} [${err.message}]` : hint);
   }
   if (!res.ok) {

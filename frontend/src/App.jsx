@@ -268,7 +268,7 @@ function DemoBar({ onAction }) {
       setResults({
         _wake: {
           ok: false,
-          error: 'API still cold/unreachable. Open https://vigil-ai-api.onrender.com/api/health, wait until it loads, then Fetch again (2–3 sources max on free tier).',
+          error: 'API still cold/unreachable. Wait 30–60s and Fetch again with only 2–3 sources (free Render sleeps when idle).',
         },
       });
       setRunning(false);

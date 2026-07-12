@@ -26,7 +26,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    # Reflect request Origin when credentials are used — browsers reject ACAO:* + credentials.
+    # Explicit list covers local Vite + production Vercel; "*" alone is unsafe with credentials.
+    allow_origins=[
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:4173",
+        "http://localhost:4173",
+        "https://vigil-ai-eight.vercel.app",
+        "https://vigil-ai.vercel.app",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
