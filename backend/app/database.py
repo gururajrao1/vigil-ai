@@ -90,17 +90,17 @@ def migrate_schema() -> None:
 
 def _widen_postgres_varchars(conn) -> None:
     """Widen columns that can exceed historical SQLite-era VARCHAR lengths."""
-    widens = (
-        ("raw_posts", "external_id", 512),
-        ("raw_posts", "url", 2048),
-        ("suggested_sources", "url", 2048),
+    text_cols = (
+        ("raw_posts", "external_id"),
+        ("raw_posts", "url"),
+        ("raw_posts", "title"),
+        ("suggested_sources", "url"),
+        ("suggested_sources", "title"),
     )
-    for table, col, size in widens:
+    for table, col in text_cols:
         try:
-            conn.execute(text(
-                f"ALTER TABLE {table} ALTER COLUMN {col} TYPE VARCHAR({size})"
-            ))
-            logger.info("migrate_schema: widened %s.%s to VARCHAR(%s)", table, col, size)
+            conn.execute(text(f'ALTER TABLE {table} ALTER COLUMN {col} TYPE TEXT'))
+            logger.info("migrate_schema: widened %s.%s to TEXT", table, col)
         except Exception as exc:
             logger.debug("migrate_schema widen skip %s.%s: %s", table, col, exc)
 

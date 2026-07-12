@@ -116,10 +116,10 @@ class RawPost(Base):
 
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=True)
-    external_id = Column(String(512), index=True)  # dedupe key (Google News IDs can be long)
+    external_id = Column(Text, index=True)  # dedupe key (Google News IDs can be very long)
     platform = Column(String(64), index=True)       # reddit / twitter / forum / stream
     product_type = Column(String(16), default="drug", index=True)  # drug | device | combination
-    url = Column(String(2048))
+    url = Column(Text)
     author_hash = Column(String(64))                # pseudonymized
     title = Column(Text)
     body = Column(Text)                              # already PII-scrubbed (English)
