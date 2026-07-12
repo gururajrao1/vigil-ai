@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
-import { Button, Card } from '../components/ui';
+import { Button } from '../components/ui';
 
 export default function Login() {
   const { login } = useAuth();
-  const nav = useNavigate();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('admin@vigilai.dev');
   const [password, setPassword] = useState('admin123');
@@ -16,18 +14,18 @@ export default function Login() {
 
   const submit = async (e) => {
     e.preventDefault();
-    setBusy(true); setErr('');
+    setBusy(true);
+    setErr('');
     try {
       const res = mode === 'login'
         ? await api.login(email, password)
         : await api.register(email, password, name);
       login(res.token, res.user);
-      nav('/');
     } catch (e2) {
       const msg = String(e2?.message || e2 || 'Failed');
       setErr(
         /failed to fetch|network|timeout|abort/i.test(msg)
-          ? 'Server unreachable or busy (ingest may be locking the DB). Wait a few seconds and retry — use a single backend on port 8010.'
+          ? 'Server is waking up or unreachable. Wait ~30s and try again.'
           : msg
       );
     }
@@ -35,33 +33,65 @@ export default function Login() {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10">
-      <Card className="p-6">
-        <h2 className="text-xl font-bold text-slate-100 mb-1">
-          {mode === 'login' ? 'Sign in to VigilAI' : 'Create an account'}
-        </h2>
-        <p className="text-xs text-slate-500 mb-4">
-          Seeded admin: <span className="text-slate-300">admin@vigilai.dev / admin123</span>
-        </p>
+    <div className="login-gate min-h-[100dvh] w-full flex items-center justify-center px-4 py-10">
+      <div className="login-gate-panel w-full max-w-md rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-solid)]/95 p-6 sm:p-8 shadow-2xl">
+        <div className="mb-6">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--app-accent)] mb-2">VigilAI</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-[var(--app-text)] leading-tight">
+            {mode === 'login' ? 'Sign in' : 'Create account'}
+          </h1>
+          <p className="mt-2 text-sm text-[var(--app-text-muted)] leading-snug">
+            Worldwide pharmacovigilance & device-vigilance — social listening to explainable safety signals.
+          </p>
+        </div>
+
         <form onSubmit={submit} className="space-y-3">
           {mode === 'register' && (
-            <input className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
-                   placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className="app-input"
+              placeholder="Full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+            />
           )}
-          <input className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
-                 placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input type="password" className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
-                 placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input
+            className="app-input"
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            required
+          />
+          <input
+            type="password"
+            className="app-input"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            required
+          />
           {err && <div className="text-xs text-rose-400">{err}</div>}
           <Button variant="primary" disabled={busy} className="w-full">
-            {busy ? 'Please wait…' : (mode === 'login' ? 'Sign in' : 'Register')}
+            {busy ? 'Please wait…' : (mode === 'login' ? 'Enter VigilAI' : 'Register')}
           </Button>
         </form>
-        <button onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                className="mt-4 text-xs text-sky-400 hover:underline">
+
+        <p className="mt-4 text-[11px] text-[var(--app-text-faint)] leading-snug">
+          Demo: <span className="text-[var(--app-text-muted)]">admin@vigilai.dev</span> /{' '}
+          <span className="text-[var(--app-text-muted)]">admin123</span>
+        </p>
+
+        <button
+          type="button"
+          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+          className="mt-4 text-xs text-[var(--app-accent)] hover:underline"
+        >
           {mode === 'login' ? 'Need an account? Register' : 'Have an account? Sign in'}
         </button>
-      </Card>
+      </div>
     </div>
   );
 }

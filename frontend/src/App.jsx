@@ -445,13 +445,11 @@ function UserMenu() {
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
 
-  if (!user) {
-    return <NavLink to="/login" className="text-xs rounded-lg px-3 py-1.5 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700">Sign in</NavLink>;
-  }
+  if (!user) return null;
   return (
     <>
       <button ref={btnRef} onClick={toggle} className="flex items-center gap-2 text-xs text-slate-300">
-        <span className="h-7 w-7 rounded-full bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-white font-bold">
+        <span className="h-7 w-7 rounded-full bg-gradient-to-br from-sky-500 to-teal-600 flex items-center justify-center text-white font-bold">
           {(user.email || '?')[0].toUpperCase()}
         </span>
         <span className="hidden md:block">{user.role}</span>
@@ -475,6 +473,7 @@ export default function App() {
   const [tick, setTick] = useState(0);
   const [lastIngest, setLastIngest] = useState(null);
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(!getToken());
   const bump = () => setTick((t) => t + 1);
   const recordIngest = (info) => {
     if (info) setLastIngest(info);
@@ -482,11 +481,19 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!user) return;
     api.health().then(setHealth).catch(() => setHealth(null));
-  }, [tick]);
+  }, [tick, user]);
 
   useEffect(() => {
-    if (getToken()) api.me().then(setUser).catch(() => { setToken(''); setUser(null); });
+    if (!getToken()) {
+      setAuthReady(true);
+      return;
+    }
+    api.me()
+      .then(setUser)
+      .catch(() => { setToken(''); setUser(null); })
+      .finally(() => setAuthReady(true));
   }, []);
 
   const login = (token, u) => { setToken(token); setUser(u); };
@@ -494,7 +501,6 @@ export default function App() {
     localStorage.removeItem('vigilai_token');
     setToken('');
     setUser(null);
-    window.location.replace('/');
   };
 
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -504,13 +510,14 @@ export default function App() {
   const closeNav = useCallback(() => setNavOpen(false), []);
 
   useEffect(() => {
+    if (!user) return undefined;
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdOpen((o) => !o); }
       if (e.key === 'Escape') { setCmdOpen(false); setNavOpen(false); }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const onResize = () => {
@@ -523,6 +530,13 @@ export default function App() {
   return (
     <ThemeProvider>
     <AuthContext.Provider value={{ user, login, logout }}>
+      {!authReady ? (
+        <div className="login-gate min-h-[100dvh] flex items-center justify-center text-sm text-[var(--app-text-muted)]">
+          Loading VigilAI…
+        </div>
+      ) : !user ? (
+        <Login />
+      ) : (
       <ProjectProvider>
       <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
         {cmdOpen && <CommandPalette onClose={closeCmd} />}
@@ -537,39 +551,42 @@ export default function App() {
           )}
           <Sidebar health={health} open={navOpen} onNavigate={closeNav} />
           <div className="app-main-column">
-            <header className="app-header flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 sm:px-4 md:px-6 py-2.5 md:py-3 border-b backdrop-blur">
-              <div className="min-w-0 flex items-center gap-2 sm:gap-3 flex-1">
-                <button
-                  type="button"
-                  aria-label="Open navigation"
-                  aria-expanded={navOpen}
-                  onClick={() => setNavOpen((o) => !o)}
-                  className="app-nav-toggle shrink-0 rounded-lg border border-[var(--app-border)] px-2.5 py-1.5 text-sm text-[var(--app-text-muted)] hover:bg-[var(--app-surface-hover)]"
-                >
-                  ☰
-                </button>
-                <div className="min-w-0">
-                  <h1 className="app-header-title-full text-sm md:text-base lg:text-lg font-semibold text-[var(--app-text)] leading-tight truncate">
-                    Real-Time Social Listening for Patient Safety <span className="text-[var(--app-accent)] opacity-90">· Worldwide</span>
-                  </h1>
-                  <h1 className="app-header-title-short text-sm font-semibold text-[var(--app-text)] leading-tight">
-                    VigilAI <span className="text-[var(--app-accent)] opacity-90">· PV</span>
-                  </h1>
-                  <p className="hidden sm:block text-[11px] md:text-xs text-[var(--app-text-muted)] leading-tight truncate">
-                    Entities · disproportionality · WHO-UMC · MedDRA · knowledge graph · E2B
-                  </p>
+            <header className="app-header px-3 sm:px-4 md:px-5 py-2.5 border-b backdrop-blur">
+              <div className="app-header-row">
+                <div className="app-header-brand min-w-0">
+                  <button
+                    type="button"
+                    aria-label="Open navigation"
+                    aria-expanded={navOpen}
+                    onClick={() => setNavOpen((o) => !o)}
+                    className="app-nav-toggle shrink-0 rounded-lg border border-[var(--app-border)] px-2.5 py-1.5 text-sm text-[var(--app-text-muted)] hover:bg-[var(--app-surface-hover)]"
+                  >
+                    ☰
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="app-header-title-full text-sm lg:text-base font-semibold text-[var(--app-text)] leading-tight truncate">
+                      Social listening for patient safety
+                      <span className="text-[var(--app-accent)] opacity-90"> · Worldwide</span>
+                    </h1>
+                    <h1 className="app-header-title-short text-sm font-semibold text-[var(--app-text)] leading-tight truncate">
+                      VigilAI <span className="text-[var(--app-accent)] opacity-90">· PV</span>
+                    </h1>
+                    <p className="app-header-sub text-[10px] md:text-[11px] text-[var(--app-text-muted)] leading-tight truncate">
+                      Entities · disproportionality · WHO-UMC · MedDRA · E2B
+                    </p>
+                  </div>
                 </div>
-                <button type="button" onClick={openCmd}
-                  className="hidden lg:flex items-center gap-1.5 text-[11px] text-[var(--app-text-muted)] border border-[var(--app-border)] rounded-lg px-2.5 py-1 hover:text-[var(--app-text)] transition-colors shrink-0">
-                  <span>⌘K</span>
-                  <span className="text-[var(--app-text-faint)]">Quick nav</span>
-                </button>
-              </div>
-              <div className="app-header-actions">
-                <ProjectSelector />
-                <ThemeToggle />
-                <DemoBar onAction={bump} />
-                <UserMenu />
+                <div className="app-header-actions">
+                  <button type="button" onClick={openCmd}
+                    className="hidden xl:flex items-center gap-1.5 text-[11px] text-[var(--app-text-muted)] border border-[var(--app-border)] rounded-lg px-2.5 py-1 hover:text-[var(--app-text)] transition-colors shrink-0">
+                    <span>⌘K</span>
+                    <span className="text-[var(--app-text-faint)]">Quick nav</span>
+                  </button>
+                  <ProjectSelector />
+                  <ThemeToggle />
+                  <DemoBar onAction={bump} />
+                  <UserMenu />
+                </div>
               </div>
             </header>
             <main className="app-main-scroll">
@@ -583,7 +600,7 @@ export default function App() {
                 <Route path="/source-queue" element={<DiscoveryHub />} />
                 <Route path="/sources" element={<SourcesHub />} />
                 <Route path="/forge" element={<Forge />} />
-                <Route path="/login" element={<Login />} />
+                <Route path="/login" element={<Navigate to="/" replace />} />
                 {/* Legacy paths → hub tabs (bookmarks / old demos keep working) */}
                 <Route path="/kpis" element={<Navigate to="/?tab=ops" replace />} />
                 <Route path="/lifecycle" element={<Navigate to="/signals?tab=lifecycle" replace />} />
@@ -604,6 +621,7 @@ export default function App() {
         </div>
       </RefreshContext.Provider>
       </ProjectProvider>
+      )}
     </AuthContext.Provider>
     </ThemeProvider>
   );
