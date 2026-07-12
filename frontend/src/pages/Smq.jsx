@@ -71,8 +71,15 @@ export default function Smq({ embedded = false }) {
       {view === 'active' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {groups.map((g) => (
-            <SmqActiveCard key={g.smq} g={g} expanded={expanded[g.smq]} onToggle={() => toggleExpanded(g.smq)}
-                           onDrugClick={() => nav(`/signals?smq=${g.smq}`)} />
+            <SmqActiveCard
+              key={g.smq}
+              g={g}
+              expanded={expanded[g.smq]}
+              onToggle={() => toggleExpanded(g.smq)}
+              onDrugClick={(drug) =>
+                nav(`/signals?smq=${encodeURIComponent(g.smq)}&pin=${encodeURIComponent(drug)}`)
+              }
+            />
           ))}
         </div>
       )}
@@ -165,9 +172,9 @@ function SmqActiveCard({ g, expanded, onToggle, onDrugClick }) {
         <tbody>
           {drugs.map((d) => (
             <tr key={d.drug} className="border-b border-slate-800/40 hover:bg-slate-800/30 cursor-pointer"
-                onClick={onDrugClick}
-                title={`Member PTs: ${d.member_pts.map(([pt, n]) => `${pt} (${n})`).join(', ')}`}>
-              <td className="py-2 capitalize text-slate-100">
+                onClick={() => onDrugClick(d.drug)}
+                title={`Open ${d.drug} within this SMQ · Member PTs: ${d.member_pts.map(([pt, n]) => `${pt} (${n})`).join(', ')}`}>
+              <td className="py-2 capitalize text-sky-300 hover:text-sky-200">
                 {d.drug}
                 <div className="text-[10px] text-slate-500 normal-case">
                   {d.member_pts.slice(0, 3).map(([pt]) => pt).join(', ')}

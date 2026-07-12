@@ -42,24 +42,32 @@ export default function Signals({ embedded = false }) {
   const [wellDocOnly, setWellDocOnly] = useState(false);
   const [hrElevatedOnly, setHrElevatedOnly] = useState(false);
   const [maxsprtOnly, setMaxsprtOnly] = useState(false);
-  const [smq, setSmq] = useState('ALL');
+  const [smq, setSmq] = useState(searchParams.get('smq') || 'ALL');
   const [noveltyFilter, setNoveltyFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('prr');
   const [profile, setProfile] = useState(null); // { mode: 'drug'|'event', query: string }
+  // Pin a drug to the top when deep-linking from SMQ (keep full SMQ set visible)
+  const [pinDrug, setPinDrug] = useState(searchParams.get('pin') || '');
 
-  // Sync deep-link tokens from Dashboard chart clicks (searchEvent | symptom | drug | …)
+  // Sync deep-link tokens from Dashboard / SMQ / chart clicks
   useEffect(() => {
     const d = searchParams.get('drug');
+    const pin = searchParams.get('pin');
     const searchEvent = searchParams.get('searchEvent');
     const s = searchParams.get('symptom') || searchEvent;
     const st = searchParams.get('strength');
     const r = searchParams.get('region');
     const soc = searchParams.get('soc');
+    const smqParam = searchParams.get('smq');
+    const classEffect = searchParams.get('class_effect');
     if (d != null) setDrugQ(d);
+    if (pin != null) setPinDrug(pin);
     if (s != null) setSymptomQ(s);
     if (st) setFilter(st);
     if (r) setRegion(r);
     if (soc != null) setSocQ(soc);
+    if (smqParam) setSmq(smqParam);
+    if (classEffect === '1' || classEffect === 'true') setClassEffectOnly(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -78,6 +86,9 @@ export default function Signals({ embedded = false }) {
     setDrugQ('');
     setSymptomQ('');
     setSocQ('');
+    setPinDrug('');
+    setSmq('ALL');
+    setClassEffectOnly(false);
     setFilter('ALL');
     setRegion('Global');
     setSearchParams({}, { replace: true });
@@ -94,6 +105,11 @@ export default function Signals({ embedded = false }) {
     (s.smq || []).forEach((m) => { acc[m.name] = m.smq; });
     return acc;
   }, {});
+  const smqLabel = smq !== 'ALL'
+    ? (Object.entries(smqKeyByName).find(([, k]) => k === smq)?.[0] || smq)
+    : null;
+
+  const pinNorm = (pinDrug || '').trim().toLowerCase();
 
   // product-type + SDR + SMQ filtering and Bayesian sort are applied client-side.
   const rows = (signals || [])
@@ -112,6 +128,12 @@ export default function Signals({ embedded = false }) {
     .filter((s) => !maxsprtOnly || s.maxsprt_crossed)
     .filter((s) => smq === 'ALL' || (s.smq || []).some((m) => m.smq === smq))
     .sort((a, b) => {
+      // SMQ deep-link: pinned drug first, then remaining members of the syndrome
+      if (pinNorm) {
+        const aPin = (a.drug || '').toLowerCase() === pinNorm ? 0 : 1;
+        const bPin = (b.drug || '').toLowerCase() === pinNorm ? 0 : 1;
+        if (aPin !== bPin) return aPin - bPin;
+      }
       // When novelty filter is active, float novel signals to top
       if (noveltyFilter === 'novel') {
         const aNovel = (a.label_novelty === 'novel') ? 0 : 1;
@@ -123,9 +145,15 @@ export default function Signals({ embedded = false }) {
 
   return (
     <div className="space-y-4">
-      {(drugQ || symptomQ || socQ) && (
+      {(drugQ || symptomQ || socQ || (smq !== 'ALL') || pinDrug) && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-xs text-teal-100">
-          <span className="font-medium">Filtered from Overview / deep-link</span>
+          <span className="font-medium">Filtered deep-link</span>
+          {smq !== 'ALL' && (
+            <span className="rounded bg-cyan-500/20 px-2 py-0.5">SMQ: {smqLabel || smq}</span>
+          )}
+          {pinDrug && (
+            <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-100">pinned: {pinDrug}</span>
+          )}
           {drugQ && <span className="rounded bg-sky-500/20 px-2 py-0.5">drug: {drugQ}</span>}
           {symptomQ && <span className="rounded bg-rose-500/20 px-2 py-0.5">AE: {symptomQ}</span>}
           {socQ && <span className="rounded bg-violet-500/20 px-2 py-0.5">SOC: {socQ}</span>}
@@ -264,14 +292,21 @@ export default function Signals({ embedded = false }) {
               {rows.length === 0 && (
                 <tr><td colSpan={13} className="px-4 py-8 text-center text-slate-500">No signals. Load the demo corpus.</td></tr>
               )}
-              {rows.map((s) => (
+              {rows.map((s) => {
+                const isPinned = pinNorm && (s.drug || '').toLowerCase() === pinNorm;
+                return (
                 <tr
                   key={s.id}
                   onClick={() => nav(`/signals/${s.id}`)}
-                  className="border-b border-slate-800/50 hover:bg-slate-800/40 cursor-pointer transition"
+                  className={`border-b border-slate-800/50 hover:bg-slate-800/40 cursor-pointer transition ${
+                    isPinned ? 'bg-amber-500/5 border-l-2 border-l-amber-400/60' : ''
+                  }`}
                 >
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-100 capitalize flex items-center gap-2">
+                      {isPinned && (
+                        <Badge value="pinned" className="bg-amber-500/15 text-amber-200 border-amber-500/30" />
+                      )}
                       {s.spike_flag && <span className="h-2 w-2 rounded-full bg-rose-500 pulse-dot" title="Spiking" />}
                       <span title={(s.product_type || 'drug')}>{(s.product_type === 'device') ? '🩺' : '💊'}</span>
                       {s.drug} <span className="text-slate-500">→</span> {s.meddra?.pt || s.symptom}
@@ -404,7 +439,8 @@ export default function Signals({ embedded = false }) {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           </div>
