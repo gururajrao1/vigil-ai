@@ -196,6 +196,11 @@ vigil-ai/
 | If you need… | Open |
 |--------------|------|
 | AE gate logic | `backend/app/nlp/ae_detector.py` |
+| Ingest bouncer | `backend/app/nlp/ingest_gateway.py` |
+| Hybrid MedDRA match (RapidFuzz / SapBERT·BioBERT / cosine) | `backend/app/nlp/hybrid_resolver.py` |
+| Stage-4 embedding cosine map | `backend/app/nlp/stage4_meddra_embed.py` |
+| Open MedDRA-style PT/SOC thesaurus | `backend/app/nlp/meddra.py` |
+| CUI / UMLS-style IDs | `backend/app/nlp/stage3_ner_cui.py` |
 | Brand→generic / ATC | `backend/app/nlp/lexicons.py`, `drug_norm.py` |
 | PRR / EBGM / SDR | `backend/app/analytics/disproportionality.py` |
 | Lifecycle transitions | `backend/app/analytics/lifecycle.py` |
@@ -330,10 +335,41 @@ Lenses are **overlays** — they do not replace PRR/SDR.
 | Negation | `nlp/negation.py` | Sliding-window cues |
 | AE decision | `nlp/ae_detector.py` | `explainability.gate_1…gate_4` |
 | Content dedupe | `nlp/content_dedupe.py` | Same narrative across platforms → one row |
+| Ingest bouncer | `nlp/ingest_gateway.py` | Pre-DB drop of verb/negated/unmapped spans |
 
 **UI:** Signal Detail → supporting posts → gate ✓/✕ with counts & items.
 
 **Tests:** `backend/tests/test_ae_detector.py`
+
+### Normalization & MedDRA mapping — where each technique lives
+
+Orchestrator: `backend/app/nlp/text_normalize.py` (4-stage pipeline).  
+Heavy matching: **`backend/app/nlp/hybrid_resolver.py`** (3-pass hybrid).  
+PT/SOC catalog (open MedDRA-style surrogate, **not licensed MedDRA/UMLS**): `backend/app/nlp/meddra.py`.
+
+| Technique | File(s) | Role in VigilAI |
+|-----------|---------|-----------------|
+| **RapidFuzz** (token_sort / token_set / partial — Levenshtein-family edit ratios) | `nlp/hybrid_resolver.py` Pass 1 · also `nlp/condition_norm.py` | Morphological collapse onto catalog PT when combined score ≥ 85 |
+| **Token Jaccard** (n-gram / set overlap) | `nlp/hybrid_resolver.py` Pass 1 | Order-invariant overlap; blended 50/50 with RapidFuzz edit score |
+| **Levenshtein-style edit distance** | via RapidFuzz scorers above (fallback: `difflib.SequenceMatcher`) | Spelling / plural / token-order drift |
+| **Jaro–Winkler** | *Not a separate scorer today* — same Pass 1 uses RapidFuzz token ratios (Levenshtein-based). Add `rapidfuzz.distance.JaroWinkler` only if you want JW explicitly | — |
+| **SapBERT / BioBERT / MiniLM** dense embeddings | `nlp/hybrid_resolver.py` Pass 2 (`_SapBertFaissIndex`) · model preference: SapBERT → BioBERT-NLI → MiniLM | Zero-character-overlap synonyms (e.g. layman ↔ PT) |
+| **Faiss ANN** (Inner Product) + numpy argmax fallback | `nlp/hybrid_resolver.py` Pass 2 | Fast nearest neighbor over vocabulary embeddings |
+| **Cosine similarity ≥ 0.85** | `nlp/stage4_meddra_embed.py` (MiniLM or n-gram cosine) · Pass 2 vector threshold in `hybrid_resolver.py` | Layman → MedDRA-style PT semantic map |
+| **spaCy / scispaCy contextual re-rank** | `nlp/hybrid_resolver.py` Pass 3 · also bouncer gates in `ingest_gateway.py` | Drop conversational verbs; keep clinical phenotypes |
+| **UMLS / CUI-style IDs** (surrogate namespaces, not a live UMLS API) | `nlp/stage3_ner_cui.py` (`assign_cui`) · ICD-10-CM-inspired codes + RxNorm when available | Stable concept IDs on entities |
+| **Open MedDRA-style thesaurus** (PT → SOC map) | `nlp/meddra.py` (`map_term`, `_PT_MAP`) | Regulator-shaped coding without redistributing licensed MedDRA |
+| **Synonym / vernacular thesaurus** | `nlp/stage2_synonyms.py` · `nlp/vernacular.py` · seeds in `hybrid_resolver._SEMANTIC_SEEDS` | Brand/alias/slang → canonical surface before fuzzy/vector passes |
+| **Brand → INN + ATC / RxNorm** | `nlp/lexicons.py` · `nlp/drug_norm.py` | Product normalization |
+| **Event inflection collapse** | `nlp/event_collapse.py` | Near-duplicate PT folding |
+
+**Pass summary (hybrid resolver)**
+
+1. Morphological Jaccard + RapidFuzz edit → PT if score ≥ 85  
+2. SapBERT/BioBERT/MiniLM + Faiss (cosine / IP ≥ 0.85) → PT for semantic matches  
+3. spaCy POS / clinical-relevance filter → discard non-phenotypes  
+
+Offline-first: every optional package (rapidfuzz, faiss, transformers, spacy) has a deterministic fallback. Diagnostics: `GET /api/nlp/resolver-status`.
 
 ---
 
