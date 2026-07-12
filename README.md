@@ -529,18 +529,6 @@ Use this as **speaker notes** for a live walkthrough.
 
 ---
 
-### KT checklist for a new engineer
-
-- [ ] Run backend `:8010` + frontend `:5173` · login admin  
-- [ ] Trace one post: `pipeline._process_raw` → `ae_detector` → Signal Detail gates  
-- [ ] Trace one signal: `recompute_signals` → Detect table → Detail  
-- [ ] Advance lifecycle on Workflow board · find audit entry  
-- [ ] Escalate an alert with and without `ALERT_WEBHOOK_URL`  
-- [ ] Open Network registry · explain connector vs surrogate  
-- [ ] Run `python -m tests.test_ae_detector` and `tests.test_disproportionality`  
-- [ ] Skim `docs/ARCHITECTURE.md` + `docs/DEMO_SCRIPT.md`
-
----
 
 ---
 
