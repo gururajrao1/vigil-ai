@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { api, setToken, getToken } from './api';
+import { api, setToken, getToken, wakeApi } from './api';
 import { Button } from './components/ui';
 import { ThemeProvider, ThemeToggle } from './theme';
 import Dashboard from './pages/Dashboard';
@@ -262,20 +262,37 @@ function DemoBar({ onAction }) {
     setRunning(true);
     setOpen(false);
     setResults({});
+    // Wake free-tier Render before the first crawl — otherwise every source shows ✗.
+    const awake = await wakeApi();
+    if (!awake) {
+      setResults({
+        _wake: {
+          ok: false,
+          error: 'API still cold/unreachable. Open https://vigil-ai-api.onrender.com/api/health, wait until it loads, then Fetch again (2–3 sources max on free tier).',
+        },
+      });
+      setRunning(false);
+      setOpen(true);
+      return;
+    }
     const srcs = INGEST_SOURCES.filter((s) => selected.includes(s.id));
     // Skip corpus recompute on every source — one pass at the end (was causing 15+ min hangs).
+    let anyOk = false;
     for (const s of srcs) {
       try {
         const r = await s.fn({ recompute: false });
+        anyOk = true;
         setResults((prev) => ({ ...prev, [s.id]: { ok: true, ingested: r?.ingested ?? 0, fetched: r?.fetched ?? r?.unique_fetched ?? 0 } }));
       } catch (err) {
         const msg = err?.message || err?.detail || String(err);
         setResults((prev) => ({ ...prev, [s.id]: { ok: false, error: msg } }));
       }
     }
-    try {
-      await api.recompute();
-    } catch { /* dashboard still refreshes with newly ingested posts */ }
+    if (anyOk) {
+      try {
+        await api.recompute();
+      } catch { /* dashboard still refreshes with newly ingested posts */ }
+    }
     onAction();
     setRunning(false);
   };
@@ -317,6 +334,14 @@ function DemoBar({ onAction }) {
               {FAST_SOURCE_IDS.every((id) => selected.includes(id)) ? 'Clear all' : 'Select fast'}
             </button>
           </div>
+          <p className="px-2 pb-1 text-[10px] text-amber-400/90 leading-snug">
+            Deploy tip: wake API first, then Fetch 2–3 sources (not all). Free Render times out if you stack every feed.
+          </p>
+          {results._wake && !results._wake.ok && (
+            <p className="px-2 py-1.5 mb-1 text-[10px] text-rose-300 bg-rose-950/40 rounded-lg border border-rose-800/50 leading-snug">
+              {results._wake.error}
+            </p>
+          )}
           {INGEST_SOURCES.map((s) => {
             const checked = selected.includes(s.id);
             const res = results[s.id];
@@ -328,6 +353,11 @@ function DemoBar({ onAction }) {
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-slate-200">{s.icon} {s.label}</div>
                   <div className="text-[10px] text-slate-500 truncate">{s.note}</div>
+                  {res && !res.ok && (
+                    <div className="text-[10px] text-rose-400 mt-0.5 break-words whitespace-normal">
+                      {res.error || 'Ingest failed'}
+                    </div>
+                  )}
                 </div>
                 {res && (
                   <span

@@ -18,18 +18,55 @@ export function setProjectId(id) {
 }
 export function getProjectId() { return _projectId; }
 
-async function req(path, opts = {}) {
+function _errDetail(detail) {
+  if (detail == null) return null;
+  if (typeof detail === 'string') return detail;
+  try { return JSON.stringify(detail); } catch { return String(detail); }
+}
+
+async function req(path, opts = {}, _attempt = 1) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   if (_token) headers.Authorization = `Bearer ${_token}`;
   if (_projectId) headers['X-Project-Id'] = _projectId;
-  const res = await fetch(`${BASE}${path}`, { ...opts, headers });
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, { ...opts, headers });
+  } catch (err) {
+    // Free Render sleeps; first call from a new device often fails mid-wake.
+    if (_attempt < 2) {
+      await new Promise((r) => setTimeout(r, 2500));
+      return req(path, opts, _attempt + 1);
+    }
+    const hint = BASE
+      ? `Network error talking to API (${BASE}). Wake ${BASE}/api/health then retry.`
+      : 'Network error (no VITE_API_BASE — local proxy may be down).';
+    throw new Error(err?.message ? `${hint} [${err.message}]` : hint);
+  }
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
-    try { const j = await res.json(); if (j.detail) msg = j.detail; } catch { /* ignore */ }
+    try {
+      const j = await res.json();
+      const d = _errDetail(j.detail);
+      if (d) msg = d;
+    } catch { /* ignore */ }
     throw new Error(msg);
   }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.text();
+}
+
+/** Ping API so Render free cold-starts before a multi-source Fetch. */
+export async function wakeApi(timeoutMs = 90000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    await req('/api/health', { signal: ctrl.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 export const api = {
