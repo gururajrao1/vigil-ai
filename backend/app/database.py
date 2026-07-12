@@ -59,6 +59,9 @@ def migrate_schema() -> None:
     Iterates over every SQLAlchemy-mapped table and column. For each column that
     is defined in the model but absent from the live database schema, issues an
     ALTER TABLE ADD COLUMN. Safe to run repeatedly (idempotent).
+
+    On PostgreSQL also widens a few VARCHAR columns that SQLite never enforced
+    (Google News external_id / long article URLs).
     """
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
@@ -80,6 +83,26 @@ def migrate_schema() -> None:
                 except Exception as exc:
                     # Column may already exist in a race; log and continue
                     logger.debug("migrate_schema skip %s.%s: %s", table.name, col.name, exc)
+
+        if not _is_sqlite:
+            _widen_postgres_varchars(conn)
+
+
+def _widen_postgres_varchars(conn) -> None:
+    """Widen columns that can exceed historical SQLite-era VARCHAR lengths."""
+    widens = (
+        ("raw_posts", "external_id", 512),
+        ("raw_posts", "url", 2048),
+        ("suggested_sources", "url", 2048),
+    )
+    for table, col, size in widens:
+        try:
+            conn.execute(text(
+                f"ALTER TABLE {table} ALTER COLUMN {col} TYPE VARCHAR({size})"
+            ))
+            logger.info("migrate_schema: widened %s.%s to VARCHAR(%s)", table, col, size)
+        except Exception as exc:
+            logger.debug("migrate_schema widen skip %s.%s: %s", table, col, exc)
 
 
 def checkpoint_wal() -> None:

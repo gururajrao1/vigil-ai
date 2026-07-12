@@ -7,10 +7,9 @@ Stack used for submissions:
 
 ## Empty dashboards after sleep?
 
-Render free wipes SQLite when the instance sleeps. With `AUTO_SEED_DEMO=true` (default in `render.yaml`), startup **auto-fills** empty workspaces (General PV + oncology + vaccine) in the background so Overview / Signals / Alerts are not zeros for demo visitors.
+With **Neon `DATABASE_URL`** on Render, posts/signals **persist** across free-tier sleep — Fetch and Demo corpus **accumulate**.
 
-- First open after sleep: wait ~1–2 min after health is OK while the corpus loads.
-- Optional true persistence: Neon `DATABASE_URL` (seed runs once, then keeps real ingested data).
+If `DATABASE_URL` is unset, SQLite is wiped on sleep; `AUTO_SEED_DEMO=true` re-fills empty workspaces so demos aren’t blank (but history is lost).
 
 ## 1) Backend on Render (one-time clicks)
 

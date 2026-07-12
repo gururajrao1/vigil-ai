@@ -17,7 +17,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        sync: false   # set manually to Neon/Supabase URL, or leave unset for SQLite
+        sync: false   # Neon Postgres (set in dashboard/API) — persists posts across Render sleep
       - key: JWT_SECRET
         generateValue: true
       - key: SEED_ADMIN_EMAIL
