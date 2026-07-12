@@ -1,0 +1,580 @@
+import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { api, setToken, getToken } from './api';
+import { Button } from './components/ui';
+import { ThemeProvider, ThemeToggle } from './theme';
+import Dashboard from './pages/Dashboard';
+import SignalWorkbench from './pages/SignalWorkbench';
+import SignalDetail from './pages/SignalDetail';
+import Evidence from './pages/Evidence';
+import Lenses from './pages/Lenses';
+import SourcesHub from './pages/SourcesHub';
+import DiscoveryHub from './pages/DiscoveryHub';
+import Forge from './pages/Forge';
+import Projects from './pages/Projects';
+import Login from './pages/Login';
+import { ProjectProvider, ProjectSelector } from './projectContext';
+
+export const RefreshContext = createContext({
+  tick: 0,
+  bump: () => {},
+  lastIngest: null,
+  recordIngest: () => {},
+});
+export const useRefresh = () => useContext(RefreshContext);
+
+// ⌘K — hubs + legacy deep-links (old paths redirect into hub tabs)
+const CMD_ITEMS = [
+  { label: 'Dashboard · corpus metrics', icon: '📊', path: '/' },
+  { label: 'Dashboard · ops KPIs', icon: '📈', path: '/?tab=ops' },
+  { label: 'Safety Signals · detect', icon: '🚨', path: '/signals' },
+  { label: 'Safety Signals · workflow', icon: '📋', path: '/signals?tab=lifecycle' },
+  { label: 'Safety Signals · alert inbox', icon: '🔔', path: '/signals?tab=alerts' },
+  { label: 'Analytic Lenses', icon: '◈', path: '/lenses' },
+  { label: 'Lenses · SMQ', icon: '◈', path: '/lenses?tab=smq' },
+  { label: 'Lenses · class effects', icon: '⚗', path: '/lenses?tab=class' },
+  { label: 'Lenses · vaccine', icon: '💉', path: '/lenses?tab=vaccine' },
+  { label: 'Lenses · geo clusters', icon: '📍', path: '/lenses?tab=spatial' },
+  { label: 'Lenses · vs FAERS', icon: '📉', path: '/lenses?tab=divergence' },
+  { label: 'Evidence · drug ↔ AE graph', icon: '🕸', path: '/graph' },
+  { label: 'Evidence · compare story', icon: '📖', path: '/graph?tab=story' },
+  { label: 'Projects', icon: '📁', path: '/projects' },
+  { label: 'Source Discovery', icon: '🔗', path: '/source-queue' },
+  { label: 'Source Discovery · manual URL', icon: '🔍', path: '/source-queue?tab=manual' },
+  { label: 'Data Sources · catalog', icon: '🌐', path: '/sources' },
+  { label: 'Data Sources · live stream', icon: '📡', path: '/sources?tab=live' },
+  { label: 'Data Sources · networks', icon: '🛰', path: '/sources?tab=networks' },
+  { label: 'Data Sources · agent chat', icon: '🎛', path: '/sources?tab=agent' },
+  { label: 'Data Forge (Synthetic)', icon: '⚗', path: '/forge' },
+];
+
+function CommandPalette({ onClose }) {
+  const [q, setQ] = useState('');
+  const nav = useNavigate();
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const filtered = q.trim()
+    ? CMD_ITEMS.filter((i) => i.label.toLowerCase().includes(q.toLowerCase()))
+    : CMD_ITEMS;
+
+  const go = (path) => { nav(path); onClose(); };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 px-4"
+         style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(4px)' }}
+         onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-lg rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-2xl overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--app-border)]">
+          <span className="text-[var(--app-text-muted)] text-sm">⌘</span>
+          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') onClose();
+              if (e.key === 'Enter' && filtered.length > 0) go(filtered[0].path);
+            }}
+            placeholder="Go to page… (type to filter)"
+            className="flex-1 bg-transparent text-[var(--app-text)] text-sm outline-none placeholder:text-[var(--app-text-faint)]" />
+          <kbd className="text-[10px] text-[var(--app-text-faint)] border border-[var(--app-border)] rounded px-1">ESC</kbd>
+        </div>
+        <div className="max-h-80 overflow-y-auto py-1">
+          {filtered.length === 0 && (
+            <div className="px-4 py-3 text-xs text-[var(--app-text-muted)]">No pages match "{q}"</div>
+          )}
+          {filtered.map((item) => (
+            <button key={item.path} type="button" onClick={() => go(item.path)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] transition-colors text-left">
+              <span className="text-base">{item.icon}</span>
+              {item.label}
+              <span className="ml-auto text-[10px] font-mono text-[var(--app-text-faint)]">{item.path}</span>
+            </button>
+          ))}
+        </div>
+        <div className="px-4 py-2 border-t border-[var(--app-border)] flex items-center gap-4 text-[10px] text-[var(--app-text-faint)]">
+          <span>↵ open</span><span>↑↓ navigate</span><span>ESC close</span>
+          <span className="ml-auto">Press <kbd className="border border-slate-700 rounded px-1">⌘K</kbd> / <kbd className="border border-slate-700 rounded px-1">Ctrl+K</kbd> to toggle</span>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+export const AuthContext = createContext({ user: null, login: () => {}, logout: () => {} });
+export const useAuth = () => useContext(AuthContext);
+
+/** One sidebar item per feature family — related views live as tabs inside. */
+const NAV_SECTIONS = [
+  {
+    title: 'Core',
+    items: [
+      { to: '/', label: 'Dashboard', icon: '◧', end: true },
+      { to: '/signals', label: 'Safety Signals', icon: '⚠' },
+      { to: '/lenses', label: 'Analytic Lenses', icon: '◈' },
+      { to: '/graph', label: 'Evidence Explorer', icon: '⬡' },
+    ],
+  },
+  {
+    title: 'Workspace',
+    items: [
+      { to: '/projects', label: 'Projects', icon: '📁' },
+      { to: '/source-queue', label: 'Source Discovery', icon: '🔗' },
+      { to: '/sources', label: 'Data Sources', icon: '⛓' },
+      { to: '/forge', label: 'Data Forge', icon: '⚗' },
+    ],
+  },
+];
+
+function Sidebar({ health, open, onNavigate }) {
+  return (
+    <aside className={`app-sidebar shrink-0 border-r backdrop-blur flex flex-col ${open ? 'is-open' : ''}`}>
+      <div className="px-5 py-5 border-b border-[var(--app-border-accent)]">
+        <div className="flex items-center gap-2.5">
+          <div className="h-9 w-9 shrink-0 rounded-lg bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-900/40">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none">
+              <circle cx="12" cy="12" r="2.6" fill="#052e2b" />
+              <line x1="12" y1="9.4" x2="12" y2="4.5"   stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="12" y1="14.6" x2="12" y2="19.5" stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="9.65" y1="10.7" x2="5.4" y2="8.2"  stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="14.35" y1="13.3" x2="18.6" y2="15.8" stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="14.35" y1="10.7" x2="18.6" y2="8.2"  stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
+              <line x1="9.65" y1="13.3" x2="5.4" y2="15.8" stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="12"   cy="3.8"  r="1.4" fill="#052e2b" />
+              <circle cx="12"   cy="20.2" r="1.4" fill="#052e2b" />
+              <circle cx="4.6"  cy="7.6"  r="1.4" fill="#052e2b" />
+              <circle cx="19.4" cy="16.4" r="1.4" fill="#052e2b" />
+              <circle cx="19.4" cy="7.6"  r="1.4" fill="#052e2b" />
+              <circle cx="4.6"  cy="16.4" r="1.4" fill="#052e2b" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="font-bold text-[var(--app-text)] leading-tight tracking-wide truncate">VigilAI</div>
+            <div className="text-[10px] text-[var(--app-accent)] leading-tight uppercase tracking-widest opacity-90 truncate">Pharmacovigilance</div>
+          </div>
+        </div>
+      </div>
+      <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.title}>
+            <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--app-text-faint)]">
+              {section.title}
+            </div>
+            <div className="space-y-0.5">
+              {section.items.map((n) => (
+                <NavLink
+                  key={n.to}
+                  to={n.to}
+                  end={n.end}
+                  onClick={() => onNavigate?.()}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition border ${
+                      isActive
+                        ? 'app-nav-link-active font-medium'
+                        : 'app-nav-link border-transparent'
+                    }`}
+                >
+                  <span className="w-4 text-center shrink-0">{n.icon}</span>
+                  <span className="truncate">{n.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+      <div className="px-4 py-3 border-t border-[var(--app-border)] text-[11px] text-[var(--app-text-muted)]">
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full shrink-0 ${health ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+          {health ? 'Backend online' : 'Backend offline'}
+        </div>
+        <div className="mt-1 break-words">
+          LLM: <span className={health?.llm?.backend && health.llm.backend !== 'deterministic' ? 'text-emerald-400/80' : 'text-slate-500'}>
+            {health?.llm?.backend || (health?.llm?.ollama ? 'ollama' : 'offline')}
+          </span>
+          {' · '}NER: {health?.transformer_ner ? 'transformer' : 'lexicon'}
+        </div>
+        <div className="mt-1.5 text-[10px] text-[var(--app-text-faint)] leading-snug">
+          Related views are tabs inside each page · ⌘K for deep links
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// `fast: true` = included in "Select all". Slow sources (Reddit/YouTube) are opt-in only —
+// selecting every source used to recompute the full corpus after EACH crawl (15+ min).
+const INGEST_SOURCES = [
+  { id: 'google_news',  label: 'Google News',             icon: '📰', fast: true,  fn: (opts) => api.crawlGoogleNews(undefined, opts),                         note: '5 PV queries · works on work networks' },
+  { id: 'life_science', label: 'Life-science news',       icon: '🧬', fast: true,  fn: (opts) => api.crawlLifeScience(undefined, 50, opts),                    note: 'ScienceDaily · STAT · Nature Med · WHO · FiercePharma' },
+  { id: 'hackernews',   label: 'HackerNews',              icon: '🔶', fast: true,  fn: (opts) => api.crawlHackerNews(undefined, 30, opts),                     note: 'Drug safety discussions — Algolia, no key' },
+  { id: 'fda_rss',      label: 'FDA alerts + recalls',    icon: '🚨', fast: true,  fn: (opts) => api.crawlFdaRss(undefined, opts),                             note: 'MedWatch · recalls · press releases' },
+  { id: 'faers_live',   label: 'FDA FAERS reports',       icon: '🏥', fast: true,  fn: (opts) => api.crawlFaersLive(30, 90, opts),                             note: 'Live serious AE reports from openFDA' },
+  { id: 'pubmed',       label: 'PubMed literature',       icon: '🔬', fast: true,  fn: (opts) => api.crawlPubmedLive(undefined, 20, opts),                     note: 'PV / drug safety articles via NCBI' },
+  { id: 'dailymed',     label: 'DailyMed labels',         icon: '💊', fast: true,  fn: (opts) => api.crawlDailymedRss(40, opts),                               note: 'New & revised drug labels from NLM' },
+  { id: 'mhra',         label: 'MHRA device alerts (UK)', icon: '🇬🇧', fast: true,  fn: (opts) => api.crawlMhraDevices(40, opts),                                note: 'Field Safety Notices + device alerts — gov.uk' },
+  { id: 'maude',        label: 'MAUDE live (device MDRs)', icon: '🩺', fast: true,  fn: (opts) => api.crawlMaudeLive(30, opts),                                  note: 'Real FDA device adverse event reports' },
+  { id: 'stream',       label: 'Synthetic batch',         icon: '▶',  fast: true,  fn: () => api.streamTick(4, false),                                        note: 'Demo only' },
+  { id: 'youtube',      label: 'YouTube videos + comments', icon: '📺', fast: false, fn: (opts) => api.crawlYoutube(undefined, 20, opts),                       note: 'SLOWER · titles/descriptions + comments · needs API key' },
+  { id: 'twitter',      label: 'X / Twitter',             icon: '🐦', fast: false, fn: (opts) => api.crawlTwitter(undefined, opts),                           note: 'SLOWER · live — key configured' },
+  { id: 'reddit_pp',    label: 'Reddit (Pullpush)',       icon: '🔴', fast: false, fn: (opts) => api.crawlRedditPullpush(undefined, opts),                    note: '~1–2 min · 29 subs via mirror — demo carefully' },
+  { id: 'reddit',       label: 'Reddit (direct)',         icon: '🔴', fast: false, fn: (opts) => api.crawlRedditHealth('drug adverse reaction', opts),         note: 'SLOWER · may be blocked on corporate networks' },
+];
+const FAST_SOURCE_IDS = INGEST_SOURCES.filter((s) => s.fast).map((s) => s.id);
+
+function DemoBar({ onAction }) {
+  const { lastIngest } = useRefresh();
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(['google_news', 'life_science', 'faers_live']);
+  const [running, setRunning] = useState(false);
+  const [results, setResults] = useState({});
+  const [seeding, setSeeding] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const btnRef = useRef(null);
+  const panelRef = useRef(null);
+  const [dropPos, setDropPos] = useState({ top: 0, right: 0 });
+
+  const openDrop = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setDropPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+    }
+    setOpen((o) => !o);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => {
+      const inBtn = btnRef.current && btnRef.current.contains(e.target);
+      const inPanel = panelRef.current && panelRef.current.contains(e.target);
+      if (!inBtn && !inPanel) setOpen(false);
+    };
+    // Use mousedown so we can intercept before click fires on the label
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  const toggle = (id) => setSelected((prev) =>
+    prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  );
+
+  const runSelected = async () => {
+    if (!selected.length) return;
+    setRunning(true);
+    setOpen(false);
+    setResults({});
+    const srcs = INGEST_SOURCES.filter((s) => selected.includes(s.id));
+    // Skip corpus recompute on every source — one pass at the end (was causing 15+ min hangs).
+    for (const s of srcs) {
+      try {
+        const r = await s.fn({ recompute: false });
+        setResults((prev) => ({ ...prev, [s.id]: { ok: true, ingested: r?.ingested ?? 0, fetched: r?.fetched ?? r?.unique_fetched ?? 0 } }));
+      } catch (err) {
+        const msg = err?.message || err?.detail || String(err);
+        setResults((prev) => ({ ...prev, [s.id]: { ok: false, error: msg } }));
+      }
+    }
+    try {
+      await api.recompute();
+    } catch { /* dashboard still refreshes with newly ingested posts */ }
+    onAction();
+    setRunning(false);
+  };
+
+  const totalIngested = Object.values(results).reduce((s, r) => s + (r.ingested || 0), 0)
+    + (lastIngest?.ingested && lastIngest.source === 'pathfinder' ? lastIngest.ingested : 0);
+  const anyResult = Object.keys(results).length > 0 || (lastIngest?.ingested > 0);
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap justify-end">
+      {/* Multi-source picker — portal so dropdown doesn't overlap page content */}
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={openDrop}
+        disabled={running}
+        className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border border-sky-700 bg-sky-900/20 text-sky-300 hover:bg-sky-800/30 disabled:opacity-50 transition-colors"
+      >
+        <span>📡 Sources</span>
+        <span className="bg-sky-700 text-white rounded-full px-1.5 text-[10px]">{selected.length}</span>
+        <span className="text-[10px]">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', top: dropPos.top, right: dropPos.right, zIndex: 9999 }}
+          className="w-[min(16rem,calc(100vw-1.5rem))] max-h-[min(70vh,28rem)] overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-2 space-y-0.5"
+        >
+          <div className="flex items-center justify-between px-2 py-1">
+            <span className="text-[10px] uppercase tracking-wide text-slate-500">Select sources</span>
+            <button type="button"
+              className="text-[10px] text-sky-400 hover:text-sky-300"
+              onClick={() => setSelected(
+                FAST_SOURCE_IDS.every((id) => selected.includes(id))
+                  ? []
+                  : [...FAST_SOURCE_IDS]
+              )}>
+              {FAST_SOURCE_IDS.every((id) => selected.includes(id)) ? 'Clear all' : 'Select fast'}
+            </button>
+          </div>
+          {INGEST_SOURCES.map((s) => {
+            const checked = selected.includes(s.id);
+            const res = results[s.id];
+            return (
+              <label key={s.id}
+                className={`flex items-start gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-sky-900/30' : 'hover:bg-slate-800'}`}>
+                <input type="checkbox" checked={checked} onChange={() => toggle(s.id)}
+                       className="mt-0.5 accent-sky-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-200">{s.icon} {s.label}</div>
+                  <div className="text-[10px] text-slate-500 truncate">{s.note}</div>
+                </div>
+                {res && (
+                  <span
+                    title={res.ok ? undefined : (res.error || 'Ingest failed')}
+                    className={`text-[10px] shrink-0 ${res.ok ? 'text-emerald-400' : 'text-rose-400'}`}
+                  >
+                    {res.ok ? `+${res.ingested}` : '✗'}
+                  </span>
+                )}
+              </label>
+            );
+          })}
+          {lastIngest?.source === 'pathfinder' && lastIngest.ingested > 0 && (
+            <div className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-teal-900/20 border border-teal-800/40 mt-1">
+              <span className="text-xs text-teal-200">🔗 Pathfinder</span>
+              <span className="ml-auto text-[10px] text-emerald-400 shrink-0">
+                +{lastIngest.ingested}
+                {lastIngest.signals != null && (
+                  <span className="text-slate-500 ml-1">· {lastIngest.signals} signals</span>
+                )}
+              </span>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Run button */}
+      <button
+        type="button"
+        onClick={runSelected}
+        disabled={running || !selected.length}
+        className="text-xs rounded-lg px-3 py-1.5 border border-emerald-700 bg-emerald-900/20 text-emerald-300 hover:bg-emerald-800/30 disabled:opacity-40 font-medium transition-colors"
+      >
+        {running ? <span className="animate-pulse">Ingesting…</span> : '▶ Fetch'}
+      </button>
+
+      {anyResult && !running && (
+        <span className="text-[11px] text-emerald-400" title={lastIngest?.url || ''}>
+          +{totalIngested} new
+          {lastIngest?.source === 'pathfinder' && lastIngest.signals != null && (
+            <span className="text-slate-500"> · {lastIngest.signals} signals</span>
+          )}
+        </span>
+      )}
+
+      {/* Demo corpus */}
+      <Button variant="ghost" disabled={running || seeding || resetting}
+              onClick={async () => { setSeeding(true); await api.seed(21); onAction(); setSeeding(false); }}>
+        {seeding ? 'Seeding…' : 'Demo corpus'}
+      </Button>
+
+      {/* Reset */}
+      <Button variant="danger" disabled={running || seeding || resetting}
+              onClick={async () => { setResetting(true); await api.reset(); onAction(); setResetting(false); }}>
+        {resetting ? 'Resetting…' : 'Reset'}
+      </Button>
+    </div>
+  );
+}
+
+function UserMenu() {
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const panelRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+    }
+    setOpen((o) => !o);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => {
+      const inBtn = btnRef.current && btnRef.current.contains(e.target);
+      const inPanel = panelRef.current && panelRef.current.contains(e.target);
+      if (!inBtn && !inPanel) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  if (!user) {
+    return <NavLink to="/login" className="text-xs rounded-lg px-3 py-1.5 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700">Sign in</NavLink>;
+  }
+  return (
+    <>
+      <button ref={btnRef} onClick={toggle} className="flex items-center gap-2 text-xs text-slate-300">
+        <span className="h-7 w-7 rounded-full bg-gradient-to-br from-sky-500 to-violet-600 flex items-center justify-center text-white font-bold">
+          {(user.email || '?')[0].toUpperCase()}
+        </span>
+        <span className="hidden md:block">{user.role}</span>
+      </button>
+      {open && typeof document !== 'undefined' && createPortal(
+        <div ref={panelRef} style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
+          className="w-52 rounded-lg border border-slate-700 bg-slate-900 shadow-2xl p-2 text-xs">
+          <div className="px-2 py-1 text-slate-400 truncate">{user.email}</div>
+          <div className="px-2 py-1 text-teal-400 capitalize font-semibold">{user.role}</div>
+          <hr className="border-slate-700 my-1"/>
+          <button onClick={() => { setOpen(false); logout(); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800 text-rose-300">Sign out</button>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+export default function App() {
+  const [health, setHealth] = useState(null);
+  const [tick, setTick] = useState(0);
+  const [lastIngest, setLastIngest] = useState(null);
+  const [user, setUser] = useState(null);
+  const bump = () => setTick((t) => t + 1);
+  const recordIngest = (info) => {
+    if (info) setLastIngest(info);
+    bump();
+  };
+
+  useEffect(() => {
+    api.health().then(setHealth).catch(() => setHealth(null));
+  }, [tick]);
+
+  useEffect(() => {
+    if (getToken()) api.me().then(setUser).catch(() => { setToken(''); setUser(null); });
+  }, []);
+
+  const login = (token, u) => { setToken(token); setUser(u); };
+  const logout = () => {
+    localStorage.removeItem('vigilai_token');
+    setToken('');
+    setUser(null);
+    window.location.replace('/');
+  };
+
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const openCmd = useCallback(() => setCmdOpen(true), []);
+  const closeCmd = useCallback(() => setCmdOpen(false), []);
+  const closeNav = useCallback(() => setNavOpen(false), []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdOpen((o) => !o); }
+      if (e.key === 'Escape') { setCmdOpen(false); setNavOpen(false); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth > 1200) setNavOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  return (
+    <ThemeProvider>
+    <AuthContext.Provider value={{ user, login, logout }}>
+      <ProjectProvider>
+      <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
+        {cmdOpen && <CommandPalette onClose={closeCmd} />}
+        <div className="app-shell">
+          {navOpen && (
+            <button
+              type="button"
+              aria-label="Close navigation"
+              className="app-sidebar-backdrop"
+              onClick={closeNav}
+            />
+          )}
+          <Sidebar health={health} open={navOpen} onNavigate={closeNav} />
+          <div className="app-main-column">
+            <header className="app-header flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 sm:px-4 md:px-6 py-2.5 md:py-3 border-b backdrop-blur">
+              <div className="min-w-0 flex items-center gap-2 sm:gap-3 flex-1">
+                <button
+                  type="button"
+                  aria-label="Open navigation"
+                  aria-expanded={navOpen}
+                  onClick={() => setNavOpen((o) => !o)}
+                  className="app-nav-toggle shrink-0 rounded-lg border border-[var(--app-border)] px-2.5 py-1.5 text-sm text-[var(--app-text-muted)] hover:bg-[var(--app-surface-hover)]"
+                >
+                  ☰
+                </button>
+                <div className="min-w-0">
+                  <h1 className="app-header-title-full text-sm md:text-base lg:text-lg font-semibold text-[var(--app-text)] leading-tight truncate">
+                    Real-Time Social Listening for Patient Safety <span className="text-[var(--app-accent)] opacity-90">· Worldwide</span>
+                  </h1>
+                  <h1 className="app-header-title-short text-sm font-semibold text-[var(--app-text)] leading-tight">
+                    VigilAI <span className="text-[var(--app-accent)] opacity-90">· PV</span>
+                  </h1>
+                  <p className="hidden sm:block text-[11px] md:text-xs text-[var(--app-text-muted)] leading-tight truncate">
+                    Entities · disproportionality · WHO-UMC · MedDRA · knowledge graph · E2B
+                  </p>
+                </div>
+                <button type="button" onClick={openCmd}
+                  className="hidden lg:flex items-center gap-1.5 text-[11px] text-[var(--app-text-muted)] border border-[var(--app-border)] rounded-lg px-2.5 py-1 hover:text-[var(--app-text)] transition-colors shrink-0">
+                  <span>⌘K</span>
+                  <span className="text-[var(--app-text-faint)]">Quick nav</span>
+                </button>
+              </div>
+              <div className="app-header-actions">
+                <ProjectSelector />
+                <ThemeToggle />
+                <DemoBar onAction={bump} />
+                <UserMenu />
+              </div>
+            </header>
+            <main className="app-main-scroll">
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/signals" element={<SignalWorkbench />} />
+                <Route path="/signals/:id" element={<SignalDetail />} />
+                <Route path="/lenses" element={<Lenses />} />
+                <Route path="/graph" element={<Evidence />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/source-queue" element={<DiscoveryHub />} />
+                <Route path="/sources" element={<SourcesHub />} />
+                <Route path="/forge" element={<Forge />} />
+                <Route path="/login" element={<Login />} />
+                {/* Legacy paths → hub tabs (bookmarks / old demos keep working) */}
+                <Route path="/kpis" element={<Navigate to="/?tab=ops" replace />} />
+                <Route path="/lifecycle" element={<Navigate to="/signals?tab=lifecycle" replace />} />
+                <Route path="/alerts" element={<Navigate to="/signals?tab=alerts" replace />} />
+                <Route path="/smq" element={<Navigate to="/lenses?tab=smq" replace />} />
+                <Route path="/class-effects" element={<Navigate to="/lenses?tab=class" replace />} />
+                <Route path="/vaccine" element={<Navigate to="/lenses?tab=vaccine" replace />} />
+                <Route path="/spatial" element={<Navigate to="/lenses?tab=spatial" replace />} />
+                <Route path="/divergence" element={<Navigate to="/lenses?tab=divergence" replace />} />
+                <Route path="/story" element={<Navigate to="/graph?tab=story" replace />} />
+                <Route path="/feed" element={<Navigate to="/sources?tab=live" replace />} />
+                <Route path="/command" element={<Navigate to="/sources?tab=agent" replace />} />
+                <Route path="/onboarding" element={<Navigate to="/source-queue?tab=manual" replace />} />
+                <Route path="/surveillance" element={<Navigate to="/sources?tab=networks" replace />} />
+              </Routes>
+            </main>
+          </div>
+        </div>
+      </RefreshContext.Provider>
+      </ProjectProvider>
+    </AuthContext.Provider>
+    </ThemeProvider>
+  );
+}

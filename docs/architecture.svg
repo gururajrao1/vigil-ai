@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" font-family="Inter, Segoe UI, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="100%" stop-color="#111a33"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/>
+    </marker>
+    <style>
+      .t{fill:#e5e9f0;font-size:14px;font-weight:600;}
+      .s{fill:#94a3b8;font-size:11px;}
+      .lbl{fill:#cbd5e1;font-size:12px;font-weight:700;}
+      .edge{stroke:#64748b;stroke-width:1.5;fill:none;}
+    </style>
+  </defs>
+
+  <rect width="1120" height="640" fill="url(#bg)"/>
+  <text x="40" y="42" fill="#f1f5f9" font-size="24" font-weight="800">VigilAI &#8212; System Architecture (worldwide)</text>
+  <text x="40" y="66" class="s" font-size="13">Real-Time Social Listening for Patient Experience &amp; Safety Signals &#183; runs offline, zero API keys</text>
+
+  <!-- Sources -->
+  <rect x="40" y="100" width="230" height="90" rx="10" fill="#0f2036" stroke="#38bdf8"/>
+  <text x="60" y="128" class="lbl" fill="#7dd3fc">DATA SOURCES</text>
+  <text x="60" y="150" class="s">Reddit RSS (no key)</text>
+  <text x="60" y="166" class="s">Multi-region seed &#183; streaming sim</text>
+  <text x="60" y="182" class="s">(opt) Twitter &#183; Firecrawl</text>
+
+  <!-- Ingestion -->
+  <rect x="40" y="230" width="230" height="86" rx="10" fill="#131c33" stroke="#475569"/>
+  <text x="60" y="256" class="lbl">INGESTION (worldwide)</text>
+  <text x="60" y="276" class="s">detect language &#183; translate &#8594; EN</text>
+  <text x="60" y="292" class="s">multi-locale PII scrub (Presidio+regex)</text>
+  <text x="60" y="308" class="s">dedupe &#183; store</text>
+
+  <!-- NLP -->
+  <rect x="40" y="356" width="230" height="120" rx="10" fill="#131c33" stroke="#475569"/>
+  <text x="60" y="382" class="lbl">NLP ENGINE</text>
+  <text x="60" y="404" class="s">transformer + lexicon NER (drugs + devices)</text>
+  <text x="60" y="420" class="s">drug &#8594; generic/ATC &#183; device &#8594; GMDN/IMDRF</text>
+  <text x="60" y="436" class="s">symptom &#8594; MedDRA PT/SOC</text>
+  <text x="60" y="452" class="s">sentiment &#183; negation &#183; 4-gate AE</text>
+
+  <!-- Analytics trio -->
+  <rect x="340" y="120" width="240" height="80" rx="10" fill="#1a1230" stroke="#a78bfa"/>
+  <text x="360" y="144" class="lbl" fill="#c4b5fd">DISPROPORTIONALITY</text>
+  <text x="360" y="164" class="s">PRR &#183; ROR (+95% CI) &#183; &#967;&#178;</text>
+  <text x="360" y="180" class="s">EBGM &#183; IC025 &#183; SDR flag</text>
+  <text x="360" y="196" class="s">STRONG / MODERATE / WEAK</text>
+
+  <rect x="340" y="230" width="240" height="80" rx="10" fill="#2a1420" stroke="#fb7185"/>
+  <text x="360" y="258" class="lbl" fill="#fda4af">TREND / SPIKE</text>
+  <text x="360" y="280" class="s">daily buckets &#183; EWMA slope</text>
+  <text x="360" y="296" class="s">z-score spike detection</text>
+
+  <rect x="340" y="340" width="240" height="80" rx="10" fill="#12241f" stroke="#34d399"/>
+  <text x="360" y="368" class="lbl" fill="#6ee7b7">WHO-UMC CAUSALITY</text>
+  <text x="360" y="390" class="s">temporal &#183; dechallenge &#183; rechallenge</text>
+  <text x="360" y="406" class="s">Certain &#8230; Unlikely (+ LLM narrative)</text>
+
+  <!-- openFDA -->
+  <rect x="340" y="450" width="240" height="70" rx="10" fill="#131c33" stroke="#475569"/>
+  <text x="360" y="478" class="lbl">openFDA FAERS + MAUDE (no key)</text>
+  <text x="360" y="500" class="s">drug &amp; device report counts &#8594; confidence</text>
+
+  <!-- Signal store + KG -->
+  <rect x="650" y="200" width="220" height="120" rx="10" fill="#0f2036" stroke="#38bdf8"/>
+  <text x="670" y="228" class="lbl" fill="#7dd3fc">SIGNAL STORE</text>
+  <text x="670" y="250" class="s">signals &#183; alerts &#183; narrative</text>
+  <text x="670" y="272" class="lbl" fill="#7dd3fc">KNOWLEDGE GRAPH</text>
+  <text x="670" y="294" class="s">drug &#8596; symptom &#8596; condition</text>
+  <text x="670" y="310" class="s">degree-centrality hubs</text>
+
+  <!-- API -->
+  <rect x="650" y="360" width="220" height="60" rx="10" fill="#131c33" stroke="#475569"/>
+  <text x="670" y="388" class="lbl">REST API &#183; FastAPI + JWT</text>
+  <text x="670" y="408" class="s">/docs &#183; auth roles (admin/analyst/viewer)</text>
+
+  <!-- E2B -->
+  <rect x="650" y="450" width="220" height="60" rx="10" fill="#131c33" stroke="#475569"/>
+  <text x="670" y="478" class="lbl">ICH E2B (R2/R3) XML</text>
+  <text x="670" y="498" class="s">per-signal ICSR export</text>
+
+  <!-- Dashboard -->
+  <rect x="920" y="200" width="170" height="230" rx="10" fill="#0f2036" stroke="#38bdf8"/>
+  <text x="940" y="228" class="lbl" fill="#7dd3fc">REACT DASHBOARD</text>
+  <text x="940" y="252" class="s">Overview</text>
+  <text x="940" y="272" class="s">Safety Signals</text>
+  <text x="940" y="292" class="s">Knowledge Graph</text>
+  <text x="940" y="312" class="s">KPIs &#183; SPC &#183; Alerts</text>
+  <text x="940" y="332" class="s">Live Feed &#183; Data Forge</text>
+  <text x="940" y="352" class="s">Surveillance &#183; Onboarding</text>
+  <text x="940" y="378" class="s">Explainability +</text>
+  <text x="940" y="394" class="s">source traceability</text>
+
+  <!-- Agentic -->
+  <rect x="650" y="540" width="440" height="60" rx="10" fill="#1a1230" stroke="#a78bfa"/>
+  <text x="670" y="566" class="lbl" fill="#c4b5fd">AGENTIC (optional LLM &#183; Ollama)</text>
+  <text x="670" y="586" class="s">Forge: synthetic posts (scenario &#8594; write &#8594; judge &#8594; repair &#8594; score)  &#183;  forum onboarding</text>
+
+  <!-- edges -->
+  <path class="edge" d="M155,190 L155,230" marker-end="url(#arrow)"/>
+  <path class="edge" d="M155,316 L155,356" marker-end="url(#arrow)"/>
+  <path class="edge" d="M270,410 L340,160" marker-end="url(#arrow)"/>
+  <path class="edge" d="M270,415 L340,270" marker-end="url(#arrow)"/>
+  <path class="edge" d="M270,420 L340,380" marker-end="url(#arrow)"/>
+  <path class="edge" d="M580,160 L650,240" marker-end="url(#arrow)"/>
+  <path class="edge" d="M580,270 L650,260" marker-end="url(#arrow)"/>
+  <path class="edge" d="M580,380 L650,280" marker-end="url(#arrow)"/>
+  <path class="edge" d="M580,485 L650,300" marker-end="url(#arrow)"/>
+  <path class="edge" d="M760,320 L760,360" marker-end="url(#arrow)"/>
+  <path class="edge" d="M760,420 L760,450" marker-end="url(#arrow)"/>
+  <path class="edge" d="M870,300 L920,300" marker-end="url(#arrow)"/>
+</svg>

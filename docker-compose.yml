@@ -1,0 +1,90 @@
+version: "3.9"
+
+# VigilAI full-stack development environment.
+# Usage:
+#   docker-compose up --build        # build + start everything
+#   docker-compose up                # start with cached images
+#   docker-compose down -v           # stop + remove volumes
+#
+# Frontend: http://localhost:5173
+# Backend:  http://localhost:8000
+# API docs: http://localhost:8000/docs
+# SearXNG:  http://localhost:8080
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vigilai
+      POSTGRES_USER: vigilai
+      POSTGRES_PASSWORD: vigilai_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigilai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+    volumes:
+      - searxng_data:/etc/searxng
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://vigilai:vigilai_dev@db:5432/vigilai
+      USE_TRANSFORMER_NER: "false"
+      USE_PRESIDIO: "true"
+      USE_ONLINE_TRANSLATION: "true"
+      USE_LLM: "true"
+      JWT_SECRET: "local-dev-secret-change-in-prod"
+      SEED_ADMIN_EMAIL: "admin@vigilai.dev"
+      SEED_ADMIN_PASSWORD: "admin123"
+      PORT: "8000"
+      SEARXNG_BASE_URL: http://searxng:8080
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /app/.venv
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ""
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:
+  searxng_data:

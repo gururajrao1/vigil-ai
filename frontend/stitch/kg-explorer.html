@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VigilAI | Knowledge Graph Explorer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed": "#d8e3fb",
+                    "secondary-fixed": "#dae2fd",
+                    "on-primary-container": "#00423b",
+                    "secondary-fixed-dim": "#bec6e0",
+                    "outline-variant": "#3c4947",
+                    "tertiary-container": "#9aa5bb",
+                    "on-primary-fixed-variant": "#005048",
+                    "surface-container-high": "#1c2b3c",
+                    "primary-fixed": "#71f8e4",
+                    "inverse-surface": "#d4e4fa",
+                    "on-secondary-container": "#adb4ce",
+                    "secondary-container": "#3f465c",
+                    "surface-bright": "#2c3a4c",
+                    "surface": "#051424",
+                    "on-error-container": "#ffdad6",
+                    "inverse-primary": "#006b5f",
+                    "error-container": "#93000a",
+                    "on-tertiary-container": "#303b4e",
+                    "surface-variant": "#273647",
+                    "on-tertiary": "#263143",
+                    "on-primary-fixed": "#00201c",
+                    "on-surface": "#d4e4fa",
+                    "on-secondary": "#283044",
+                    "surface-container-lowest": "#010f1f",
+                    "surface-container-highest": "#273647",
+                    "primary-container": "#14b8a6",
+                    "on-secondary-fixed-variant": "#3f465c",
+                    "primary": "#4fdbc8",
+                    "error": "#ffb4ab",
+                    "primary-fixed-dim": "#4fdbc8",
+                    "outline": "#859490",
+                    "background": "#051424",
+                    "on-error": "#690005",
+                    "tertiary-fixed-dim": "#bcc7de",
+                    "on-tertiary-fixed-variant": "#3c475a",
+                    "on-primary": "#003731",
+                    "inverse-on-surface": "#233143",
+                    "on-tertiary-fixed": "#111c2d",
+                    "on-surface-variant": "#bbcac6",
+                    "surface-container": "#122131",
+                    "on-secondary-fixed": "#131b2e",
+                    "surface-dim": "#051424",
+                    "surface-tint": "#4fdbc8",
+                    "tertiary": "#bcc7de",
+                    "surface-container-low": "#0d1c2d",
+                    "secondary": "#bec6e0",
+                    "on-background": "#d4e4fa"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "container-padding": "24px",
+                    "section-gap": "32px",
+                    "gutter": "16px",
+                    "row-gap-dense": "8px",
+                    "max-width": "1600px"
+            },
+            "fontFamily": {
+                    "label-mono": ["JetBrains Mono"],
+                    "body-md": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "headline-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "label-mono": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "500"}],
+                    "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg": ["30px", {"lineHeight": "38px", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #051424;
+            color: #d4e4fa;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0d1c2d;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px;
+        }
+        .node-line {
+            stroke: #3c4947;
+            stroke-width: 1px;
+            stroke-dasharray: 4;
+        }
+        .glass-panel {
+            background: rgba(18, 33, 49, 0.8);
+            backdrop-filter: blur(8px);
+        }
+        /* Column organization for graph simulation */
+        .graph-col {
+            border-right: 1px dashed rgba(60, 73, 71, 0.5);
+            height: 100%;
+            position: relative;
+        }
+        .graph-col:last-child {
+            border-right: none;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="bg-surface-container dark:bg-surface-container text-primary dark:text-primary font-body-md text-body-md flex justify-between items-center px-gutter w-full h-16 sticky top-0 z-50 border-b border-outline-variant flat no shadows">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary">VigilAI</span>
+<div class="hidden md:flex items-center gap-6 ml-8">
+<span class="text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80 px-2 py-1">Safety Overview</span>
+<span class="text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80 px-2 py-1">Signal Detection</span>
+<span class="text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer">Knowledge Graph</span>
+<span class="text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-80 px-2 py-1">Case Narrative</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative flex items-center bg-surface-variant rounded px-3 py-1.5 w-64">
+<span class="material-symbols-outlined text-on-surface-variant text-sm mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-sm w-full outline-none text-on-surface" placeholder="Search signals..." type="text"/>
+</div>
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-2 rounded transition-colors">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-2 rounded transition-colors">help</span>
+<div class="h-8 w-8 rounded-full bg-secondary-container flex items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined text-on-secondary-container">account_circle</span>
+</div>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden">
+<!-- SideNavBar -->
+<aside class="bg-surface-container-low dark:bg-surface-container-low text-primary dark:text-primary font-label-caps text-label-caps h-screen w-64 sticky left-0 top-0 border-r border-outline-variant flex flex-col py-4">
+<div class="px-4 mb-8">
+<h2 class="font-headline-sm text-headline-sm font-semibold text-primary">VigilAI</h2>
+<p class="text-on-surface-variant font-label-caps text-[10px] tracking-widest">CLINICAL INTELLIGENCE</p>
+</div>
+<nav class="flex-1 space-y-1">
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant transition-all cursor-pointer">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Safety Overview</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant transition-all cursor-pointer">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Signal Detection</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container font-bold transition-all cursor-pointer">
+<span class="material-symbols-outlined">hub</span>
+<span>Knowledge Graph</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant transition-all cursor-pointer">
+<span class="material-symbols-outlined">description</span>
+<span>Case Narrative</span>
+</div>
+<div class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant transition-all cursor-pointer">
+<span class="material-symbols-outlined">assignment_late</span>
+<span>Risk Assessment</span>
+</div>
+</nav>
+<div class="mt-auto px-4 py-4 border-t border-outline-variant flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-sm">medical_services</span>
+</div>
+<div class="overflow-hidden">
+<p class="text-on-surface truncate font-bold">Analyst ID: 9921</p>
+<p class="text-on-surface-variant text-[10px] truncate">Role: Senior Lead PV</p>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col overflow-hidden relative">
+<!-- Header & Filters -->
+<div class="px-gutter py-4 border-b border-outline-variant bg-surface flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h1 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">hub</span>
+                        Knowledge Graph Explorer
+                    </h1>
+<div class="flex gap-2">
+<button class="bg-primary-container text-on-primary-container px-4 py-1.5 rounded text-body-sm font-bold flex items-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-sm">save</span>
+                            Export Report
+                        </button>
+</div>
+</div>
+<div class="flex flex-wrap gap-4 items-center">
+<div class="flex flex-col">
+<span class="text-[10px] font-label-caps text-on-surface-variant mb-1">DRUG FAMILY</span>
+<select class="bg-surface-container-high border border-outline-variant text-on-surface text-body-sm rounded px-3 py-1 outline-none focus:border-primary w-40 appearance-none">
+<option>TNF Inhibitors</option>
+<option>Anticoagulants</option>
+<option>NSAIDs</option>
+</select>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] font-label-caps text-on-surface-variant mb-1">AE CLASS (MedDRA)</span>
+<select class="bg-surface-container-high border border-outline-variant text-on-surface text-body-sm rounded px-3 py-1 outline-none focus:border-primary w-40 appearance-none">
+<option>Infections</option>
+<option>Cardiac Disorders</option>
+<option>Skin/Subcutaneous</option>
+</select>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] font-label-caps text-on-surface-variant mb-1">CONDITION</span>
+<select class="bg-surface-container-high border border-outline-variant text-on-surface text-body-sm rounded px-3 py-1 outline-none focus:border-primary w-40 appearance-none">
+<option>Rheumatoid Arthritis</option>
+<option>Psoriasis</option>
+</select>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] font-label-caps text-on-surface-variant mb-1">REGION</span>
+<select class="bg-surface-container-high border border-outline-variant text-on-surface text-body-sm rounded px-3 py-1 outline-none focus:border-primary w-40 appearance-none">
+<option>Global (All)</option>
+<option>North America</option>
+<option>European Union</option>
+</select>
+</div>
+<div class="ml-auto flex gap-2 self-end">
+<button class="bg-surface-variant border border-outline-variant text-on-surface px-3 py-1 rounded text-body-sm hover:bg-outline-variant transition-colors">Clear Filters</button>
+<button class="bg-primary text-on-primary px-4 py-1 rounded text-body-sm font-bold shadow-lg shadow-primary/10">Apply Analytics</button>
+</div>
+</div>
+</div>
+<!-- Briefing Card (Table of top paths) -->
+<div class="p-4">
+<div class="bg-surface-container-low border border-outline-variant rounded-lg p-3">
+<div class="flex items-center justify-between mb-3 px-1">
+<h3 class="font-label-caps text-label-caps text-primary tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                            HIGH-CONFIDENCE PATHWAY SUMMARY
+                        </h3>
+<span class="text-on-surface-variant text-[10px]">Data updated: 2024-10-27 14:02 UTC</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-body-sm">
+<thead>
+<tr class="border-b border-outline-variant text-on-surface-variant">
+<th class="py-2 px-3 font-semibold">Drug Entity</th>
+<th class="py-2 px-3 font-semibold">Adverse Event</th>
+<th class="py-2 px-3 font-semibold text-right">PRR</th>
+<th class="py-2 px-3 font-semibold text-center">Tier</th>
+<th class="py-2 px-3 font-semibold">Hotspot Regions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/30">
+<tr class="hover:bg-surface-variant/40 transition-colors">
+<td class="py-2 px-3 font-medium text-on-surface">Adalimumab</td>
+<td class="py-2 px-3 text-error">Pulmonary Tuberculosis</td>
+<td class="py-2 px-3 text-right font-label-mono">14.82</td>
+<td class="py-2 px-3 text-center">
+<span class="bg-error-container text-on-error-container text-[10px] px-1.5 py-0.5 rounded-sm font-bold">CRITICAL</span>
+</td>
+<td class="py-2 px-3 text-on-surface-variant">SEA, NAM, LAC</td>
+</tr>
+<tr class="hover:bg-surface-variant/40 transition-colors">
+<td class="py-2 px-3 font-medium text-on-surface">Etanercept</td>
+<td class="py-2 px-3 text-on-surface">Demyelinating CNS Disorder</td>
+<td class="py-2 px-3 text-right font-label-mono">5.12</td>
+<td class="py-2 px-3 text-center">
+<span class="bg-secondary-container text-on-secondary-container text-[10px] px-1.5 py-0.5 rounded-sm font-bold">SIGNAL</span>
+</td>
+<td class="py-2 px-3 text-on-surface-variant">EUR, ANZ</td>
+</tr>
+<tr class="hover:bg-surface-variant/40 transition-colors">
+<td class="py-2 px-3 font-medium text-on-surface">Infliximab</td>
+<td class="py-2 px-3 text-on-surface">Severe Hepatotoxicity</td>
+<td class="py-2 px-3 text-right font-label-mono">3.44</td>
+<td class="py-2 px-3 text-center">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] px-1.5 py-0.5 rounded-sm font-bold">MONITOR</span>
+</td>
+<td class="py-2 px-3 text-on-surface-variant">NAM, AFR</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Knowledge Graph Workspace -->
+<div class="flex-1 relative flex bg-surface-container-lowest mx-4 mb-4 rounded-xl border border-outline-variant overflow-hidden">
+<!-- Column Labels -->
+<div class="absolute top-0 inset-x-0 h-8 flex border-b border-outline-variant bg-surface-container-high/50 z-10 backdrop-blur-sm">
+<div class="flex-1 flex items-center justify-center text-[10px] font-label-caps text-on-surface-variant border-r border-outline-variant">DRUGS</div>
+<div class="flex-1 flex items-center justify-center text-[10px] font-label-caps text-on-surface-variant border-r border-outline-variant">TARGETS</div>
+<div class="flex-1 flex items-center justify-center text-[10px] font-label-caps text-on-surface-variant border-r border-outline-variant">CONDITIONS</div>
+<div class="flex-1 flex items-center justify-center text-[10px] font-label-caps text-on-surface-variant border-r border-outline-variant">ADVERSE EVENTS</div>
+<div class="flex-1 flex items-center justify-center text-[10px] font-label-caps text-on-surface-variant">REGIONS</div>
+</div>
+<!-- Graph Columns Representation -->
+<div class="flex-1 grid grid-cols-5 h-full pt-8">
+<!-- Column: Drugs -->
+<div class="graph-col flex flex-col items-center justify-center gap-12 p-4">
+<div class="w-10 h-10 rounded bg-primary/20 border border-primary flex items-center justify-center shadow-[0_0_8px_rgba(79,219,200,0.2)] cursor-pointer group hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-primary text-xl">medication</span>
+<span class="absolute -bottom-6 text-[10px] text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">ADALIMUMAB</span>
+</div>
+<div class="w-10 h-10 rounded bg-surface-container-high border border-outline flex items-center justify-center cursor-pointer group hover:border-primary hover:scale-110 transition-all">
+<span class="material-symbols-outlined text-outline text-xl group-hover:text-primary">medication</span>
+<span class="absolute -bottom-6 text-[10px] text-on-surface-variant whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">ETANERCEPT</span>
+</div>
+<div class="w-10 h-10 rounded bg-surface-container-high border border-outline flex items-center justify-center cursor-pointer group hover:border-primary hover:scale-110 transition-all">
+<span class="material-symbols-outlined text-outline text-xl group-hover:text-primary">medication</span>
+</div>
+</div>
+<!-- Column: Targets -->
+<div class="graph-col flex flex-col items-center justify-around p-4">
+<div class="w-8 h-8 rounded-full border border-secondary bg-secondary/10 flex items-center justify-center cursor-pointer group hover:bg-secondary/30 transition-all">
+<span class="material-symbols-outlined text-secondary text-sm">biotech</span>
+<span class="absolute -bottom-6 text-[10px] text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100">TNF-α</span>
+</div>
+<div class="w-8 h-8 rounded-full border border-secondary bg-secondary/10 flex items-center justify-center cursor-pointer group">
+<span class="material-symbols-outlined text-secondary text-sm">biotech</span>
+</div>
+</div>
+<!-- Column: Conditions -->
+<div class="graph-col flex flex-col items-center justify-center gap-16 p-4">
+<div class="px-3 py-1.5 rounded border border-tertiary-container bg-tertiary-container/10 text-on-surface text-[11px] font-medium cursor-pointer hover:border-primary transition-all">
+                            Rheumatoid Arthritis
+                        </div>
+<div class="px-3 py-1.5 rounded border border-tertiary-container bg-tertiary-container/10 text-on-surface text-[11px] font-medium cursor-pointer hover:border-primary transition-all">
+                            Psoriasis
+                        </div>
+</div>
+<!-- Column: AEs -->
+<div class="graph-col flex flex-col items-center justify-center gap-10 p-4">
+<div class="w-12 h-12 rounded bg-error/10 border border-error flex items-center justify-center shadow-[0_0_12px_rgba(255,180,171,0.2)] cursor-pointer group relative">
+<span class="material-symbols-outlined text-error">warning</span>
+<div class="absolute -right-32 bg-surface-container-highest border border-error px-2 py-1 rounded text-[10px] text-on-surface-variant pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                Pulmonary TB <br/> Signal Confidence: 0.94
+                            </div>
+</div>
+<div class="w-12 h-12 rounded bg-surface-container-high border border-outline-variant flex items-center justify-center cursor-pointer group">
+<span class="material-symbols-outlined text-on-surface-variant">emergency</span>
+</div>
+<div class="w-12 h-12 rounded bg-surface-container-high border border-outline-variant flex items-center justify-center cursor-pointer group">
+<span class="material-symbols-outlined text-on-surface-variant">emergency</span>
+</div>
+</div>
+<!-- Column: Regions -->
+<div class="graph-col flex flex-col items-center justify-around p-4">
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-on-surface-variant opacity-60">public</span>
+<span class="text-[9px] font-label-mono text-outline">NAM</span>
+</div>
+<div class="flex flex-col items-center gap-1 border-2 border-primary/40 p-2 rounded bg-primary/5">
+<span class="material-symbols-outlined text-primary">public</span>
+<span class="text-[9px] font-label-mono text-primary font-bold">EUR</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-on-surface-variant opacity-60">public</span>
+<span class="text-[9px] font-label-mono text-outline">SEA</span>
+</div>
+</div>
+</div>
+<!-- Pseudo SVG Connections (Canvas Overlay) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;">
+<!-- Highlighted Path: Drug -> Target -> Condition -> AE -->
+<path d="M 120 280 Q 200 280, 350 200" fill="none" stroke="#4fdbc8" stroke-opacity="0.6" stroke-width="2"></path>
+<path d="M 400 200 Q 500 200, 650 240" fill="none" stroke="#4fdbc8" stroke-opacity="0.6" stroke-width="2"></path>
+<path d="M 750 240 Q 850 240, 1000 300" fill="none" stroke="#ffb4ab" stroke-dasharray="6" stroke-opacity="0.8" stroke-width="3"></path>
+<path d="M 1120 300 Q 1200 300, 1300 350" fill="none" stroke="#4fdbc8" stroke-opacity="0.4" stroke-width="1.5"></path>
+</svg>
+<!-- Floating Toolbar -->
+<div class="absolute bottom-4 left-4 flex gap-2 bg-surface-container/90 backdrop-blur border border-outline-variant rounded p-1">
+<button class="p-1.5 hover:bg-surface-variant text-on-surface rounded"><span class="material-symbols-outlined text-sm">zoom_in</span></button>
+<button class="p-1.5 hover:bg-surface-variant text-on-surface rounded"><span class="material-symbols-outlined text-sm">zoom_out</span></button>
+<button class="p-1.5 hover:bg-surface-variant text-on-surface rounded"><span class="material-symbols-outlined text-sm">center_focus_strong</span></button>
+<div class="w-px h-4 bg-outline-variant my-auto"></div>
+<button class="p-1.5 hover:bg-surface-variant text-on-surface rounded"><span class="material-symbols-outlined text-sm">layers</span></button>
+</div>
+</div>
+</main>
+<!-- Right: Inspector Panel -->
+<aside class="w-80 bg-surface-container border-l border-outline-variant flex flex-col">
+<!-- Panel Header -->
+<div class="p-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-high/30">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant">ENTITY INSPECTOR</h2>
+<button class="text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined text-sm">close</span></button>
+</div>
+<!-- Selection State -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-6" id="inspector-content">
+<!-- Header Segment -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-2">
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded border border-primary/30 uppercase tracking-tighter">Drug Entity</span>
+<span class="text-[10px] font-label-mono text-outline">ID: RX-20993</span>
+</div>
+<h3 class="text-headline-sm font-bold text-on-surface leading-tight">Adalimumab</h3>
+<p class="text-body-sm text-on-surface-variant italic">Humira • TNF-α Inhibitor</p>
+</div>
+<!-- Metric Grid -->
+<div class="grid grid-cols-2 gap-2">
+<div class="bg-surface-container-low border border-outline-variant p-2 rounded">
+<span class="block text-[9px] font-label-caps text-outline mb-1">DEGREE</span>
+<span class="text-lg font-label-mono text-primary">24</span>
+</div>
+<div class="bg-surface-container-low border border-outline-variant p-2 rounded">
+<span class="block text-[9px] font-label-caps text-outline mb-1">AVG PRR</span>
+<span class="text-lg font-label-mono text-primary">8.42</span>
+</div>
+<div class="bg-surface-container-low border border-outline-variant p-2 rounded col-span-2">
+<span class="block text-[9px] font-label-caps text-outline mb-1">CONFIDENCE SCORE</span>
+<div class="flex items-center gap-3">
+<div class="flex-1 h-1.5 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 92%"></div>
+</div>
+<span class="text-sm font-label-mono text-primary">0.92</span>
+</div>
+</div>
+</div>
+<!-- Neighbor List -->
+<div class="flex flex-col gap-3">
+<h4 class="text-[10px] font-label-caps text-on-surface-variant tracking-widest border-b border-outline-variant pb-1">NEIGHBORS BY EDGE TYPE</h4>
+<!-- Edge Type: Mechanism -->
+<div class="flex flex-col gap-1">
+<button class="flex items-center justify-between py-1 text-xs text-on-surface-variant group">
+<span class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px]">link</span> Target (1)</span>
+<span class="material-symbols-outlined text-[14px] rotate-90">chevron_right</span>
+</button>
+<div class="bg-surface-variant/30 rounded p-2 flex items-center justify-between cursor-pointer hover:bg-surface-variant transition-colors border border-transparent hover:border-outline-variant">
+<span class="text-xs text-on-surface">TNF-α</span>
+<span class="text-[10px] text-outline px-1 bg-surface rounded">Molecular</span>
+</div>
+</div>
+<!-- Edge Type: Signal -->
+<div class="flex flex-col gap-1 mt-2">
+<button class="flex items-center justify-between py-1 text-xs text-on-surface-variant">
+<span class="flex items-center gap-2"><span class="material-symbols-outlined text-[14px] text-error">bolt</span> Adverse Events (12)</span>
+<span class="material-symbols-outlined text-[14px] rotate-90">chevron_right</span>
+</button>
+<div class="space-y-1">
+<div class="bg-surface-variant/30 rounded p-2 flex items-center justify-between cursor-pointer hover:bg-surface-variant border border-transparent hover:border-outline-variant">
+<div class="flex flex-col">
+<span class="text-xs text-error font-medium">Pulmonary Tuberculosis</span>
+<span class="text-[9px] text-outline">Confidence: 0.94</span>
+</div>
+<span class="material-symbols-outlined text-sm text-outline">arrow_forward</span>
+</div>
+<div class="bg-surface-variant/30 rounded p-2 flex items-center justify-between cursor-pointer hover:bg-surface-variant border border-transparent hover:border-outline-variant">
+<div class="flex flex-col">
+<span class="text-xs text-on-surface">Injection Site Rash</span>
+<span class="text-[9px] text-outline">Confidence: 0.88</span>
+</div>
+<span class="material-symbols-outlined text-sm text-outline">arrow_forward</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="mt-auto pt-4 flex flex-col gap-2">
+<button class="w-full bg-secondary-container text-on-secondary-container py-2 rounded text-body-sm font-bold flex items-center justify-center gap-2 hover:bg-secondary-container/80 transition-colors">
+<span class="material-symbols-outlined text-sm">my_location</span>
+                        Focus Neighborhood
+                    </button>
+<button class="w-full border border-outline-variant text-on-surface py-2 rounded text-body-sm flex items-center justify-center gap-2 hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-sm">history</span>
+                        View Audit Log
+                    </button>
+</div>
+</div>
+<!-- Empty State (Hidden by default in this mockup) -->
+<div class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center gap-4" id="inspector-empty">
+<span class="material-symbols-outlined text-6xl text-outline-variant">ads_click</span>
+<p class="text-on-surface-variant text-body-md">Select a node in the Knowledge Graph to begin deep clinical analysis.</p>
+</div>
+</aside>
+</div>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest text-primary dark:text-primary font-body-sm text-body-sm flex justify-between items-center px-gutter w-full py-2 mt-auto border-t border-outline-variant flat no shadows">
+<div class="flex items-center gap-4">
+<span class="font-label-caps text-label-caps text-outline">VigilAI SYSTEMS</span>
+<span class="text-on-surface-variant">© 2024 VigilAI Systems. Clinical Data Attribution: MedDRA v26.1</span>
+</div>
+<div class="flex gap-6 items-center">
+<a class="text-on-surface-variant hover:text-primary transition-opacity underline-offset-4 hover:underline" href="#">Data Privacy</a>
+<a class="text-on-surface-variant hover:text-primary transition-opacity underline-offset-4 hover:underline" href="#">Regulatory Compliance</a>
+<a class="text-on-surface-variant hover:text-primary transition-opacity underline-offset-4 hover:underline" href="#">Support</a>
+</div>
+</footer>
+<script>
+        // Micro-interaction for node selection
+        document.querySelectorAll('.graph-col > div').forEach(node => {
+            node.addEventListener('click', () => {
+                // Simplified mock behavior
+                document.querySelectorAll('.graph-col > div').forEach(n => n.classList.remove('border-primary', 'shadow-lg'));
+                node.classList.add('border-primary', 'shadow-lg');
+                
+                // Potential to swap between empty state and content if needed
+                // document.getElementById('inspector-empty').classList.add('hidden');
+                // document.getElementById('inspector-content').classList.remove('hidden');
+            });
+        });
+    </script>
+</body></html>

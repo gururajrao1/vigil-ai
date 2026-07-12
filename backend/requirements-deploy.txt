@@ -1,0 +1,35 @@
+# VigilAI production requirements — lean build without heavy ML models.
+# Torch / transformers / presidio are optional (app falls back to fast lexicon NLP).
+# Total install size: ~120 MB vs ~900 MB with ML stack.
+# To enable transformer NER in production, add torch + transformers and set
+# USE_TRANSFORMER_NER=true in your environment.
+
+# --- core ---
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlalchemy>=2.0
+pydantic>=2.6
+python-dotenv>=1.0
+scipy>=1.11
+networkx>=3.2
+vaderSentiment>=3.3.2
+feedparser>=6.0
+httpx>=0.27
+python-multipart>=0.0.9
+beautifulsoup4>=4.12
+rdflib>=7.0
+numpy>=1.26
+pypdf>=4.0
+reportlab>=4.0
+
+# --- auth ---
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3
+email-validator>=2.0
+
+# --- lightweight NLP (translation + language detection only) ---
+deep-translator>=1.11
+langdetect>=1.0.9
+
+# --- PostgreSQL (production database) ---
+psycopg2-binary>=2.9

@@ -1,0 +1,107 @@
+"""SQLAlchemy engine/session setup with additive schema migration.
+
+`init_db()` calls `create_all` (creates missing tables) then `migrate_schema`
+(adds any missing columns to existing tables). This means new model fields can
+be added in models.py without ever wiping the database. Data is always preserved.
+"""
+from __future__ import annotations
+
+import logging
+
+from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+from .config import settings
+
+logger = logging.getLogger("vigilai.database")
+
+_is_sqlite = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False, "timeout": 60} if _is_sqlite else {}
+
+engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
+
+if _is_sqlite:
+    @event.listens_for(engine, "connect")
+    def _sqlite_pragmas(dbapi_conn, _record):  # pragma: no cover
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=60000")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.close()
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+Base = declarative_base()
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def _col_default_ddl(col) -> str:
+    """Return a safe SQL DEFAULT clause for a column type."""
+    type_name = type(col.type).__name__.upper()
+    if "INT" in type_name:
+        return "DEFAULT 0"
+    if any(t in type_name for t in ("FLOAT", "NUMERIC", "REAL")):
+        return "DEFAULT 0.0"
+    if "BOOL" in type_name:
+        return "DEFAULT 0"
+    return "DEFAULT NULL"
+
+
+def migrate_schema() -> None:
+    """Add missing columns to existing tables — never drops or alters existing data.
+
+    Iterates over every SQLAlchemy-mapped table and column. For each column that
+    is defined in the model but absent from the live database schema, issues an
+    ALTER TABLE ADD COLUMN. Safe to run repeatedly (idempotent).
+    """
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue  # create_all handles genuinely new tables
+            existing_cols = {c["name"] for c in inspector.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in existing_cols:
+                    continue
+                try:
+                    default = _col_default_ddl(col)
+                    nullable = "" if col.nullable else ""  # keep nullable for ADD COLUMN compat
+                    ddl = f"ALTER TABLE {table.name} ADD COLUMN {col.name} {col.type} {default}"
+                    conn.execute(text(ddl))
+                    logger.info("migrate_schema: added column %s.%s", table.name, col.name)
+                except Exception as exc:
+                    # Column may already exist in a race; log and continue
+                    logger.debug("migrate_schema skip %s.%s: %s", table.name, col.name, exc)
+
+
+def checkpoint_wal() -> None:
+    """Force a full WAL checkpoint so pending writes are flushed into the main DB file.
+
+    Must be called before `create_all` / `migrate_schema` so schema operations
+    see a consistent view, and called on shutdown so no data sits only in the WAL.
+    Only meaningful for SQLite — no-op for PostgreSQL.
+    """
+    if not _is_sqlite:
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+        logger.info("WAL checkpoint complete")
+    except Exception as exc:
+        logger.warning("WAL checkpoint failed (non-fatal): %s", exc)
+
+
+def init_db() -> None:
+    from . import models  # noqa: F401  (ensure models are registered)
+
+    checkpoint_wal()                        # flush any pending WAL data first
+    Base.metadata.create_all(bind=engine)  # creates missing tables
+    migrate_schema()                        # adds missing columns to existing tables

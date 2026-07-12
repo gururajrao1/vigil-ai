@@ -1,0 +1,34 @@
+import { HubShell } from '../components/PageTabs';
+import Smq from './Smq';
+import ClassEffects from './ClassEffects';
+import Vaccine from './Vaccine';
+import Spatial from './Spatial';
+import Divergence from './Divergence';
+
+const TABS = [
+  { id: 'smq', label: 'SMQ syndromes' },
+  { id: 'class', label: 'Class effects' },
+  { id: 'vaccine', label: 'Vaccine' },
+  { id: 'spatial', label: 'Geo clusters' },
+  { id: 'divergence', label: 'vs FAERS' },
+];
+
+/** Analytic lenses that used to be five separate nav items. */
+export default function Lenses() {
+  return (
+    <HubShell
+      title="Analytic Lenses"
+      subtitle="Syndrome pooling, ATC class effects, vaccine AESI, geographic scan, and social↔FAERS divergence."
+      tabDefs={TABS}
+      defaultTab="smq"
+    >
+      {(tab) => {
+        if (tab === 'class') return <ClassEffects embedded />;
+        if (tab === 'vaccine') return <Vaccine embedded />;
+        if (tab === 'spatial') return <Spatial embedded />;
+        if (tab === 'divergence') return <Divergence embedded />;
+        return <Smq embedded />;
+      }}
+    </HubShell>
+  );
+}

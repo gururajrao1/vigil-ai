@@ -1,0 +1,148 @@
+{
+  "resourceType": "Bundle",
+  "id": "vigilai-test-bundle-001",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "AdverseEvent",
+        "id": "ae-001",
+        "status": "completed",
+        "actuality": "actual",
+        "event": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "62014003",
+              "display": "rhabdomyolysis"
+            }
+          ],
+          "text": "rhabdomyolysis"
+        },
+        "suspectEntity": [
+          {
+            "instance": {
+              "display": "simvastatin"
+            }
+          }
+        ],
+        "seriousness": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/adverse-event-seriousness",
+              "code": "hospitalization",
+              "display": "Hospitalization"
+            }
+          ]
+        },
+        "outcome": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/adverse-event-outcome",
+              "code": "resolvedWithSequelae",
+              "display": "Resolved with sequelae"
+            }
+          ]
+        },
+        "location": {
+          "display": "United States"
+        },
+        "recordedDate": "2024-03-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AdverseEvent",
+        "id": "ae-002",
+        "status": "completed",
+        "actuality": "actual",
+        "event": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "271807003",
+              "display": "angioedema"
+            }
+          ],
+          "text": "angioedema"
+        },
+        "suspectEntity": [
+          {
+            "instance": {
+              "display": "lisinopril"
+            }
+          }
+        ],
+        "seriousness": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/adverse-event-seriousness",
+              "code": "lifeThreatening",
+              "display": "Life threatening"
+            }
+          ]
+        },
+        "outcome": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/adverse-event-outcome",
+              "code": "resolved",
+              "display": "Resolved"
+            }
+          ]
+        },
+        "location": {
+          "display": "Germany"
+        },
+        "recordedDate": "2024-04-02"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AdverseEvent",
+        "id": "ae-003",
+        "status": "completed",
+        "actuality": "actual",
+        "event": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "418290006",
+              "display": "liver injury"
+            }
+          ],
+          "text": "liver injury"
+        },
+        "suspectEntity": [
+          {
+            "instance": {
+              "display": "amiodarone"
+            }
+          }
+        ],
+        "seriousness": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/adverse-event-seriousness",
+              "code": "hospitalization",
+              "display": "Hospitalization"
+            }
+          ]
+        },
+        "outcome": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/adverse-event-outcome",
+              "code": "notRecovered",
+              "display": "Not recovered"
+            }
+          ]
+        },
+        "location": {
+          "display": "United Kingdom"
+        },
+        "recordedDate": "2024-05-20"
+      }
+    }
+  ]
+}

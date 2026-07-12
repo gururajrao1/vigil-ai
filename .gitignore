@@ -1,0 +1,42 @@
+# Python
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+backend/vigilai.db
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+
+# Secrets — never commit
+**/.env
+**/.env.local
+**/.env.production
+**/audit_key.pem
+**/audit_key.pub
+**/*.pem
+
+# Runtime / local artifacts
+backend/uvicorn.out.log
+backend/uvicorn.out.log.err
+backend/uvicorn.log
+backend/uvicorn_*.log
+backend/*.log
+backend/smoke_out*.txt
+backend/_audit_posts.json
+backend/_audit_results.json
+backend/app/browser_profiles/**
+!backend/app/browser_profiles/.gitkeep
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Docker volumes
+postgres_data/

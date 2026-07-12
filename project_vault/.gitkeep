@@ -1,0 +1,3 @@
+# Place Playwright storage_state here as cookies.json for login-walled onboarding.
+# Generate once:
+#   playwright codegen --save-storage=project_vault/cookies.json <forum-url>
