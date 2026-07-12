@@ -480,7 +480,7 @@ Use this as **speaker notes** for a live walkthrough.
 
 ---
 
-## 16. Disclaimers (say these out loud)
+## 16. Disclaimers
 
 - Prototype / research UX — **not for clinical decision-making**  
 - Synthetic Forge data is **fictional**  
@@ -492,31 +492,6 @@ Use this as **speaker notes** for a live walkthrough.
 - VigiBase / Sentinel / NESTcc = **surrogate cards**, not ingested warehouses  
 
 ---
-
-## 17. Ready-made slide outline
-
-Copy this list into PowerPoint / Google Slides (1 slide each):
-
-1. Title — VigilAI: worldwide PV + device vigilance  
-2. Problem — late / rare AEs in the wild  
-3. Solution one-liner + scope (drugs · vaccines · devices)  
-4. Architecture diagram  
-5. Pipeline swimlane (ingest → gates → DMA → workflow)  
-6. Repo map (where code lives)  
-7. UI hubs overview  
-8. Safety Signals tour (Detect / Workflow / Alerts)  
-9. 4-gate AE explainability  
-10. Disproportionality toolkit (PRR · EB05 · IC025 · SDR)  
-11. Analytic lenses (5 cards)  
-12. Evidence graph + Story Mode  
-13. Data Sources: catalog · live · registry honesty  
-14. Workflow ownership vs Escalate webhook  
-15. Live demo path (10-minute script)  
-16. Run locally + credentials  
-17. Optional keys & offline-first rule  
-18. Limitations & disclaimers  
-19. KT checklist (next section)  
-20. Q&A / appendix — link to `docs/`
 
 ### KT checklist for a new engineer
 
@@ -530,18 +505,6 @@ Copy this list into PowerPoint / Google Slides (1 slide each):
 - [ ] Skim `docs/ARCHITECTURE.md` + `docs/DEMO_SCRIPT.md`
 
 ---
-
-## Further reading
-
-| Doc | When to open |
-|-----|----------------|
-| [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.md) | Full merged handbook |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design decisions & invariants |
-| [`docs/FEATURE_USAGE_GUIDE.md`](docs/FEATURE_USAGE_GUIDE.md) | Page-by-page how-to |
-| [`docs/FEATURES_BY_SOURCE.md`](docs/FEATURES_BY_SOURCE.md) | Lineage vs Algo-Pharma / SignalRx / PulseAI |
-| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | Timed presenter script |
-| [`docs/PRESENTER_GUIDE.md`](docs/PRESENTER_GUIDE.md) | Talking points |
-| [`docs/AGENTIC_PIPELINE.md`](docs/AGENTIC_PIPELINE.md) | Command / onboarding agents |
 
 ---
 
