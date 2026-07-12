@@ -5,6 +5,13 @@ Stack used for submissions:
 - **Backend:** Render free Web Service (Docker) — sleeps after ~15 min idle
 - **Database:** SQLite on the Render instance (ephemeral) **or** free Neon Postgres if you add `DATABASE_URL`
 
+## Empty dashboards after sleep?
+
+Render free wipes SQLite when the instance sleeps. With `AUTO_SEED_DEMO=true` (default in `render.yaml`), startup **auto-fills** empty workspaces (General PV + oncology + vaccine) in the background so Overview / Signals / Alerts are not zeros for demo visitors.
+
+- First open after sleep: wait ~1–2 min after health is OK while the corpus loads.
+- Optional true persistence: Neon `DATABASE_URL` (seed runs once, then keeps real ingested data).
+
 ## 1) Backend on Render (one-time clicks)
 
 1. Open: https://render.com/deploy?repo=https://github.com/gururajrao1/vigil-ai  
@@ -36,4 +43,4 @@ Then: header **Sources → Fetch** (or Data Sources) → Safety Signals.
 
 ## Demo tip
 
-Before presenting, open `https://YOUR-RENDER-URL/api/health` once so Render wakes up (cold start 30–60s).
+Before presenting, open `https://YOUR-RENDER-URL/api/health` once so Render wakes up (cold start 30–60s), then give the auto-seed ~1–2 minutes before walking a judge through the UI.

@@ -68,8 +68,13 @@ def ensure_projects(db: Session) -> Project:
 
     db.commit()
 
-    # Fill empty specialty workspaces in the background so startup stays fast.
-    threading.Thread(target=_fill_empty_specialty_async, daemon=True).start()
+    # Fill empty workspaces in the background so /api/health stays fast on cold start.
+    # Critical for Render free: ephemeral SQLite resets after sleep — without this,
+    # non-tech demo users land on zeros everywhere.
+    from ..config import settings
+
+    if settings.auto_seed_demo:
+        threading.Thread(target=_fill_empty_workspaces_async, daemon=True).start()
     return default  # type: ignore[return-value]
 
 
@@ -120,12 +125,19 @@ def fill_project_workspace(db: Session, project: Project, days: int = 21) -> dic
     return {"ingested": ingested, "area": area, **counts, **stats}
 
 
-def _fill_empty_specialty_async() -> None:
+def _fill_empty_workspaces_async() -> None:
+    """Seed any empty default workspace so dashboards are never blank after cold start.
+
+    Runs only when a workspace has zero posts (Neon/persistent DB → no-op after first fill).
+    ``general-pv`` is filled first (default UI project) and polished with ``prepare_demo``.
+    """
     from ..database import SessionLocal
+    from ..demo import prepare_demo
 
     db = SessionLocal()
     try:
-        for slug in ("oncology", "vaccine"):
+        # general-pv first so Overview/Signals/Alerts light up ASAP for visitors.
+        for slug in ("general-pv", "oncology", "vaccine"):
             project = db.query(Project).filter(Project.slug == slug, Project.is_active.is_(True)).first()
             if not project:
                 continue
@@ -134,7 +146,12 @@ def _fill_empty_specialty_async() -> None:
                 continue
             logger.info("Auto-filling empty project workspace: %s", slug)
             fill_project_workspace(db, project)
+            if slug == "general-pv":
+                try:
+                    prepare_demo(db)
+                except Exception:
+                    logger.exception("prepare_demo after general-pv auto-fill failed")
     except Exception:
-        logger.exception("Specialty project auto-fill failed")
+        logger.exception("Workspace auto-fill failed")
     finally:
         db.close()

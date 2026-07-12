@@ -314,14 +314,60 @@ def generate_corpus(days: int = 21, seed: int = 42) -> List[dict]:
             ae = roll < 0.82
             post = _make_post(idx, ts, rng, ae)
             if spike and ae and rng.random() < 0.6:
-                post["body"] = (
+                # Vary wording so content-hash dedupe does not collapse the hero
+                # Accutane→depression burst into a single post (which kills spike_flag).
+                region = rng.choice(["North America", "Europe", "Asia"])
+                variants = (
                     "Started Accutane for my acne and the depression hit me hard within days. "
-                    "Stopped it and things improved. Took it again and the depression came right back."
+                    "Stopped it and things improved. Took it again and the depression came right back.",
+                    "Week 2 on Accutane — mood crashed into depression. Dermatologist said hold the dose.",
+                    "Accutane made my depression worse than the acne ever was. Dechallenge helped in days.",
+                    "Positive rechallenge: Accutane → depression again after restart. Reporting this.",
+                    "On isotretinoin (Accutane) and spiraling into depression. Family noticed first.",
+                    "Accutane side effect diary day {n}: severe depression, can't focus at work.",
                 )
-                post["title"] = "Accutane and depression"
-                post["region"] = rng.choice(["North America", "Europe", "Asia"])
+                body = rng.choice(variants).format(n=idx % 14 + 1)
+                post["body"] = f"{body} [report #{idx}]"
+                post["title"] = rng.choice([
+                    "Accutane and depression",
+                    "Accutane mood crash",
+                    "Isotretinoin depression",
+                    "Stopping Accutane — depression",
+                ])
+                post["region"] = region
             posts.append(post)
             idx += 1
+
+    # Concentrated Accutane→depression burst on the most recent days so
+    # ``compute_trend`` flags spike_flag (z≥2 and last-day count≥3). Bodies must
+    # differ — identical text is collapsed by content-hash dedupe.
+    _spike_bodies = [
+        "Started Accutane for acne; depression hit hard within days. Stopped and improved.",
+        "Week 2 on Accutane — mood crashed into depression. Derm holding the dose.",
+        "Accutane made depression worse than the acne. Dechallenge helped quickly.",
+        "Positive rechallenge: restarted Accutane and depression returned same week.",
+        "On isotretinoin (Accutane) and spiraling into depression. Family noticed first.",
+        "Accutane side-effect diary: severe depression, cannot focus at work or school.",
+        "Isotretinoin triggered suicidal ideation / deep depression — ER visit last night.",
+        "Came off Accutane after depression flared; mood lifting already (positive dechallenge).",
+    ]
+    for i, body in enumerate(_spike_bodies):
+        day_offset = 1 if i < 6 else 2  # 6 on newest day, 2 on day before
+        day = now - timedelta(days=day_offset)
+        ts = day.replace(hour=8 + i, minute=(i * 7) % 60)
+        platform = _PLATFORMS[i % len(_PLATFORMS)]
+        posts.append({
+            "external_id": f"hero-accutane-{i}-{int(ts.timestamp())}",
+            "platform": platform,
+            "url": f"https://{_SUBS[platform]}/post/hero{i}",
+            "author": _hash_author(f"hero-accutane-{i}"),
+            "title": "Accutane and depression",
+            "body": f"{body} Case note {i + 1}.",
+            "lang": "en",
+            "posted_at": ts,
+            **_meta("Accutane", "North America", "United States"),
+        })
+        idx += 1
 
     # Deterministically inject pharmacogenomically-actionable AE pairs so the PGx
     # overlay reliably has genomically-explainable signals to surface in the demo.

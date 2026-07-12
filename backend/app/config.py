@@ -92,6 +92,10 @@ class Settings:
         self.jwt_expire_minutes: int = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
         self.seed_admin_email: str = os.getenv("SEED_ADMIN_EMAIL", "admin@vigilai.dev").strip()
         self.seed_admin_password: str = os.getenv("SEED_ADMIN_PASSWORD", "admin123").strip()
+        # When true, empty project workspaces are auto-filled with a synthetic demo
+        # corpus on startup (background). Keeps Render free cold-starts from showing
+        # zeros. Skips workspaces that already have posts (safe with Neon).
+        self.auto_seed_demo: bool = _b("AUTO_SEED_DEMO", "true")
 
         # Forge (synthetic data) knobs
         self.forge_quality_threshold: int = int(os.getenv("FORGE_QUALITY_THRESHOLD", "80"))
