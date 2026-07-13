@@ -176,17 +176,17 @@ export default function BiotechHomepagePage() {
     hero_manifesto: {
       ...layout.hero_manifesto,
       primary_cta: { label: loginLabel, href: loginHref, disabled: !apiReady },
-      // Guests should not get a free pass into /signals from the hero.
-      secondary_cta: user
-        ? layout.hero_manifesto?.secondary_cta
-        : { label: apiReady ? 'Login to continue' : 'Connecting…', href: loginHref, disabled: !apiReady },
+      // One Login CTA only — no duplicate secondary.
+      secondary_cta: null,
     },
-    cta_strip: {
-      ...(layout.cta_strip || {}),
-      buttons: user
-        ? (layout.cta_strip?.buttons || [])
-        : [{ label: apiReady ? 'Login' : 'Connecting…', href: loginHref, disabled: !apiReady }],
-    },
+    cta_strip: user
+      ? (layout.cta_strip || {})
+      : {
+          ...(layout.cta_strip || {}),
+          title: layout.cta_strip?.title || 'Ready when you are',
+          body: 'Sign in with your VigilAI account to open the pharmacovigilance workbench.',
+          buttons: [],
+        },
     // Hide mutating homepage actions until signed in as analyst+.
     actions: user ? (layout.actions || []) : [],
   };
