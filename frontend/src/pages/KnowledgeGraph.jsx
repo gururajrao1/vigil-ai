@@ -1149,16 +1149,11 @@ export default function KnowledgeGraph({ embedded = false }) {
                   onBackgroundClick={() => { setSelectedNodeId(null); setFocusNode(null); }}
                   onNodeDrag={(node) => { node.fx = node.x; node.fy = node.y; }}
                   onNodeDragEnd={(node) => { node.fx = node.__colX; node.fy = node.__seedY; }}
-                  linkDirectionalParticles={(l) => {
-                    if (!selectedNodeId) return 0;
-                    const s = typeof l.source === 'object' ? l.source.id : l.source;
-                    const t = typeof l.target === 'object' ? l.target.id : l.target;
-                    return (s === selectedNodeId || t === selectedNodeId) ? 2 : 0;
-                  }}
-                  linkDirectionalParticleWidth={2}
-                  cooldownTicks={80}
-                  d3AlphaDecay={0.06}
-                  d3VelocityDecay={0.5}
+                  linkDirectionalParticles={0}
+                  cooldownTicks={40}
+                  d3AlphaDecay={0.12}
+                  d3VelocityDecay={0.4}
+                  warmupTicks={20}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     const isSelected = node.id === selectedNodeId;
                     const isNeighbor = neighborIds.has(node.id);

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { api, setToken, getToken, wakeApi } from './api';
 import { Button } from './components/ui';
 import { ThemeProvider, ThemeToggle } from './theme';
@@ -14,6 +14,7 @@ import DiscoveryHub from './pages/DiscoveryHub';
 import Forge from './pages/Forge';
 import Projects from './pages/Projects';
 import Login from './pages/Login';
+import BiotechHomepagePage from './biotech/BiotechHomepagePage';
 import { ProjectProvider, ProjectSelector } from './projectContext';
 
 export const RefreshContext = createContext({
@@ -26,8 +27,9 @@ export const useRefresh = () => useContext(RefreshContext);
 
 // ⌘K — hubs + legacy deep-links (old paths redirect into hub tabs)
 const CMD_ITEMS = [
-  { label: 'Dashboard · corpus metrics', icon: '📊', path: '/' },
-  { label: 'Dashboard · ops KPIs', icon: '📈', path: '/?tab=ops' },
+  { label: 'Biotech homepage', icon: '◈', path: '/' },
+  { label: 'Dashboard · corpus metrics', icon: '📊', path: '/dashboard' },
+  { label: 'Dashboard · ops KPIs', icon: '📈', path: '/dashboard?tab=ops' },
   { label: 'Safety Signals · detect', icon: '🚨', path: '/signals' },
   { label: 'Safety Signals · workflow', icon: '📋', path: '/signals?tab=lifecycle' },
   { label: 'Safety Signals · alert inbox', icon: '🔔', path: '/signals?tab=alerts' },
@@ -66,7 +68,7 @@ function CommandPalette({ onClose }) {
     <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 px-4"
          style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(4px)' }}
          onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-lg rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-solid)] shadow-2xl overflow-hidden">
+      <div className="w-full max-w-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] overflow-hidden" style={{ borderRadius: 4 }}>
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--app-border)]">
           <span className="text-[var(--app-text-muted)] text-sm">⌘</span>
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)}
@@ -109,7 +111,8 @@ const NAV_SECTIONS = [
   {
     title: 'Core',
     items: [
-      { to: '/', label: 'Dashboard', icon: '◧', end: true },
+      { to: '/', label: 'Homepage', icon: '◈', end: true },
+      { to: '/dashboard', label: 'Dashboard', icon: '◧' },
       { to: '/signals', label: 'Safety Signals', icon: '⚠' },
       { to: '/lenses', label: 'Analytic Lenses', icon: '◈' },
       { to: '/graph', label: 'Evidence Explorer', icon: '⬡' },
@@ -128,36 +131,33 @@ const NAV_SECTIONS = [
 
 function Sidebar({ health, open, onNavigate }) {
   return (
-    <aside className={`app-sidebar shrink-0 border-r backdrop-blur flex flex-col ${open ? 'is-open' : ''}`}>
-      <div className="px-5 py-5 border-b border-[var(--app-border-accent)]">
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 shrink-0 rounded-lg bg-gradient-to-br from-teal-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-900/40">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none">
-              <circle cx="12" cy="12" r="2.6" fill="#052e2b" />
-              <line x1="12" y1="9.4" x2="12" y2="4.5"   stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
-              <line x1="12" y1="14.6" x2="12" y2="19.5" stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
-              <line x1="9.65" y1="10.7" x2="5.4" y2="8.2"  stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
-              <line x1="14.35" y1="13.3" x2="18.6" y2="15.8" stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
-              <line x1="14.35" y1="10.7" x2="18.6" y2="8.2"  stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
-              <line x1="9.65" y1="13.3" x2="5.4" y2="15.8" stroke="#052e2b" strokeWidth="1.5" strokeLinecap="round"/>
-              <circle cx="12"   cy="3.8"  r="1.4" fill="#052e2b" />
-              <circle cx="12"   cy="20.2" r="1.4" fill="#052e2b" />
-              <circle cx="4.6"  cy="7.6"  r="1.4" fill="#052e2b" />
-              <circle cx="19.4" cy="16.4" r="1.4" fill="#052e2b" />
-              <circle cx="19.4" cy="7.6"  r="1.4" fill="#052e2b" />
-              <circle cx="4.6"  cy="16.4" r="1.4" fill="#052e2b" />
-            </svg>
+    <aside className={`app-sidebar shrink-0 border-r flex flex-col ${open ? 'is-open' : ''}`}>
+      <div className="px-5 py-5 border-b border-[var(--app-border)]">
+        <div className="flex items-center gap-3">
+          <div
+            className="h-9 w-9 shrink-0 flex items-center justify-center border border-[var(--app-border)] bg-[var(--app-surface)] font-mono text-[10px] font-bold text-[var(--app-accent)] tracking-widest"
+            style={{ borderRadius: 4 }}
+            aria-hidden
+          >
+            VA
           </div>
           <div className="min-w-0">
-            <div className="font-bold text-[var(--app-text)] leading-tight tracking-wide truncate">VigilAI</div>
-            <div className="text-[10px] text-[var(--app-accent)] leading-tight uppercase tracking-widest opacity-90 truncate">Pharmacovigilance</div>
+            <div
+              className="font-extrabold text-[var(--app-text)] leading-tight truncate"
+              style={{ letterSpacing: '-0.04em' }}
+            >
+              VigilAI
+            </div>
+            <div className="text-[10px] text-[var(--app-text-muted)] leading-tight uppercase tracking-[0.12em] truncate font-mono">
+              Life Sciences
+            </div>
           </div>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
         {NAV_SECTIONS.map((section) => (
           <div key={section.title}>
-            <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--app-text-faint)]">
+            <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--app-text-faint)] font-mono">
               {section.title}
             </div>
             <div className="space-y-0.5">
@@ -168,13 +168,15 @@ function Sidebar({ health, open, onNavigate }) {
                   end={n.end}
                   onClick={() => onNavigate?.()}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition border ${
+                    `flex items-center gap-3 px-3 py-2 text-sm border ${
                       isActive
-                        ? 'app-nav-link-active font-medium'
+                        ? 'app-nav-link-active font-semibold'
                         : 'app-nav-link border-transparent'
-                    }`}
+                    }`
+                  }
+                  style={{ borderRadius: 4, letterSpacing: '-0.02em' }}
                 >
-                  <span className="w-4 text-center shrink-0">{n.icon}</span>
+                  <span className="w-4 text-center shrink-0 text-[var(--app-accent)] opacity-80">{n.icon}</span>
                   <span className="truncate">{n.label}</span>
                 </NavLink>
               ))}
@@ -183,18 +185,18 @@ function Sidebar({ health, open, onNavigate }) {
         ))}
       </nav>
       <div className="px-4 py-3 border-t border-[var(--app-border)] text-[11px] text-[var(--app-text-muted)]">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full shrink-0 ${health ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-          {health ? 'Backend online' : 'Backend offline'}
+        <div className="flex items-center gap-2 font-mono text-[10px] tracking-wide">
+          <span className={`h-1.5 w-1.5 shrink-0 ${health ? 'bg-[var(--app-accent)]' : 'bg-rose-400'}`} />
+          {health ? 'BACKEND ONLINE' : 'BACKEND OFFLINE'}
         </div>
-        <div className="mt-1 break-words">
-          LLM: <span className={health?.llm?.backend && health.llm.backend !== 'deterministic' ? 'text-emerald-400/80' : 'text-slate-500'}>
+        <div className="mt-1.5 break-words font-mono text-[10px]">
+          LLM: <span className={health?.llm?.backend && health.llm.backend !== 'deterministic' ? 'text-[var(--app-accent)]' : 'text-[var(--app-text-faint)]'}>
             {health?.llm?.backend || (health?.llm?.ollama ? 'ollama' : 'offline')}
           </span>
           {' · '}NER: {health?.transformer_ner ? 'transformer' : 'lexicon'}
         </div>
         <div className="mt-1.5 text-[10px] text-[var(--app-text-faint)] leading-snug">
-          Related views are tabs inside each page · ⌘K for deep links
+          Nine hubs · ⌘K deep links · no motion stage
         </div>
       </div>
     </aside>
@@ -508,6 +510,8 @@ export default function App() {
   const openCmd = useCallback(() => setCmdOpen(true), []);
   const closeCmd = useCallback(() => setCmdOpen(false), []);
   const closeNav = useCallback(() => setNavOpen(false), []);
+  const location = useLocation();
+  const isBiotechHome = location.pathname === '/' || location.pathname === '/home';
 
   useEffect(() => {
     if (!user) return undefined;
@@ -534,8 +538,18 @@ export default function App() {
         <div className="login-gate min-h-[100dvh] flex items-center justify-center text-sm text-[var(--app-text-muted)]">
           Loading VigilAI…
         </div>
+      ) : isBiotechHome ? (
+        <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
+          <Routes>
+            <Route path="/" element={<BiotechHomepagePage />} />
+            <Route path="/home" element={<BiotechHomepagePage />} />
+          </Routes>
+        </RefreshContext.Provider>
       ) : !user ? (
-        <Login />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
       ) : (
       <ProjectProvider>
       <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
@@ -551,7 +565,7 @@ export default function App() {
           )}
           <Sidebar health={health} open={navOpen} onNavigate={closeNav} />
           <div className="app-main-column">
-            <header className="app-header px-3 sm:px-4 md:px-5 py-2.5 border-b backdrop-blur">
+            <header className="app-header px-3 sm:px-4 md:px-5 py-2.5 border-b">
               <div className="app-header-row">
                 <div className="app-header-brand min-w-0">
                   <button
@@ -591,7 +605,7 @@ export default function App() {
             </header>
             <main className="app-main-scroll">
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/signals" element={<SignalWorkbench />} />
                 <Route path="/signals/:id" element={<SignalDetail />} />
                 <Route path="/lenses" element={<Lenses />} />
@@ -601,8 +615,9 @@ export default function App() {
                 <Route path="/sources" element={<SourcesHub />} />
                 <Route path="/forge" element={<Forge />} />
                 <Route path="/login" element={<Navigate to="/" replace />} />
-                {/* Legacy paths → hub tabs (bookmarks / old demos keep working) */}
-                <Route path="/kpis" element={<Navigate to="/?tab=ops" replace />} />
+                <Route path="/corporate" element={<Navigate to="/" replace />} />
+                <Route path="/classic" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/kpis" element={<Navigate to="/dashboard?tab=ops" replace />} />
                 <Route path="/lifecycle" element={<Navigate to="/signals?tab=lifecycle" replace />} />
                 <Route path="/alerts" element={<Navigate to="/signals?tab=alerts" replace />} />
                 <Route path="/smq" element={<Navigate to="/lenses?tab=smq" replace />} />

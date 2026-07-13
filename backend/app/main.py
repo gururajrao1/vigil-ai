@@ -13,6 +13,7 @@ from .config import settings
 from .database import SessionLocal, init_db
 from .forge.routes import router as forge_router
 from .llm import status as llm_status
+from .biotech_homepage.routes import router as biotech_router
 from .projects.routes import router as projects_router
 from .projects.scope import reset_request_project_id, set_request_project_id
 
@@ -65,6 +66,7 @@ app.include_router(auth_router)
 app.include_router(forge_router)
 app.include_router(agentic_router)
 app.include_router(projects_router)
+app.include_router(biotech_router)
 
 
 @app.on_event("startup")

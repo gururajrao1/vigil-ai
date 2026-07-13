@@ -1,4 +1,5 @@
 import { HubShell } from '../components/PageTabs';
+import SurrogateHonestyBanner from '../components/SurrogateHonestyBanner';
 import Sources from './Sources';
 import LiveFeed from './LiveFeed';
 import Surveillance from './Surveillance';
@@ -11,21 +12,23 @@ const TABS = [
   { id: 'agent', label: 'Agent chat' },
 ];
 
-/** All ingest / source surfaces in one window — Sources stay first-class. */
 export default function SourcesHub() {
   return (
-    <HubShell
-      title="Data Sources"
-      subtitle="Crawl catalog, continuous live feed, worldwide network registry, and agent-assisted ingest."
-      tabDefs={TABS}
-      defaultTab="catalog"
-    >
-      {(tab) => {
-        if (tab === 'live') return <LiveFeed embedded />;
-        if (tab === 'networks') return <Surveillance embedded />;
-        if (tab === 'agent') return <Command embedded />;
-        return <Sources embedded />;
-      }}
-    </HubShell>
+    <div className="space-y-4">
+      <SurrogateHonestyBanner />
+      <HubShell
+        title="Data Sources"
+        subtitle="Technical ingest index — live unstructured streams vs local surrogate comparative snapshots."
+        tabDefs={TABS}
+        defaultTab="catalog"
+      >
+        {(tab) => {
+          if (tab === 'live') return <LiveFeed embedded />;
+          if (tab === 'networks') return <Surveillance embedded />;
+          if (tab === 'agent') return <Command embedded />;
+          return <Sources embedded />;
+        }}
+      </HubShell>
+    </div>
   );
 }

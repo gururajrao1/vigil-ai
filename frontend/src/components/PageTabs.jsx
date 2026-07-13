@@ -5,10 +5,11 @@ import { useSearchParams } from 'react-router-dom';
 export function PageTabs({ tabs, active, onChange }) {
   return (
     <div
-      className="flex flex-wrap gap-1 p-1 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)]"
+      className="flex flex-wrap gap-0 border border-[var(--app-border)] bg-[var(--app-surface)]"
       role="tablist"
+      style={{ borderRadius: 4 }}
     >
-      {tabs.map((t) => {
+      {tabs.map((t, i) => {
         const on = active === t.id;
         return (
           <button
@@ -17,11 +18,15 @@ export function PageTabs({ tabs, active, onChange }) {
             role="tab"
             aria-selected={on}
             onClick={() => onChange(t.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`px-3 py-2 text-xs font-semibold border-r border-[var(--app-border)] last:border-r-0 ${
               on
-                ? 'bg-teal-500/20 text-teal-200 border border-teal-500/40'
-                : 'text-[var(--app-text-muted)] border border-transparent hover:text-[var(--app-text)] hover:bg-[var(--app-surface-hover)]'
+                ? 'text-[var(--app-accent)] bg-[var(--app-accent-muted)]'
+                : 'text-[var(--app-text-muted)] hover:text-[var(--app-text)] hover:bg-[var(--app-surface-hover)]'
             }`}
+            style={{
+              letterSpacing: '-0.02em',
+              borderBottom: on ? '2px solid var(--app-accent)' : '2px solid transparent',
+            }}
           >
             {t.label}
           </button>
@@ -56,9 +61,9 @@ export function HubShell({ title, subtitle, tabDefs, defaultTab, children }) {
   const [active, setTab] = useHubTab(defaultTab || ids[0], ids);
   return (
     <div className="space-y-4 min-w-0 max-w-full">
-      <div className="min-w-0">
-        <h2 className="text-lg font-semibold text-[var(--app-text)] break-words">{title}</h2>
-        {subtitle && <p className="text-sm text-[var(--app-text-muted)] mt-1 break-words">{subtitle}</p>}
+      <div className="min-w-0 va-mint-rule">
+        <h2 className="page-title break-words">{title}</h2>
+        {subtitle && <p className="page-subtitle break-words">{subtitle}</p>}
       </div>
       <PageTabs tabs={tabDefs} active={active} onChange={setTab} />
       <div className="hub-embed min-w-0 max-w-full">{typeof children === 'function' ? children(active) : children}</div>

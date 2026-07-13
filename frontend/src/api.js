@@ -322,6 +322,12 @@ export const api = {
     `${BASE}/api/projects/${projectId}/story/pdf?event=${encodeURIComponent(event)}&drugs=${encodeURIComponent(drugs)}`,
   storyPdfUrlGlobal: (event, drugs) =>
     `${BASE}/api/story/pdf?event=${encodeURIComponent(event)}&drugs=${encodeURIComponent(drugs)}`,
+  biotechHomepage: (focusDrug) => {
+    const params = new URLSearchParams();
+    if (focusDrug) params.set('focus_drug', focusDrug);
+    const q = params.toString();
+    return req(`/api/biotech/homepage${q ? `?${q}` : ''}`);
+  },
   ingestRegistries: (query = 'adverse event', limitPer = 10) =>
     req(`/api/ingest/registries?query=${encodeURIComponent(query)}&limit_per=${limitPer}`, { method: 'POST' }),
   sparqlGraph: (projectId, { drug = '', symptom = '', region = '', country = '', condition = '', focusNode = null } = {}) => {

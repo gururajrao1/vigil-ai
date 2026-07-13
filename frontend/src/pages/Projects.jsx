@@ -1,9 +1,20 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useProject } from '../projectContext';
 import { useRefresh } from '../App';
 import { Button, Card, CardHeader } from '../components/ui';
+
+const OWNER_BY_SLUG = {
+  'general-pv': 'Gururaja',
+  oncology: 'Bharat',
+  vaccine: 'Shekhar',
+  device: 'Gururaja',
+};
+
+function ownerFor(p) {
+  return OWNER_BY_SLUG[p.slug] || OWNER_BY_SLUG[p.therapeutic_area] || 'VigilAI Ops';
+}
 
 export default function Projects() {
   const { project, projects, setActiveProject, reload } = useProject();
@@ -48,62 +59,76 @@ export default function Projects() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h2 className="text-lg font-semibold text-[var(--app-text)]">Project Workspaces</h2>
-        <p className="text-sm text-[var(--app-text-muted)] mt-1">
-          Each project is a separate surveillance campaign. The header dropdown switches which
-          workspace Fetch, Demo corpus, Pathfinder, Source Queue, Divergence, and Knowledge Graph use.
+      <div className="va-mint-rule">
+        <h2 className="page-title">Projects</h2>
+        <p className="page-subtitle">
+          Case portfolio of surveillance campaigns — owners beside structural target tags.
         </p>
       </div>
 
-      <Card className="p-4 border-teal-500/25 bg-teal-500/5">
+      <Card className="p-4">
         <CardHeader title="How to use projects" subtitle="End-to-end campaign workflow" />
         <ol className="mt-3 space-y-2 text-sm text-[var(--app-text-secondary)] list-decimal list-inside">
           <li>Select a workspace in the header (or click one below).</li>
           <li>If it shows 0 posts, click <strong>Fill workspace</strong> (or Demo corpus / Fetch while it is active).</li>
-          <li>Optional: <Link to="/source-queue" className="text-teal-400">Source Queue</Link> → Run Pathfinder → Approve sources for live discovery.</li>
-          <li>Open <Link to="/graph" className="text-teal-400">Knowledge Graph</Link>, Signals, and Divergence — they reflect this project’s data.</li>
+          <li>Optional: <Link to="/source-queue" className="text-[var(--app-accent-sky)]">Source Discovery</Link> → Run Pathfinder → Approve sources.</li>
+          <li>Open <Link to="/graph" className="text-[var(--app-accent-sky)]">Evidence Explorer</Link>, Signals, and Lenses for this project&apos;s corpus.</li>
         </ol>
       </Card>
 
       {project && (
-        <Card className="p-4 border-teal-500/30">
-          <div className="text-xs text-[var(--app-text-muted)]">Active workspace</div>
-          <div className="text-xl font-semibold text-[var(--app-text)]">{project.name}</div>
+        <Card className="p-4">
+          <div className="mono-tag">ACTIVE CASE</div>
+          <div className="text-xl font-extrabold text-[var(--app-text)] mt-2" style={{ letterSpacing: '-0.04em' }}>
+            {project.name}
+          </div>
           <div className="text-sm text-[var(--app-text-secondary)] mt-1">{project.description}</div>
-          <div className="flex flex-wrap gap-3 mt-3 text-xs text-[var(--app-text-muted)]">
+          <div className="flex flex-wrap gap-3 mt-3 text-xs font-mono text-[var(--app-text-muted)]">
+            <span>owner · {ownerFor(project)}</span>
             <span>{project.post_count ?? 0} posts</span>
             <span>{project.signal_count ?? 0} signals</span>
             <span className="capitalize">{project.therapeutic_area}</span>
           </div>
           <div className="flex flex-wrap gap-2 mt-3">
             {project.keywords?.map((k) => (
-              <span key={k} className="text-xs px-2 py-0.5 rounded bg-teal-500/10 text-teal-300">{k}</span>
+              <span
+                key={k}
+                className="text-[10px] px-2 py-0.5 font-mono border border-[var(--app-border)] text-[var(--app-accent)]"
+                style={{ borderRadius: 4 }}
+              >
+                {k}
+              </span>
             ))}
           </div>
         </Card>
       )}
 
       <Card className="p-4">
-        <CardHeader title="All workspaces" subtitle="Click to switch · Fill empty specialty campaigns" />
+        <CardHeader title="Case portfolio" subtitle="Click to switch · Fill empty specialty campaigns" />
         <div className="space-y-2 mt-3">
           {projects.map((p) => {
             const empty = !(p.post_count > 0);
             return (
               <div
                 key={p.id}
-                className={`rounded-lg border px-4 py-3 transition ${
+                className={`border px-4 py-3 ${
                   project?.id === p.id
-                    ? 'border-teal-500/50 bg-teal-500/10'
+                    ? 'border-[var(--app-accent)] bg-[var(--app-accent-muted)]'
                     : 'border-[var(--app-border)]'
                 }`}
+                style={{ borderRadius: 4 }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <button type="button" onClick={() => setActiveProject(p)} className="text-left min-w-0">
-                    <div className="font-medium text-[var(--app-text)]">{p.name}</div>
-                    <div className="text-xs text-[var(--app-text-muted)]">
+                    <div className="font-bold text-[var(--app-text)]" style={{ letterSpacing: '-0.03em' }}>
+                      {p.name}
+                    </div>
+                    <div className="text-[10px] font-mono text-[var(--app-text-muted)] mt-1 tracking-wide">
+                      OWNER · {ownerFor(p).toUpperCase()}
+                    </div>
+                    <div className="text-xs text-[var(--app-text-muted)] mt-1">
                       {p.therapeutic_area} · {p.slug} · {p.post_count ?? 0} posts · {p.signal_count ?? 0} signals
-                      {empty && <span className="text-amber-400"> · empty</span>}
+                      {empty && <span className="text-[var(--app-accent-sky)]"> · empty</span>}
                     </div>
                   </button>
                   <Button
@@ -118,7 +143,7 @@ export default function Projects() {
             );
           })}
         </div>
-        {msg && <p className="text-xs text-[var(--app-text-muted)] mt-3">{msg}</p>}
+        {msg && <p className="text-xs text-[var(--app-text-muted)] mt-3 font-mono">{msg}</p>}
       </Card>
 
       <Card className="p-4">

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "vigilai-biotech": {
+      "command": "python",
+      "args": ["-m", "app.biotech_homepage.mcp_server"],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/backend"
+      }
+    }
+  }
+}
