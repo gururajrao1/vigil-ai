@@ -5,17 +5,21 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .agentic.routes import router as agentic_router
 from .api.auth_routes import router as auth_router
 from .api.routes import router
+from .auth import decode_token
+from .biotech_homepage.routes import router as biotech_router
 from .config import settings
 from .database import SessionLocal, init_db
 from .forge.routes import router as forge_router
 from .llm import status as llm_status
-from .biotech_homepage.routes import router as biotech_router
+from .models import User
 from .projects.routes import router as projects_router
 from .projects.scope import reset_request_project_id, set_request_project_id
+from .rbac import min_role_for_write, role_rank
 
 logging.basicConfig(level=logging.INFO)
 
@@ -42,6 +46,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _enforce_rbac(request: Request, call_next):
+    """Viewer = read-only API; analyst = ops writes; admin = users + reset."""
+    needed = min_role_for_write(request.url.path, request.method)
+    if needed is None:
+        return await call_next(request)
+
+    auth = request.headers.get("Authorization") or ""
+    if not auth.lower().startswith("bearer "):
+        return JSONResponse({"detail": "authentication required"}, status_code=401)
+    payload = decode_token(auth[7:].strip())
+    if not payload:
+        return JSONResponse({"detail": "invalid or expired token"}, status_code=401)
+
+    db = SessionLocal()
+    try:
+        user = db.get(User, payload.get("uid"))
+        if user is None or not user.is_active:
+            return JSONResponse({"detail": "authentication required"}, status_code=401)
+        if role_rank(user.role) < role_rank(needed):
+            return JSONResponse({"detail": f"requires {needed} role"}, status_code=403)
+    finally:
+        db.close()
+
+    return await call_next(request)
 
 
 @app.middleware("http")

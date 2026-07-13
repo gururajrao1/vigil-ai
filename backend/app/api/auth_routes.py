@@ -72,6 +72,9 @@ class NewUserReq(BaseModel):
 @router.post("/users")
 def add_user(req: NewUserReq, db: Session = Depends(get_db),
              _admin=Depends(require_role("admin"))):
+    from ..auth import ROLES
+    if req.role not in ROLES:
+        raise HTTPException(400, f"role must be one of: {', '.join(sorted(ROLES))}")
     if db.query(User).filter(User.email == req.email.lower().strip()).first():
         raise HTTPException(400, "email already registered")
     user = create_user(db, req.email, req.password, req.full_name, req.role)
@@ -85,6 +88,9 @@ class RoleReq(BaseModel):
 @router.patch("/users/{user_id}/role")
 def set_role(user_id: int, req: RoleReq, db: Session = Depends(get_db),
              _admin=Depends(require_role("admin"))):
+    from ..auth import ROLES
+    if req.role not in ROLES:
+        raise HTTPException(400, f"role must be one of: {', '.join(sorted(ROLES))}")
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(404, "user not found")

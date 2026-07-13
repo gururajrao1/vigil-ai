@@ -102,6 +102,19 @@ body {
 *::-webkit-scrollbar-thumb { background: var(--app-scrollbar); border-radius: 0; }
 *::-webkit-scrollbar-track { background: transparent; }
 
+/* Public homepage boot only — product chrome stays zero-motion */
+@keyframes vigil-boot-spin {
+  to { transform: rotate(360deg); }
+}
+.vigil-boot-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--app-border, #1e293b);
+  border-top-color: var(--app-accent, #2dd4bf);
+  border-radius: 50%;
+  animation: vigil-boot-spin 0.85s linear infinite !important;
+}
+
 .page-title {
   font-family: var(--app-font-display);
   font-weight: 800;

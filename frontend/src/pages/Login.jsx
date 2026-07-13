@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, wakeApi } from '../api';
 import { useAuth } from '../App';
 import { Button } from '../components/ui';
 
@@ -13,11 +13,27 @@ export default function Login() {
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [apiReady, setApiReady] = useState(false);
+  const [status, setStatus] = useState('Connecting to server…');
+
+  // Pre-wake Render as soon as the login form is shown so submit is usually instant.
+  useEffect(() => {
+    let cancelled = false;
+    setApiReady(false);
+    setStatus('Connecting to server…');
+    wakeApi(90000).then((ok) => {
+      if (cancelled) return;
+      setApiReady(!!ok);
+      setStatus(ok ? 'Server ready' : 'Server slow — sign-in will retry automatically');
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     setErr('');
+    setStatus(mode === 'login' ? 'Signing in…' : 'Creating account…');
     try {
       const res = mode === 'login'
         ? await api.login(email, password)
@@ -26,11 +42,13 @@ export default function Login() {
       nav('/dashboard', { replace: true });
     } catch (e2) {
       const msg = String(e2?.message || e2 || 'Failed');
+      const cold = /failed to fetch|network|timeout|abort|502|503|520|521|522|524/i.test(msg);
       setErr(
-        /failed to fetch|network|timeout|abort/i.test(msg)
-          ? 'Server is waking up or unreachable. Wait ~30s and try again.'
+        cold
+          ? 'Server is still waking (free hosting). Wait a few seconds and try again — retries are automatic.'
           : msg
       );
+      setStatus(apiReady ? 'Server ready' : 'Server slow — sign-in will retry automatically');
     }
     setBusy(false);
   };
@@ -48,6 +66,9 @@ export default function Login() {
           </h1>
           <p className="mt-2 text-sm text-[var(--app-text-muted)] leading-snug">
             Worldwide pharmacovigilance & device-vigilance — social listening to explainable safety signals.
+          </p>
+          <p className={`mt-2 text-[11px] font-mono ${apiReady ? 'text-emerald-400/90' : 'text-[var(--app-text-faint)]'}`}>
+            {status}
           </p>
         </div>
 
@@ -81,13 +102,15 @@ export default function Login() {
           />
           {err && <div className="text-xs text-rose-400 font-mono">{err}</div>}
           <Button type="submit" variant="primary" disabled={busy} className="w-full">
-            {busy ? 'Please wait…' : (mode === 'login' ? 'Enter VigilAI' : 'Register')}
+            {busy ? 'Please wait…' : (mode === 'login' ? 'Sign in' : 'Register')}
           </Button>
         </form>
 
-        <p className="mt-4 text-[11px] text-[var(--app-text-faint)] leading-snug font-mono">
-          Demo: <span className="text-[var(--app-text-muted)]">admin@vigilai.dev</span> /{' '}
-          <span className="text-[var(--app-text-muted)]">admin123</span>
+        <p className="mt-4 text-[11px] text-[var(--app-text-faint)] leading-snug font-mono space-y-1">
+          <span className="block">Demo accounts</span>
+          <span className="block text-[var(--app-text-muted)]">admin@vigilai.dev / admin123 · admin</span>
+          <span className="block text-[var(--app-text-muted)]">analyst@vigilai.dev / analyst123 · analyst</span>
+          <span className="block text-[var(--app-text-muted)]">viewer@vigilai.dev / viewer123 · viewer</span>
         </p>
 
         <button

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../App';
+import { isAnalyst } from '../roles';
 import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 
 const REGIONS = ['Global', 'North America', 'Europe', 'Asia', 'South America', 'Africa', 'Oceania'];
@@ -18,6 +19,7 @@ export default function Forge() {
   const [form, setForm] = useState({ drug: 'isotretinoin', condition: 'acne', platform: 'reddit', region: 'Global', records: 5 });
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState('');
   const [err, setErr] = useState('');
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -33,10 +35,31 @@ export default function Forge() {
     setBusy(false);
   };
 
+  const download = async (format) => {
+    if (!result?.batch_id) return;
+    setExporting(format); setErr('');
+    try {
+      await api.forgeDownload(format, result.batch_id);
+    } catch (e) {
+      setErr(e.message || 'Export failed — API may be waking; retry in a few seconds.');
+    }
+    setExporting('');
+  };
+
   if (!user) {
     return (
       <Card className="p-6 text-sm text-slate-300">
         The Data Forge requires an analyst account. <Link to="/login" className="text-sky-400 hover:underline">Sign in</Link> to generate synthetic patient posts.
+      </Card>
+    );
+  }
+
+  if (!isAnalyst(user)) {
+    return (
+      <Card className="p-6 text-sm text-[var(--app-text-muted)]">
+        Data Forge is available to <strong className="text-[var(--app-text)]">analyst</strong> and{' '}
+        <strong className="text-[var(--app-text)]">admin</strong> roles. Your role is{' '}
+        <span className="font-mono text-[var(--app-accent)]">{user.role}</span> (read-only).
       </Card>
     );
   }
@@ -82,8 +105,12 @@ export default function Forge() {
           </div>
 
           <div className="flex gap-2">
-            <a href={api.forgeJsonlUrl(result.batch_id)} target="_blank" rel="noreferrer"><Button variant="ghost">⬇ Export JSONL</Button></a>
-            <a href={api.forgeCsvUrl(result.batch_id)} target="_blank" rel="noreferrer"><Button variant="ghost">⬇ Export CSV</Button></a>
+            <Button variant="ghost" disabled={!!exporting} onClick={() => download('jsonl')}>
+              {exporting === 'jsonl' ? 'Exporting…' : '⬇ Export JSONL'}
+            </Button>
+            <Button variant="ghost" disabled={!!exporting} onClick={() => download('csv')}>
+              {exporting === 'csv' ? 'Exporting…' : '⬇ Export CSV'}
+            </Button>
           </div>
 
           <div className="space-y-3">

@@ -25,7 +25,7 @@ class NavItem(BaseModel):
 
 class NavigationNode(BaseModel):
     brand: str = "VigilAI"
-    wordmark_sub: str = "Life Sciences · Computational Safety"
+    wordmark_sub: str = "Pharmacovigilance · Computational Safety"
     items: list[NavItem] = Field(default_factory=list)
     env_tags: list[str] = Field(default_factory=list)
 

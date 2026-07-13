@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { api } from '../api';
+import { api, wakeApi } from '../api';
 import { useAuth, useRefresh } from '../App';
 import BiotechHomepageRenderer from './BiotechHomepageRenderer';
 import { buildFallbackHomepage } from './fallbackLayout';
@@ -10,7 +10,6 @@ async function loadHomepage(focusDrug) {
   try {
     return await api.biotechHomepage(focusDrug || undefined);
   } catch {
-    // Render may lag behind Vercel — compose from endpoints that already exist in production.
     const [stats, sigPayload] = await Promise.all([
       api.stats().catch(() => ({})),
       api.signals(focusDrug ? { drug: focusDrug } : {}).catch(() => ({ signals: [] })),
@@ -20,23 +19,70 @@ async function loadHomepage(focusDrug) {
   }
 }
 
+function BootLoader({ label = 'Loading VigilAI' }) {
+  return (
+    <div
+      style={{
+        background: T.canvas,
+        color: T.muted,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 20,
+        fontFamily: T.fontDisplay,
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 4,
+          background: T.navy,
+          border: `1px solid ${T.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: T.mint,
+          fontWeight: 800,
+          fontSize: 16,
+          letterSpacing: '-0.04em',
+        }}
+      >
+        VA
+      </div>
+      <div className="vigil-boot-spinner" role="status" aria-label="Loading" />
+      <div style={{ fontSize: 13, letterSpacing: '0.04em', color: T.muted }}>{label}</div>
+    </div>
+  );
+}
+
 /**
  * Public-facing biotech product homepage.
- * Prefers FastMCP/HTTP schema; falls back to stats+signals if API host is stale.
+ * Login CTAs stay disabled until the API is awake, then open a real credential form
+ * (existing sessions are cleared so Login is never a dashboard bypass).
  */
 export default function BiotechHomepagePage() {
   const { tick } = useRefresh();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
   const drug = params.get('drug') || '';
   const [layout, setLayout] = useState(null);
   const [err, setErr] = useState(null);
+  const [apiReady, setApiReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setLayout(null);
+    setLayout(buildFallbackHomepage({}));
+    setErr(null);
+    setApiReady(false);
+    wakeApi(90000).then((ok) => {
+      if (!cancelled) setApiReady(!!ok);
+    });
     loadHomepage(drug)
       .then((d) => {
         if (!cancelled) {
@@ -50,9 +96,14 @@ export default function BiotechHomepagePage() {
     return () => { cancelled = true; };
   }, [drug, tick]);
 
+  const goLogin = () => {
+    // Force credential entry — never treat Login as a shortcut into the app.
+    logout();
+    nav('/login', { replace: true });
+  };
+
   const onNavigate = (href) => {
     if (!href) return;
-    // Hash anchors on the homepage (mission / pillars / spotlight)
     if (href === '/#manifesto' || href === '/#pillars' || href === '/#spotlight' || href.startsWith('#')) {
       const id = href.includes('#') ? href.split('#')[1] : href.slice(1);
       if (location.pathname !== '/' && location.pathname !== '/home') {
@@ -62,8 +113,15 @@ export default function BiotechHomepagePage() {
       document.getElementById(id)?.scrollIntoView({ behavior: 'auto' });
       return;
     }
-    if (!user && href !== '/login' && href !== '/' && href !== '/home') {
-      nav('/login');
+    if (href === '/login' || href === '/signin') {
+      if (!apiReady) return;
+      goLogin();
+      return;
+    }
+    // Platform routes require a verified session — guests always hit Login.
+    if (!user) {
+      if (!apiReady) return;
+      goLogin();
       return;
     }
     nav(href);
@@ -71,7 +129,8 @@ export default function BiotechHomepagePage() {
 
   const onAction = async (action) => {
     if (!user) {
-      nav('/login');
+      if (!apiReady) return;
+      goLogin();
       return;
     }
     if (action?.kind === 'recompute') {
@@ -85,38 +144,52 @@ export default function BiotechHomepagePage() {
     }
   };
 
-  if (err) {
+  if (err && !layout) {
     return (
       <div style={{ background: T.canvas, color: T.muted, minHeight: '100vh', padding: 48, fontFamily: T.fontMono }}>
-        homepage schema unavailable · {err}
+        Homepage unavailable · {err}
       </div>
     );
   }
   if (!layout) {
-    return (
-      <div style={{ background: T.canvas, color: T.muted, minHeight: '100vh', padding: 48, fontFamily: T.fontMono }}>
-        composing biotech canvas…
-      </div>
-    );
+    return <BootLoader />;
   }
 
-  const navLayout = !user
-    ? {
-        ...layout,
-        navigation: {
-          ...layout.navigation,
-          items: [
-            ...(layout.navigation?.items || []).filter((i) => i.id !== 'platform'),
-            { id: 'signin', label: 'Sign in', href: '/login', emphasis: true },
-          ],
+  const loginLabel = apiReady ? 'Login' : 'Connecting…';
+  const loginHref = '/login';
+
+  const navLayout = {
+    ...layout,
+    navigation: {
+      ...layout.navigation,
+      items: [
+        ...(layout.navigation?.items || []).filter((i) => i.id !== 'platform' && i.id !== 'signin'),
+        {
+          id: 'signin',
+          label: loginLabel,
+          href: loginHref,
+          emphasis: true,
+          disabled: !apiReady,
         },
-        hero_manifesto: {
-          ...layout.hero_manifesto,
-          primary_cta: { label: 'Sign in to enter', href: '/login' },
-          secondary_cta: layout.hero_manifesto?.secondary_cta,
-        },
-      }
-    : layout;
+      ],
+    },
+    hero_manifesto: {
+      ...layout.hero_manifesto,
+      primary_cta: { label: loginLabel, href: loginHref, disabled: !apiReady },
+      // Guests should not get a free pass into /signals from the hero.
+      secondary_cta: user
+        ? layout.hero_manifesto?.secondary_cta
+        : { label: apiReady ? 'Login to continue' : 'Connecting…', href: loginHref, disabled: !apiReady },
+    },
+    cta_strip: {
+      ...(layout.cta_strip || {}),
+      buttons: user
+        ? (layout.cta_strip?.buttons || [])
+        : [{ label: apiReady ? 'Login' : 'Connecting…', href: loginHref, disabled: !apiReady }],
+    },
+    // Hide mutating homepage actions until signed in as analyst+.
+    actions: user ? (layout.actions || []) : [],
+  };
 
   return (
     <BiotechHomepageRenderer

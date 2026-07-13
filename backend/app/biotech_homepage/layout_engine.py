@@ -171,7 +171,7 @@ def render_biotech_homepage(
                 NavItem(id="mission", label="Mission", href="/#manifesto"),
                 NavItem(id="tech", label="Technology", href="/#pillars"),
                 NavItem(id="signal", label="Spotlight", href="/#spotlight"),
-                NavItem(id="platform", label="Enter platform", href="/dashboard", emphasis=True),
+                NavItem(id="platform", label="Login", href="/login", emphasis=True),
             ],
         ),
         hero_manifesto=HeroManifesto(
@@ -208,7 +208,7 @@ def render_biotech_homepage(
                     provenance="live_unstructured_pipeline",
                 ),
             ],
-            primary_cta={"label": "Enter the platform", "href": "/dashboard"},
+            primary_cta={"label": "Login", "href": "/login"},
             secondary_cta={"label": "Open signal workbench", "href": "/signals"},
         ),
         technology_pillars=[

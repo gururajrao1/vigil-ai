@@ -45,7 +45,8 @@ function TopNav({ navigation, onNavigate }) {
           <button
             key={item.id}
             type="button"
-            onClick={() => onNavigate?.(item.href)}
+            disabled={!!item.disabled}
+            onClick={() => { if (!item.disabled) onNavigate?.(item.href); }}
             style={{
               fontFamily: T.fontDisplay,
               fontSize: 13,
@@ -54,8 +55,9 @@ function TopNav({ navigation, onNavigate }) {
               background: item.emphasis ? T.mint : 'transparent',
               border: item.emphasis ? 'none' : `1px solid ${T.border}`,
               padding: '8px 14px',
-              cursor: 'pointer',
+              cursor: item.disabled ? 'wait' : 'pointer',
               letterSpacing: '-0.02em',
+              opacity: item.disabled ? 0.55 : 1,
             }}
           >
             {item.label}
@@ -146,7 +148,8 @@ function HeroManifesto({ hero, onNavigate }) {
           {hero.primary_cta?.href && (
             <button
               type="button"
-              onClick={() => onNavigate?.(hero.primary_cta.href)}
+              disabled={!!hero.primary_cta.disabled}
+              onClick={() => { if (!hero.primary_cta.disabled) onNavigate?.(hero.primary_cta.href); }}
               style={{
                 fontFamily: T.fontDisplay,
                 fontWeight: 700,
@@ -156,7 +159,8 @@ function HeroManifesto({ hero, onNavigate }) {
                 color: T.canvas,
                 border: 'none',
                 padding: '12px 20px',
-                cursor: 'pointer',
+                cursor: hero.primary_cta.disabled ? 'wait' : 'pointer',
+                opacity: hero.primary_cta.disabled ? 0.55 : 1,
               }}
             >
               {hero.primary_cta.label}
@@ -165,7 +169,8 @@ function HeroManifesto({ hero, onNavigate }) {
           {hero.secondary_cta?.href && (
             <button
               type="button"
-              onClick={() => onNavigate?.(hero.secondary_cta.href)}
+              disabled={!!hero.secondary_cta.disabled}
+              onClick={() => { if (!hero.secondary_cta.disabled) onNavigate?.(hero.secondary_cta.href); }}
               style={{
                 fontFamily: T.fontDisplay,
                 fontWeight: 600,
@@ -175,7 +180,8 @@ function HeroManifesto({ hero, onNavigate }) {
                 color: T.text,
                 border: `1px solid ${T.border}`,
                 padding: '12px 20px',
-                cursor: 'pointer',
+                cursor: hero.secondary_cta.disabled ? 'wait' : 'pointer',
+                opacity: hero.secondary_cta.disabled ? 0.55 : 1,
               }}
             >
               {hero.secondary_cta.label}
@@ -520,9 +526,10 @@ function CtaStrip({ strip, onNavigate }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 22 }}>
         {(strip.buttons || []).map((b) => (
           <button
-            key={b.href}
+            key={`${b.label}-${b.href}`}
             type="button"
-            onClick={() => onNavigate?.(b.href)}
+            disabled={!!b.disabled}
+            onClick={() => { if (!b.disabled) onNavigate?.(b.href); }}
             style={{
               fontFamily: T.fontDisplay,
               fontWeight: 600,
@@ -531,7 +538,8 @@ function CtaStrip({ strip, onNavigate }) {
               color: T.text,
               border: `1px solid ${T.border}`,
               padding: '10px 16px',
-              cursor: 'pointer',
+              cursor: b.disabled ? 'wait' : 'pointer',
+              opacity: b.disabled ? 0.55 : 1,
             }}
           >
             {b.label}

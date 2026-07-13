@@ -13,9 +13,11 @@ import SourcesHub from './pages/SourcesHub';
 import DiscoveryHub from './pages/DiscoveryHub';
 import Forge from './pages/Forge';
 import Projects from './pages/Projects';
+import UsersAdmin from './pages/UsersAdmin';
 import Login from './pages/Login';
 import BiotechHomepagePage from './biotech/BiotechHomepagePage';
 import { ProjectProvider, ProjectSelector } from './projectContext';
+import { hasMinRole, isAdmin, isAnalyst } from './roles';
 
 export const RefreshContext = createContext({
   tick: 0,
@@ -48,19 +50,22 @@ const CMD_ITEMS = [
   { label: 'Data Sources · live stream', icon: '📡', path: '/sources?tab=live' },
   { label: 'Data Sources · networks', icon: '🛰', path: '/sources?tab=networks' },
   { label: 'Data Sources · agent chat', icon: '🎛', path: '/sources?tab=agent' },
-  { label: 'Data Forge (Synthetic)', icon: '⚗', path: '/forge' },
+  { label: 'Data Forge (Synthetic)', icon: '⚗', path: '/forge', minRole: 'analyst' },
+  { label: 'Admin · Users', icon: '👤', path: '/users', minRole: 'admin' },
 ];
 
 function CommandPalette({ onClose }) {
+  const { user } = useAuth();
   const [q, setQ] = useState('');
   const nav = useNavigate();
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
+  const allowed = CMD_ITEMS.filter((i) => !i.minRole || hasMinRole(user, i.minRole));
   const filtered = q.trim()
-    ? CMD_ITEMS.filter((i) => i.label.toLowerCase().includes(q.toLowerCase()))
-    : CMD_ITEMS;
+    ? allowed.filter((i) => i.label.toLowerCase().includes(q.toLowerCase()))
+    : allowed;
 
   const go = (path) => { nav(path); onClose(); };
 
@@ -121,15 +126,16 @@ const NAV_SECTIONS = [
   {
     title: 'Workspace',
     items: [
-      { to: '/projects', label: 'Projects', icon: '📁' },
-      { to: '/source-queue', label: 'Source Discovery', icon: '🔗' },
+      { to: '/projects', label: 'Projects', icon: '📁', minRole: 'analyst' },
+      { to: '/source-queue', label: 'Source Discovery', icon: '🔗', minRole: 'analyst' },
       { to: '/sources', label: 'Data Sources', icon: '⛓' },
-      { to: '/forge', label: 'Data Forge', icon: '⚗' },
+      { to: '/forge', label: 'Data Forge', icon: '⚗', minRole: 'analyst' },
+      { to: '/users', label: 'Users', icon: '👤', minRole: 'admin' },
     ],
   },
 ];
 
-function Sidebar({ health, open, onNavigate }) {
+function Sidebar({ health, open, onNavigate, user }) {
   return (
     <aside className={`app-sidebar shrink-0 border-r flex flex-col ${open ? 'is-open' : ''}`}>
       <div className="px-5 py-5 border-b border-[var(--app-border)]">
@@ -149,19 +155,22 @@ function Sidebar({ health, open, onNavigate }) {
               VigilAI
             </div>
             <div className="text-[10px] text-[var(--app-text-muted)] leading-tight uppercase tracking-[0.12em] truncate font-mono">
-              Life Sciences
+              Pharmacovigilance
             </div>
           </div>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
+        {NAV_SECTIONS.map((section) => {
+          const items = section.items.filter((n) => !n.minRole || hasMinRole(user, n.minRole));
+          if (!items.length) return null;
+          return (
           <div key={section.title}>
             <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--app-text-faint)] font-mono">
               {section.title}
             </div>
             <div className="space-y-0.5">
-              {section.items.map((n) => (
+              {items.map((n) => (
                 <NavLink
                   key={n.to}
                   to={n.to}
@@ -182,7 +191,8 @@ function Sidebar({ health, open, onNavigate }) {
               ))}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
       <div className="px-4 py-3 border-t border-[var(--app-border)] text-[11px] text-[var(--app-text-muted)]">
         <div className="flex items-center gap-2 font-mono text-[10px] tracking-wide">
@@ -224,6 +234,9 @@ const INGEST_SOURCES = [
 const FAST_SOURCE_IDS = INGEST_SOURCES.filter((s) => s.fast).map((s) => s.id);
 
 function DemoBar({ onAction }) {
+  const { user } = useAuth();
+  const canOps = isAnalyst(user);
+  const canReset = isAdmin(user);
   const { lastIngest } = useRefresh();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(['google_news', 'life_science', 'faers_live']);
@@ -254,6 +267,14 @@ function DemoBar({ onAction }) {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+
+  if (!canOps) {
+    return (
+      <span className="text-[10px] font-mono text-[var(--app-text-faint)] hidden sm:inline" title="Viewer role is read-only">
+        Read-only · viewer
+      </span>
+    );
+  }
 
   const toggle = (id) => setSelected((prev) =>
     prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -412,17 +433,20 @@ function DemoBar({ onAction }) {
         {seeding ? 'Seeding…' : 'Demo corpus'}
       </Button>
 
-      {/* Reset */}
-      <Button variant="danger" disabled={running || seeding || resetting}
-              onClick={async () => { setResetting(true); await api.reset(); onAction(); setResetting(false); }}>
-        {resetting ? 'Resetting…' : 'Reset'}
-      </Button>
+      {/* Reset — admin only */}
+      {canReset && (
+        <Button variant="danger" disabled={running || seeding || resetting}
+                onClick={async () => { setResetting(true); await api.reset(); onAction(); setResetting(false); }}>
+          {resetting ? 'Resetting…' : 'Reset'}
+        </Button>
+      )}
     </div>
   );
 }
 
 function UserMenu() {
   const { user, logout } = useAuth();
+  const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const panelRef = useRef(null);
@@ -461,6 +485,15 @@ function UserMenu() {
           className="w-52 rounded-lg border border-slate-700 bg-slate-900 shadow-2xl p-2 text-xs">
           <div className="px-2 py-1 text-slate-400 truncate">{user.email}</div>
           <div className="px-2 py-1 text-teal-400 capitalize font-semibold">{user.role}</div>
+          {isAdmin(user) && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); nav('/users'); }}
+              className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800 text-sky-300"
+            >
+              Manage users
+            </button>
+          )}
           <hr className="border-slate-700 my-1"/>
           <button onClick={() => { setOpen(false); logout(); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800 text-rose-300">Sign out</button>
         </div>,
@@ -539,7 +572,7 @@ export default function App() {
         <div className="login-gate min-h-[100dvh] flex items-center justify-center text-sm text-[var(--app-text-muted)]">
           Loading VigilAI…
         </div>
-      ) : isLoginPath && !user ? (
+      ) : isLoginPath ? (
         <Login />
       ) : isBiotechHome ? (
         <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
@@ -560,7 +593,7 @@ export default function App() {
               onClick={closeNav}
             />
           )}
-          <Sidebar health={health} open={navOpen} onNavigate={closeNav} />
+          <Sidebar health={health} open={navOpen} onNavigate={closeNav} user={user} />
           <div className="app-main-column">
             <header className="app-header px-3 sm:px-4 md:px-5 py-2.5 border-b">
               <div className="app-header-row">
@@ -611,7 +644,7 @@ export default function App() {
                 <Route path="/source-queue" element={<DiscoveryHub />} />
                 <Route path="/sources" element={<SourcesHub />} />
                 <Route path="/forge" element={<Forge />} />
-                <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/users" element={<UsersAdmin />} />
                 <Route path="/corporate" element={<Navigate to="/" replace />} />
                 <Route path="/classic" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/kpis" element={<Navigate to="/dashboard?tab=ops" replace />} />

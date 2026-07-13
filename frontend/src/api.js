@@ -31,19 +31,25 @@ async function req(path, opts = {}, _attempt = 1) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   if (_token) headers.Authorization = `Bearer ${_token}`;
   if (_projectId) headers['X-Project-Id'] = _projectId;
+  const maxAttempts = opts._maxAttempts || 2;
   let res;
   try {
     res = await fetch(`${BASE}${path}`, { ...opts, headers });
   } catch (err) {
     // Free Render sleeps; first call from a new device often fails mid-wake.
-    if (_attempt < 2) {
-      await new Promise((r) => setTimeout(r, 2500));
+    if (_attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 2000 * _attempt));
       return req(path, opts, _attempt + 1);
     }
     const hint = BASE
       ? `Network error talking to API (${BASE}). Wake the API / check firewall, then retry.`
       : 'Network error reaching /api (Vercel→Render proxy). Wake https://vigil-ai-api.onrender.com/api/health then retry.';
     throw new Error(err?.message ? `${hint} [${err.message}]` : hint);
+  }
+  // Gateway / cold-start responses from Cloudflare↔Render
+  if ([502, 503, 520, 521, 522, 524].includes(res.status) && _attempt < maxAttempts) {
+    await new Promise((r) => setTimeout(r, 2500 * _attempt));
+    return req(path, opts, _attempt + 1);
   }
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
@@ -63,13 +69,23 @@ export async function wakeApi(timeoutMs = 90000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    await req('/api/health', { signal: ctrl.signal });
+    await req('/api/health', { signal: ctrl.signal, _maxAttempts: 5 });
     return true;
   } catch {
     return false;
   } finally {
     clearTimeout(t);
   }
+}
+
+/** Login/register with wake + retries — free Render often needs 15–60s on first hit. */
+async function authRequest(path, body) {
+  await wakeApi(90000);
+  return req(path, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    _maxAttempts: 5,
+  });
 }
 
 export const api = {
@@ -188,10 +204,15 @@ export const api = {
   reset: () => req('/api/reset', { method: 'POST' }),
 
   // auth
-  login: (email, password) => req('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  register: (email, password, full_name) => req('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password, full_name }) }),
+  login: (email, password) => authRequest('/api/auth/login', { email, password }),
+  register: (email, password, full_name) => authRequest('/api/auth/register', { email, password, full_name }),
   me: () => req('/api/auth/me'),
   users: () => req('/api/auth/users'),
+  createUser: ({ email, password, full_name = '', role = 'analyst' }) =>
+    req('/api/auth/users', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, full_name, role }),
+    }),
   setUserRole: (id, role) => req(`/api/auth/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
 
   // forge
@@ -199,6 +220,42 @@ export const api = {
   forgeRecords: (batchId) => req(`/api/forge/records${batchId ? `?batch_id=${batchId}` : ''}`),
   forgeJsonlUrl: (batchId) => `${BASE}/api/forge/export/jsonl${batchId ? `?batch_id=${batchId}` : ''}`,
   forgeCsvUrl: (batchId) => `${BASE}/api/forge/export/csv${batchId ? `?batch_id=${batchId}` : ''}`,
+  /** Wake Render, then download forge export as a file (avoids Cloudflare 520 on cold/dead origin). */
+  async forgeDownload(format, batchId) {
+    await wakeApi(90000);
+    const path = format === 'csv'
+      ? `/api/forge/export/csv${batchId ? `?batch_id=${encodeURIComponent(batchId)}` : ''}`
+      : `/api/forge/export/jsonl${batchId ? `?batch_id=${encodeURIComponent(batchId)}` : ''}`;
+    const headers = {};
+    if (_token) headers.Authorization = `Bearer ${_token}`;
+    let res;
+    let attempt = 0;
+    while (attempt < 3) {
+      attempt += 1;
+      try {
+        res = await fetch(`${BASE}${path}`, { headers });
+        if (res.ok) break;
+        // 520/502/503 from Cloudflare/Render while origin restarts
+        if ([502, 503, 520, 521, 522, 524].includes(res.status) && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 3000 * attempt));
+          continue;
+        }
+        throw new Error(`Export failed (${res.status})`);
+      } catch (err) {
+        if (attempt >= 3) throw err;
+        await new Promise((r) => setTimeout(r, 3000 * attempt));
+      }
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = format === 'csv' ? 'forge_export.csv' : 'forge_export.jsonl';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   // FHIR/HL7 ingestion
   ingestFhir: (bundle) => req('/api/ingest/fhir', { method: 'POST', body: JSON.stringify(bundle) }),

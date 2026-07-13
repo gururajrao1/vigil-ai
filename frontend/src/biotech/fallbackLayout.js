@@ -79,7 +79,7 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
         { id: 'mission', label: 'Mission', href: '/#manifesto' },
         { id: 'tech', label: 'Technology', href: '/#pillars' },
         { id: 'signal', label: 'Spotlight', href: '/#spotlight' },
-        { id: 'platform', label: 'Enter platform', href: '/dashboard', emphasis: true },
+        { id: 'platform', label: 'Login', href: '/login', emphasis: true },
       ],
     },
     hero_manifesto: {
@@ -95,7 +95,7 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
         { label: 'AE-gated yield', value: String(ae), unit: 'posts', provenance: 'live_unstructured_pipeline' },
         { label: 'Active pairs', value: String(signalCount), unit: 'signals', provenance: 'live_unstructured_pipeline' },
       ],
-      primary_cta: { label: 'Enter the platform', href: '/dashboard' },
+      primary_cta: { label: 'Login', href: '/login' },
       secondary_cta: { label: 'Open signal workbench', href: '/signals' },
     },
     technology_pillars: [
