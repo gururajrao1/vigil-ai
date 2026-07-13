@@ -465,21 +465,6 @@ docker-compose up --build
 
 ---
 
-## 14. Recommended demo / KT path (~10 min)
-
-Use this as **speaker notes** for a live walkthrough.
-
-| Min | Step | Where |
-|-----|------|-------|
-| 0–1 | Login · show backend online · project switcher | Header / sidebar |
-| 1–2 | Corpus metrics · AE bar → Signals | Dashboard |
-| 2–4 | Detect table · filters · open a STRONG/SDR row | Safety Signals |
-| 4–6 | Gates · PRR/EB05 · WHO-UMC · evidence cards | Signal Detail |
-| 6–7 | Workflow assign **or** Alert Escalate | Workflow / Alerts |
-| 7–8 | One lens (SMQ or Class) | Analytic Lenses |
-| 8–9 | KG + Story Mode isolate/contrast | Evidence Explorer |
-| 9–10 | Network registry: live vs surrogate honesty | Data Sources |
-| Optional | Forge / Agent chat / Pathfinder | Workspace |
 
 **Do not mid-demo:** Reset DB · Reddit Pullpush · wait on cold full recompute with openFDA for every source.
 
