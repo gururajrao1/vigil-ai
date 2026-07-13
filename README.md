@@ -4,9 +4,6 @@
 > Social listening → clinical NLP → explainable AE gates → regulator-shaped signal detection → workflow → export  
 > **Offline-first · zero required API keys · drugs, vaccines, and devices**
 
-**This README is the single knowledge-transfer (KT) + GitHub entrypoint.**  
-Sections are **slide-sized** — each `##` heading ≈ one slide; tables copy cleanly into decks.
-
 Deeper handouts: [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
 
 ---
