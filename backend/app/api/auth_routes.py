@@ -23,7 +23,8 @@ class RegisterReq(BaseModel):
     email: str
     password: str
     full_name: str = ""
-    role: str = "analyst"
+    # Optional client field ignored — role is assigned server-side only.
+    role: str | None = None
 
 
 class LoginReq(BaseModel):
@@ -33,9 +34,15 @@ class LoginReq(BaseModel):
 
 @router.post("/register")
 def register(req: RegisterReq, db: Session = Depends(get_db)):
+    """Public self-signup.
+
+    Role policy:
+    - Zero users in DB → first account is admin (bootstrap only).
+    - Otherwise every public registration is viewer (read-only).
+    - Analyst / admin elevation is admin-only via /api/auth/users.
+    """
     if db.query(User).filter(User.email == req.email.lower().strip()).first():
         raise HTTPException(400, "email already registered")
-    # First user becomes admin; subsequent public registrations are viewers.
     role = "admin" if db.query(User).count() == 0 else "viewer"
     user = create_user(db, req.email, req.password, req.full_name, role)
     return {"token": create_token(user), "user": user_to_dict(user)}
