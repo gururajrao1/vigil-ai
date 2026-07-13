@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from ..analytics.kpis import compute_kpis, recent_audit
+from ..auth import require_role
 from ..config import settings
 from ..database import get_db, SessionLocal
 from ..demo import prepare_demo, prewarm_signals
@@ -92,7 +93,8 @@ def recompute_only(db: Session = Depends(get_db)):
 
 @router.post("/ingest/seed")
 def ingest_seed(days: int = 21, ml: bool = False, demo: bool = True,
-                db: Session = Depends(get_db)):
+                db: Session = Depends(get_db),
+                _user=Depends(require_role("analyst"))):
     """Ingest a synthetic corpus into the active project workspace.
 
     Uses the header ``X-Project-Id`` (set by the UI project dropdown). When the
@@ -616,7 +618,7 @@ def stream_tick(n: int = 3, recompute: bool = False, db: Session = Depends(get_d
 
 
 @router.post("/reset")
-def reset(db: Session = Depends(get_db)):
+def reset(db: Session = Depends(get_db), _admin=Depends(require_role("admin"))):
     db.query(Alert).delete()
     db.query(Signal).delete()
     db.query(ProcessedPost).delete()
