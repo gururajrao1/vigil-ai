@@ -3,11 +3,26 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth, useRefresh } from '../App';
 import BiotechHomepageRenderer from './BiotechHomepageRenderer';
+import { buildFallbackHomepage } from './fallbackLayout';
 import { BIOTECH_TOKENS as T } from './tokens';
+
+async function loadHomepage(focusDrug) {
+  try {
+    return await api.biotechHomepage(focusDrug || undefined);
+  } catch {
+    // Render may lag behind Vercel — compose from endpoints that already exist in production.
+    const [stats, sigPayload] = await Promise.all([
+      api.stats().catch(() => ({})),
+      api.signals(focusDrug ? { drug: focusDrug } : {}).catch(() => ({ signals: [] })),
+    ]);
+    const signals = Array.isArray(sigPayload) ? sigPayload : (sigPayload.signals || []);
+    return buildFallbackHomepage({ stats, signals, focusDrug: focusDrug || undefined });
+  }
+}
 
 /**
  * Public-facing biotech product homepage.
- * Schema from FastMCP / HTTP bridge — optional ?drug= scopes the spotlight.
+ * Prefers FastMCP/HTTP schema; falls back to stats+signals if API host is stale.
  */
 export default function BiotechHomepagePage() {
   const { tick } = useRefresh();
@@ -20,8 +35,8 @@ export default function BiotechHomepagePage() {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .biotechHomepage(drug || undefined)
+    setLayout(null);
+    loadHomepage(drug)
       .then((d) => {
         if (!cancelled) {
           setLayout(d);
@@ -37,12 +52,11 @@ export default function BiotechHomepagePage() {
   const onNavigate = (href) => {
     if (!href) return;
     if (href.startsWith('/#')) {
-      const id = href.slice(2);
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById(href.slice(2))?.scrollIntoView({ behavior: 'auto' });
       return;
     }
     if (href.startsWith('#')) {
-      document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+      document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'auto' });
       return;
     }
     if (!user && (href.startsWith('/dashboard') || href.startsWith('/signals') || href.startsWith('/lenses'))) {
@@ -59,12 +73,12 @@ export default function BiotechHomepagePage() {
     }
     if (action?.kind === 'recompute') {
       await api.recompute();
-      setLayout(await api.biotechHomepage(drug || undefined));
+      setLayout(await loadHomepage(drug));
       return;
     }
     if (action?.kind === 'forge_sim') {
       await api.streamTick(action.payload?.n || 5, true);
-      setLayout(await api.biotechHomepage(drug || undefined));
+      setLayout(await loadHomepage(drug));
     }
   };
 
@@ -83,7 +97,6 @@ export default function BiotechHomepagePage() {
     );
   }
 
-  // Inject sign-in CTA into nav when logged out
   const navLayout = !user
     ? {
         ...layout,
