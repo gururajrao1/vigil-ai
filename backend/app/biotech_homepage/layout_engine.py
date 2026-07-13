@@ -209,7 +209,7 @@ def render_biotech_homepage(
                 ),
             ],
             primary_cta={"label": "Login", "href": "/login"},
-            secondary_cta={"label": "Open signal workbench", "href": "/signals"},
+            secondary_cta=None,
         ),
         technology_pillars=[
             TechnologyPillar(

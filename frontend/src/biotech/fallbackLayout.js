@@ -96,7 +96,7 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
         { label: 'Active pairs', value: String(signalCount), unit: 'signals', provenance: 'live_unstructured_pipeline' },
       ],
       primary_cta: { label: 'Login', href: '/login' },
-      secondary_cta: { label: 'Open signal workbench', href: '/signals' },
+      secondary_cta: undefined,
     },
     technology_pillars: [
       {

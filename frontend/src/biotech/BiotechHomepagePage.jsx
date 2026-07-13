@@ -176,8 +176,7 @@ export default function BiotechHomepagePage() {
     hero_manifesto: {
       ...layout.hero_manifesto,
       primary_cta: { label: loginLabel, href: loginHref, disabled: !apiReady },
-      // One Login CTA only — no duplicate secondary.
-      secondary_cta: null,
+      secondary_cta: undefined,
     },
     cta_strip: user
       ? (layout.cta_strip || {})

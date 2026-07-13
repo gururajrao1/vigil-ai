@@ -166,7 +166,7 @@ function HeroManifesto({ hero, onNavigate }) {
               {hero.primary_cta.label}
             </button>
           )}
-          {hero.secondary_cta?.href && (
+          {hero.secondary_cta?.href && hero.secondary_cta?.label ? (
             <button
               type="button"
               disabled={!!hero.secondary_cta.disabled}
@@ -186,7 +186,7 @@ function HeroManifesto({ hero, onNavigate }) {
             >
               {hero.secondary_cta.label}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
       <aside style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

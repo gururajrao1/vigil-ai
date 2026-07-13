@@ -8,8 +8,8 @@ export default function Login() {
   const { login } = useAuth();
   const nav = useNavigate();
   const [mode, setMode] = useState('login');
-  const [email, setEmail] = useState('admin@vigilai.dev');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -72,32 +72,34 @@ export default function Login() {
           </p>
         </div>
 
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="space-y-3" autoComplete="off">
           {mode === 'register' && (
             <input
               className="app-input"
               placeholder="Full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
+              autoComplete="off"
             />
           )}
           <input
             className="app-input"
             placeholder="Email"
             type="email"
+            name="vigilai-email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            autoComplete="username"
+            autoComplete="off"
             required
           />
           <input
             type="password"
             className="app-input"
             placeholder="Password"
+            name="vigilai-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            autoComplete="new-password"
             required
           />
           {err && <div className="text-xs text-rose-400 font-mono">{err}</div>}
@@ -105,13 +107,6 @@ export default function Login() {
             {busy ? 'Please wait…' : (mode === 'login' ? 'Sign in' : 'Register')}
           </Button>
         </form>
-
-        <p className="mt-4 text-[11px] text-[var(--app-text-faint)] leading-snug font-mono space-y-1">
-          <span className="block">Demo accounts</span>
-          <span className="block text-[var(--app-text-muted)]">admin@vigilai.dev / admin123 · admin</span>
-          <span className="block text-[var(--app-text-muted)]">analyst@vigilai.dev / analyst123 · analyst</span>
-          <span className="block text-[var(--app-text-muted)]">viewer@vigilai.dev / viewer123 · viewer</span>
-        </p>
 
         <button
           type="button"
