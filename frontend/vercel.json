@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://vigil-ai-api.onrender.com/api/:path*"
+      "destination": "https://api-production-87a1.up.railway.app/api/:path*"
     },
     {
       "source": "/(.*)",
