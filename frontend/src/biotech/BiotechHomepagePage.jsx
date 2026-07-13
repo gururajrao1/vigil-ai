@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth, useRefresh } from '../App';
 import BiotechHomepageRenderer from './BiotechHomepageRenderer';
@@ -28,6 +28,7 @@ export default function BiotechHomepagePage() {
   const { tick } = useRefresh();
   const { user } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
   const drug = params.get('drug') || '';
   const [layout, setLayout] = useState(null);
@@ -51,15 +52,17 @@ export default function BiotechHomepagePage() {
 
   const onNavigate = (href) => {
     if (!href) return;
-    if (href.startsWith('/#')) {
-      document.getElementById(href.slice(2))?.scrollIntoView({ behavior: 'auto' });
+    // Hash anchors on the homepage (mission / pillars / spotlight)
+    if (href === '/#manifesto' || href === '/#pillars' || href === '/#spotlight' || href.startsWith('#')) {
+      const id = href.includes('#') ? href.split('#')[1] : href.slice(1);
+      if (location.pathname !== '/' && location.pathname !== '/home') {
+        nav(`/${href.includes('#') ? href.slice(href.indexOf('#')) : `#${id}`}`);
+        return;
+      }
+      document.getElementById(id)?.scrollIntoView({ behavior: 'auto' });
       return;
     }
-    if (href.startsWith('#')) {
-      document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'auto' });
-      return;
-    }
-    if (!user && (href.startsWith('/dashboard') || href.startsWith('/signals') || href.startsWith('/lenses'))) {
+    if (!user && href !== '/login' && href !== '/' && href !== '/home') {
       nav('/login');
       return;
     }

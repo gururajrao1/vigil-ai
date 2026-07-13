@@ -512,6 +512,7 @@ export default function App() {
   const closeNav = useCallback(() => setNavOpen(false), []);
   const location = useLocation();
   const isBiotechHome = location.pathname === '/' || location.pathname === '/home';
+  const isLoginPath = location.pathname === '/login';
 
   useEffect(() => {
     if (!user) return undefined;
@@ -538,18 +539,14 @@ export default function App() {
         <div className="login-gate min-h-[100dvh] flex items-center justify-center text-sm text-[var(--app-text-muted)]">
           Loading VigilAI…
         </div>
+      ) : isLoginPath && !user ? (
+        <Login />
       ) : isBiotechHome ? (
         <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
-          <Routes>
-            <Route path="/" element={<BiotechHomepagePage />} />
-            <Route path="/home" element={<BiotechHomepagePage />} />
-          </Routes>
+          <BiotechHomepagePage />
         </RefreshContext.Provider>
       ) : !user ? (
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+        <Navigate to="/login" replace />
       ) : (
       <ProjectProvider>
       <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
@@ -614,7 +611,7 @@ export default function App() {
                 <Route path="/source-queue" element={<DiscoveryHub />} />
                 <Route path="/sources" element={<SourcesHub />} />
                 <Route path="/forge" element={<Forge />} />
-                <Route path="/login" element={<Navigate to="/" replace />} />
+                <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/corporate" element={<Navigate to="/" replace />} />
                 <Route path="/classic" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/kpis" element={<Navigate to="/dashboard?tab=ops" replace />} />

@@ -88,7 +88,7 @@ export function Spinner({ label = 'Loading…' }) {
   );
 }
 
-export function Button({ children, onClick, variant = 'primary', disabled, className = '' }) {
+export function Button({ children, onClick, variant = 'primary', disabled, className = '', type = 'button' }) {
   const styles = {
     primary: 'bg-[var(--app-accent)] hover:opacity-90 text-[#030712]',
     ghost: 'bg-[var(--app-surface)] hover:bg-[var(--app-surface-hover)] text-[var(--app-text-secondary)] border border-[var(--app-border)]',
@@ -96,7 +96,7 @@ export function Button({ children, onClick, variant = 'primary', disabled, class
   };
   return (
     <button
-      type="button"
+      type={type}
       disabled={disabled}
       onClick={onClick}
       className={`px-3 py-1.5 text-sm font-semibold disabled:opacity-50 ${styles[variant] || styles.primary} ${className}`}
