@@ -15,8 +15,11 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [apiReady, setApiReady] = useState(false);
   const [status, setStatus] = useState('Connecting to server…');
+  // Remount inputs when mode changes so the browser cannot paste saved admin creds into Register.
+  const [formKey, setFormKey] = useState(0);
+  const [unlockEmail, setUnlockEmail] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState(false);
 
-  // Pre-wake Render as soon as the login form is shown so submit is usually instant.
   useEffect(() => {
     let cancelled = false;
     setApiReady(false);
@@ -28,6 +31,17 @@ export default function Login() {
     });
     return () => { cancelled = true; };
   }, []);
+
+  const switchMode = (next) => {
+    setMode(next);
+    setEmail('');
+    setPassword('');
+    setName('');
+    setErr('');
+    setUnlockEmail(false);
+    setUnlockPassword(false);
+    setFormKey((k) => k + 1);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -67,12 +81,24 @@ export default function Login() {
           <p className="mt-2 text-sm text-[var(--app-text-muted)] leading-snug">
             Worldwide pharmacovigilance & device-vigilance — social listening to explainable safety signals.
           </p>
+          {mode === 'register' && (
+            <p className="mt-2 text-[11px] text-[var(--app-text-faint)] leading-snug">
+              Self-registered accounts start as <span className="text-[var(--app-text-muted)]">viewer</span> (read-only).
+              An admin promotes analysts from the Users page.
+            </p>
+          )}
           <p className={`mt-2 text-[11px] font-mono ${apiReady ? 'text-emerald-400/90' : 'text-[var(--app-text-faint)]'}`}>
             {status}
           </p>
         </div>
 
-        <form onSubmit={submit} className="space-y-3" autoComplete="off">
+        {/* Hidden decoys soak Chrome password-manager autofill */}
+        <div aria-hidden className="absolute opacity-0 pointer-events-none h-0 w-0 overflow-hidden">
+          <input type="text" name="username" tabIndex={-1} autoComplete="username" />
+          <input type="password" name="password" tabIndex={-1} autoComplete="current-password" />
+        </div>
+
+        <form key={formKey} onSubmit={submit} className="space-y-3" autoComplete="off">
           {mode === 'register' && (
             <input
               className="app-input"
@@ -80,26 +106,31 @@ export default function Login() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoComplete="off"
+              name={`full-name-${formKey}`}
             />
           )}
           <input
             className="app-input"
             placeholder="Email"
             type="email"
-            name="vigilai-email"
+            name={`email-${formKey}`}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="off"
+            readOnly={!unlockEmail}
+            onFocus={() => setUnlockEmail(true)}
             required
           />
           <input
             type="password"
             className="app-input"
             placeholder="Password"
-            name="vigilai-password"
+            name={`pass-${formKey}`}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
+            readOnly={!unlockPassword}
+            onFocus={() => setUnlockPassword(true)}
             required
           />
           {err && <div className="text-xs text-rose-400 font-mono">{err}</div>}
@@ -110,7 +141,7 @@ export default function Login() {
 
         <button
           type="button"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+          onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
           className="mt-4 text-xs text-[var(--app-accent)]"
         >
           {mode === 'login' ? 'Need an account? Register' : 'Have an account? Sign in'}

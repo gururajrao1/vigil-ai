@@ -70,6 +70,14 @@ export default function UsersAdmin() {
           title="User administration"
           subtitle="Admin-only · list accounts, create users, and assign roles (admin › analyst › viewer)."
         />
+        <div className="mt-3 text-xs text-[var(--app-text-muted)] leading-relaxed border border-[var(--app-border)] p-3" style={{ borderRadius: 4 }}>
+          <strong className="text-[var(--app-text)]">How roles are assigned</strong>
+          <ul className="mt-2 list-disc pl-4 space-y-1">
+            <li>Public Register → always <span className="font-mono">viewer</span> (read-only).</li>
+            <li>Create user here → you choose <span className="font-mono">viewer</span> / <span className="font-mono">analyst</span> / <span className="font-mono">admin</span>.</li>
+            <li>Change role anytime with the dropdown on each account.</li>
+          </ul>
+        </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {ROLE_GUIDE.map((r) => (
             <div
