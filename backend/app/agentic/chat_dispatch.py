@@ -57,14 +57,14 @@ _UNSUPPORTED = {
 }
 
 _HELP_RE = re.compile(
-    r"^\s*(help|hi|hello|hey|status|what can you do|capabilities|sources|"
+    r"^\s*(?:help|hi|hello|hey|status|what can you do\??|capabilities|sources|"
     r"list sources|how do i|commands|\?)\s*[.!]?\s*$",
     re.I,
 )
 
 _QUERY_HINTS = re.compile(
     r"(?:about|for|on|regarding|query[=:\s]+|search(?:ing)?(?:\s+for)?|"
-    r"looking for|find|fetch(?:ing)?)\s+(.+)$",
+    r"looking for|find)\s+(.+)$",
     re.I,
 )
 
