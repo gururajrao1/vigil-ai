@@ -294,37 +294,45 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
             if ev:
                 symptoms.add(ev)
 
-        # AE-flagged posts only (RDF layer adds these); skip non-AE NER noise.
+        # AE-flagged posts: geography only. Product/event dropdowns stay Signal-backed
+        # so we never list NER mentions that have no disproportionality pair / KG edge.
         post_q = (
-            db.query(ProcessedPost, RawPost)
-            .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+            db.query(RawPost)
+            .join(ProcessedPost, ProcessedPost.raw_id == RawPost.id)
             .filter(ProcessedPost.ae_flag.is_(True))
         )
         if scope is not None:
             post_q = post_q.filter(_legacy_project_clause(RawPost.project_id, scope))
-        for proc, raw in post_q.all():
+        for raw in post_q.all():
             if raw.country:
                 countries.add(normalize_label(raw.country, kind="region") or raw.country)
             if raw.region:
                 regions.add(normalize_label(raw.region, kind="region") or raw.region)
+
+            # Conditions that co-occur on AE posts with a signal product can appear
+            # as indication edges in RDF; only keep if the post also names a known drug.
             try:
+                proc = (
+                    db.query(ProcessedPost)
+                    .filter(ProcessedPost.raw_id == raw.id)
+                    .first()
+                )
+                if not proc:
+                    continue
                 ent = json.loads(proc.entities_json or "{}")
             except json.JSONDecodeError:
                 continue
+            post_drugs = set()
             for d in ent.get("drugs", []):
                 text = (d.get("normalized") or d.get("text") or "").strip()
                 if text:
-                    drugs.add(text)
+                    post_drugs.add(text.lower())
                 canon = canonical_product(text)
                 if canon:
-                    drugs.add(canon)
-            for sym in ent.get("symptoms", []):
-                text = (sym.get("pt") or sym.get("normalized") or "").strip()
-                if text:
-                    symptoms.add(text)
-                ev = canonical_event(text)
-                if ev:
-                    symptoms.add(ev)
+                    post_drugs.add(canon.lower())
+            known = {x.lower() for x in drugs}
+            if not post_drugs.intersection(known):
+                continue
             for c in ent.get("conditions", []):
                 from ..nlp.condition_norm import canonical_condition
 
