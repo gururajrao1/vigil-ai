@@ -55,5 +55,18 @@ def onboard(req: OnboardReq, db: Session = Depends(get_db),
 @router.post("/chat")
 def agent_chat(req: ChatReq, db: Session = Depends(get_db),
                _user=Depends(require_role("analyst"))):
-    """Conversational crawl dispatcher (Algo-Pharma MCP-lite equivalent)."""
-    return chat_dispatch(db, req.message, execute=req.execute)
+    """Conversational crawl dispatcher (Algo-Pharma MCP-lite equivalent).
+
+    Always returns a JSON payload — crawl/parse failures are soft errors in the
+    reply body so the Agent chat UI never sees a bare 500 for bad prompts.
+    """
+    try:
+        return chat_dispatch(db, req.message or "", execute=req.execute)
+    except Exception as exc:  # last-resort guard
+        return {
+            "status": "error",
+            "parsed": {"slots": {}, "raw": req.message, "mode": "error"},
+            "fetched": 0,
+            "ingested": 0,
+            "reply": f"Agent error ({type(exc).__name__}: {exc}). Try `help` or `fetch google news about ozempic`.",
+        }

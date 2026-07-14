@@ -5,11 +5,14 @@ import { useAuth, useRefresh } from '../App';
 import { Badge, Button, Card, CardHeader } from '../components/ui';
 
 const EXAMPLES = [
+  'help',
   'crawl google news about ozempic side effects',
-  'fetch hackernews drug safety',
-  'pull life science news',
-  'crawl youtube about vaccine side effects',
-  'fetch pubmed pharmacovigilance',
+  'fetch reddit for accutane depression',
+  'pull faers limit 10',
+  'search pubmed for myocarditis vaccine',
+  'life science news',
+  'pull maude',
+  'hacker news about drug safety',
 ];
 
 export default function Command({ embedded = false }) {
@@ -61,7 +64,7 @@ export default function Command({ embedded = false }) {
       <Card className="p-5">
         <CardHeader
           title="Command Center · MCP-lite crawl dispatch"
-          subtitle="Chat → slot-fill (source + query) → crawl → ingest. Algo-Pharma-style agent without Groq/MCP infra."
+          subtitle="Chat → parse source + query → crawl → ingest. Ask help for commands. Recompute signals from the Demo bar when ready."
         />
         <div className="mt-3 flex flex-wrap gap-2">
           {EXAMPLES.map((ex) => (
@@ -75,7 +78,7 @@ export default function Command({ embedded = false }) {
           <input className="flex-1 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
             value={message} onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
-            placeholder='e.g. crawl youtube about ozempic side effects' />
+            placeholder='e.g. fetch google news about ozempic · help · pull faers limit 10' />
           <Button variant="primary" disabled={busy} onClick={() => send()}>
             {busy ? 'Running…' : '▶ Dispatch'}
           </Button>
