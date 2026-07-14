@@ -3,14 +3,24 @@
 Stack used for the live app:
 
 - **Frontend:** Vercel — https://vigil-ai-eight.vercel.app  
-- **Backend:** Railway Web Service (Docker) + Postgres — proxied as `/api/*` from Vercel  
-- **Auth:** JWT roles admin / analyst / viewer (`backend/app/rbac.py`)
+- **Backend:** Railway Web Service (Docker) + Postgres — https://api-production-87a1.up.railway.app · proxied as `/api/*` from Vercel  
+- **Auth:** JWT roles admin / analyst / viewer (`backend/app/rbac.py`)  
+- **Corpus:** persisted on Railway Postgres (~1.3k unique posts). Dashboard is **project-scoped** (General PV ≈ 1.1k by default).
 
 > Older notes mentioned Render free tier. Production `/api` now targets Railway (`frontend/vercel.json`). Prefer Railway for RBAC-current code.
 
 ## Empty dashboards / cold start?
 
-Postgres on Railway persists posts across deploys. After idle, wake the API once via `/api/health`, then use **Demo corpus** / Fetch as an **analyst or admin**.
+Postgres on Railway persists posts across deploys — deploys do **not** wipe the corpus. After idle, wake the API once via `/api/health`, then browse as usual. Use **Demo corpus** / Fetch only as an **analyst or admin** when you intentionally want more volume.
+
+To merge unique rows from a local `backend/vigilai.db` without truncating production:
+
+```powershell
+cd backend
+# Set DATABASE_PUBLIC_URL from Railway Postgres vars (public proxy), then:
+.\.venv\Scripts\python.exe scripts\merge_sqlite_into_pg.py
+# Then POST /api/recompute as admin/analyst
+```
 
 ## 1) Backend (Railway)
 
