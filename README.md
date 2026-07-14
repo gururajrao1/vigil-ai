@@ -4,7 +4,10 @@
 > Social listening → clinical NLP → explainable AE gates → regulator-shaped signal detection → workflow → export  
 > **Offline-first · zero required API keys · drugs, vaccines, and devices**
 
-Deeper handouts: [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+**Live app:** https://vigil-ai-eight.vercel.app  
+**API:** Railway (`/api` proxied from Vercel) · wake `/api/health` once after idle (~30–60s cold start)
+
+Deeper handouts: [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) · [`docs/DEPLOY_FREE.md`](docs/DEPLOY_FREE.md)
 
 ---
 
@@ -24,11 +27,9 @@ Deeper handouts: [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.
 | 10 | [NLP & 4-gate AE](#10-nlp--4-gate-ae-engine) | Explainability |
 | 11 | [Data sources](#11-data-sources--network-registry) | Ingest honesty |
 | 12 | [Workflow & alerts](#12-workflow--alerts) | Ops story |
-| 13 | [How to run](#13-how-to-run) | Setup |
-| 14 | [Demo path](#14-recommended-demo--kt-path) | Live walkthrough |
-| 15 | [Config & roles](#15-configuration--roles) | Ops |
-| 16 | [Disclaimers](#16-disclaimers-say-these-out-loud) | Compliance |
-| 17 | [Slide deck outline](#17-ready-made-slide-outline) | Export to PPT |
+| 13 | [How to run](#13-how-to-run) | Setup + live URLs |
+| 14 | [Config & roles](#14-configuration--roles) | Auth / RBAC |
+| 15 | [Disclaimers](#15-disclaimers) | Compliance |
 
 ---
 
@@ -176,14 +177,18 @@ vigil-ai/
 │   │   ├── agentic/          ← Command Center chat → crawl dispatch
 │   │   ├── projects/         ← workspaces, pathfinder, KG RDF, divergence
 │   │   ├── forge/            ← synthetic data generator
+│   │   ├── biotech_homepage/ ← public homepage layout schema
+│   │   ├── rbac.py           ← admin / analyst / viewer write gates
 │   │   └── scheduler.py      ← background / stream ticks
 │   ├── tests/                ← disproportionality + AE detector suites
 │   └── .env.example
 ├── frontend/
 │   └── src/
-│       ├── App.jsx           ← shell, nav, demo bar, routes
-│       ├── api.js            ← client
-│       ├── pages/            ← hubs + feature pages
+│       ├── App.jsx           ← shell, role-aware nav, demo bar, routes
+│       ├── api.js            ← client (wake + auth retries)
+│       ├── roles.js          ← role helpers for UI gates
+│       ├── biotech/          ← public homepage (Login CTA · boot loader)
+│       ├── pages/            ← hubs + UsersAdmin + feature pages
 │       └── components/       ← UI primitives, story sidebar, etc.
 └── docs/                     ← deep guides (see bottom)
 ```
@@ -213,25 +218,33 @@ vigil-ai/
 
 Sidebar is intentionally **small**. Related views are **tabs inside hubs**.
 
-### Core
+### Public
+
+| Surface | Route | Purpose |
+|---------|-------|---------|
+| **Homepage** | `/` | Biotech marketing stage · single **Login** CTA (waits for API wake) |
+| **Sign in / Register** | `/login` | Blank credential form · public register → **viewer** |
+
+### Core (after login)
 
 | Hub | Route | Tabs | Purpose |
 |-----|-------|------|---------|
-| **Dashboard** | `/` | Corpus metrics · Ops KPIs & SPC | Volume, AE rate, triage quality |
+| **Dashboard** | `/dashboard` | Corpus metrics · Ops KPIs & SPC | Volume, AE rate, triage quality |
 | **Safety Signals** | `/signals` | Detect · Workflow · Alert inbox | Find → manage → escalate |
 | **Analytic Lenses** | `/lenses` | SMQ · Class · Vaccine · Geo · vs FAERS | Overlays on core DMA |
 | **Evidence Explorer** | `/graph` | Drug↔AE graph · Compare story · Glossary | Relationships & narrative |
 
 ### Workspace
 
-| Hub | Route | Tabs | Purpose |
-|-----|-------|------|---------|
-| **Projects** | `/projects` | — | Therapeutic workspaces (PV / oncology / vaccine…) |
-| **Source Discovery** | `/source-queue` | Pathfinder queue · Manual forum URL | Find & onboard communities |
-| **Data Sources** | `/sources` | Catalog · Live stream · Network registry · Agent chat | Ingest & honesty map |
-| **Data Forge** | `/forge` | — | Synthetic (fictional) patient posts |
+| Hub | Route | Who | Purpose |
+|-----|-------|-----|---------|
+| **Projects** | `/projects` | Analyst+ | Therapeutic workspaces (PV / oncology / vaccine…) |
+| **Source Discovery** | `/source-queue` | Analyst+ | Pathfinder queue · Manual forum URL |
+| **Data Sources** | `/sources` | All roles (read) | Catalog · Live stream · Network registry · Agent chat |
+| **Data Forge** | `/forge` | Analyst+ | Synthetic (fictional) patient posts |
+| **Users** | `/users` | **Admin only** | List / create accounts · change roles |
 
-**Shortcuts:** `⌘K` / `Ctrl+K` command palette · header **Sources → Fetch** for multi-crawl · project dropdown scopes the workspace.
+**Shortcuts:** `⌘K` / `Ctrl+K` command palette · header **Sources → Fetch** (analyst+) · **Reset** (admin only) · project dropdown scopes the workspace.
 
 Legacy URLs (`/lifecycle`, `/alerts`, `/smq`, …) **redirect** into the hubs above.
 
@@ -418,7 +431,17 @@ Plain labels: **Inbox → Looking into it → Looks real → High priority → W
 
 ## 13. How to run
 
-### Prerequisites
+### Live (production)
+
+| Piece | URL |
+|-------|-----|
+| **App** | https://vigil-ai-eight.vercel.app |
+| **Login** | https://vigil-ai-eight.vercel.app/login |
+| **API health** | https://vigil-ai-eight.vercel.app/api/health (Vercel → Railway) |
+
+Frontend: Vercel · Backend: Railway (Postgres) · `frontend/vercel.json` rewrites `/api/*` to the Railway API.
+
+### Prerequisites (local)
 
 - Python 3.11+ · Node.js 18+  
 - Optional: [Ollama](https://ollama.ai) → `ollama pull llama3.2:3b`  
@@ -455,7 +478,7 @@ docker-compose up --build
 
 - UI http://localhost:5173 · API http://localhost:8000/docs
 
-### Default users
+### Default users (seeded)
 
 | Role | Email | Password |
 |------|-------|----------|
@@ -465,14 +488,13 @@ docker-compose up --build
 
 ---
 
-
 **Do not mid-demo:** Reset DB · Reddit Pullpush · wait on cold full recompute with openFDA for every source.
 
 **Prefer:** existing corpus · Google News / FAERS / life-science · header Fetch with `recompute` once at the end.
 
 ---
 
-## 15. Configuration & roles
+## 14. Configuration & roles
 
 ### Optional env (`backend/.env`)
 
@@ -482,19 +504,35 @@ docker-compose up --build
 | `TWITTERAPI_IO_KEY` | X / Twitter |
 | `GEMINI_API_KEY` | Cloud LLM if Ollama down |
 | `FIRECRAWL_API_KEY` | Richer forum scrape |
+| `TAVILY_API_KEY` / `EXA_API_KEY` | Pathfinder discovery (optional) |
 | `ALERT_WEBHOOK_URL` | Live Slack/Teams on Escalate |
 | `OPENROUTER_API_KEY` | Extra LLM fallback |
-| `DATABASE_URL` | Postgres in prod / Docker |
+| `DATABASE_URL` | Postgres in prod (Railway / Docker); SQLite locally |
 
 **LLM chain:** Ollama → Gemini → OpenRouter → deterministic templates.
 
-### Roles
+### Roles (RBAC)
 
-| Role | Can |
-|------|-----|
-| **Admin** | Users, ingest, reset, everything |
-| **Analyst** | Analytics, review, lifecycle, Forge, Command, onboarding |
-| **Viewer** | Read signals / analytics / exports |
+Hierarchy: **admin (3) > analyst (2) > viewer (1)**. Enforced in UI and on mutating API routes (`backend/app/rbac.py` + `require_role`).
+
+| Capability | Viewer | Analyst | Admin |
+|------------|:------:|:-------:|:-----:|
+| Browse dashboard / signals / lenses / evidence | ✓ | ✓ | ✓ |
+| Fetch sources · demo corpus · stream / recompute | ✗ | ✓ | ✓ |
+| Projects · Source Discovery · Data Forge · agentic | ✗ | ✓ | ✓ |
+| Signal review / alert actions | ✗ | ✓ | ✓ |
+| **Users** page — list / create / change role | ✗ | ✗ | ✓ |
+| **Reset** database | ✗ | ✗ | ✓ |
+
+**How roles are assigned**
+
+| Path | Role |
+|------|------|
+| Public **Register** on `/login` | Always **viewer** |
+| First user in an empty DB | **admin** (bootstrap only) |
+| Admin **Users** page (`/users`) | Choose viewer / analyst / admin on create or role dropdown |
+
+Login form is blank (no demo-credential autofill). Homepage **Login** waits for API wake and clears any stale session so it is not a dashboard bypass.
 
 ---
 
@@ -508,9 +546,6 @@ docker-compose up --build
 - HR panel = **social-listening surrogate**, not a clinical hazard ratio  
 - Completeness = **documentation quality**, not causality  
 - VigiBase / Sentinel / NESTcc = **surrogate cards**, not ingested warehouses  
-
----
-
 
 ---
 

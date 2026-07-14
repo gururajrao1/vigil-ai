@@ -1,45 +1,43 @@
-# Free deploy (Vercel + Render) — no paid trial required
+# Free / low-cost deploy
 
-Stack used for submissions:
-- **Frontend:** Vercel Hobby (free)
-- **Backend:** Render free Web Service (Docker) — sleeps after ~15 min idle
-- **Database:** SQLite on the Render instance (ephemeral) **or** free Neon Postgres if you add `DATABASE_URL`
+Stack used for the live app:
 
-## Empty dashboards after sleep?
+- **Frontend:** Vercel — https://vigil-ai-eight.vercel.app  
+- **Backend:** Railway Web Service (Docker) + Postgres — proxied as `/api/*` from Vercel  
+- **Auth:** JWT roles admin / analyst / viewer (`backend/app/rbac.py`)
 
-With **Neon `DATABASE_URL`** on Render, posts/signals **persist** across free-tier sleep — Fetch and Demo corpus **accumulate**.
+> Older notes mentioned Render free tier. Production `/api` now targets Railway (`frontend/vercel.json`). Prefer Railway for RBAC-current code.
 
-If `DATABASE_URL` is unset, SQLite is wiped on sleep; `AUTO_SEED_DEMO=true` re-fills empty workspaces so demos aren’t blank (but history is lost).
+## Empty dashboards / cold start?
 
-## 1) Backend on Render (one-time clicks)
+Postgres on Railway persists posts across deploys. After idle, wake the API once via `/api/health`, then use **Demo corpus** / Fetch as an **analyst or admin**.
 
-1. Open: https://render.com/deploy?repo=https://github.com/gururajrao1/vigil-ai  
-2. Sign in with **GitHub** (same account as the repo).  
-3. Apply the Blueprint (`render.yaml`) → create **vigil-ai-api**.  
-4. Wait for the first deploy (5–10 min).  
-5. Copy the service URL, e.g. `https://vigil-ai-api.onrender.com`.
+## 1) Backend (Railway)
 
-Optional (persistent DB): create a free project at https://console.neon.tech → copy connection string → Render → Environment → `DATABASE_URL` → Redeploy.
+1. Create/link a Railway project with a Postgres service + `api` service.  
+2. From `backend/`: set `DATABASE_URL` (Postgres), `SEED_ADMIN_*`, `AUTO_SEED_DEMO`, optional `TAVILY_API_KEY`, then `railway up -s api`.  
+3. Generate a public domain for `api` (e.g. `https://api-….up.railway.app`).  
+4. Point `frontend/vercel.json` rewrite `/api/:path*` → that host’s `/api/:path*`.
 
-## 2) Frontend on Vercel
+## 2) Frontend (Vercel)
 
 ```powershell
 cd frontend
-vercel link --yes --project vigil-ai
-vercel env add VITE_API_BASE production
-# paste: https://YOUR-RENDER-URL   (no trailing slash)
 vercel --prod
 ```
 
-Or: Vercel Dashboard → Import `gururajrao1/vigil-ai` → Root Directory = `frontend` → Env `VITE_API_BASE` = Render URL → Deploy.
+Or: Vercel Dashboard → project root `frontend` → Deploy.
 
-## 3) Submit this link
+## 3) Demo credentials
 
-Give judges the **Vercel URL** only.
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@vigilai.dev` | `admin123` |
+| Analyst | `analyst@vigilai.dev` | `analyst123` |
+| Viewer | `viewer@vigilai.dev` | `viewer123` |
 
-Login: `admin@vigilai.dev` / `admin123`  
-Then: header **Sources → Fetch** (or Data Sources) → Safety Signals.
+Public Register → **viewer** only. Admins promote users on `/users`.
 
 ## Demo tip
 
-Before presenting, open `https://YOUR-RENDER-URL/api/health` once so Render wakes up (cold start 30–60s), then give the auto-seed ~1–2 minutes before walking a judge through the UI.
+Before presenting, open `/api/health` once so the API is warm, then walk judges through homepage → Login → Signals.
