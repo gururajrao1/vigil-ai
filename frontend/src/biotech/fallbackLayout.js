@@ -141,7 +141,7 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
     ],
     signal_spotlight: spot,
     honesty: {
-      title: 'Data integrity · biotech honesty',
+      title: 'Data integrity',
       live_pipeline:
         'Unstructured patient content is ingested and scored inside your workspace. Throughput numbers above reflect that live local pipeline.',
       surrogate_benchmarks:

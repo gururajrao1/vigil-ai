@@ -287,7 +287,7 @@ def render_biotech_homepage(
         ],
         signal_spotlight=_spotlight_from_signal(spotlight_sig, focus_drug),
         honesty=HonestyBlock(
-            title="Data integrity · biotech honesty",
+            title="Data integrity",
             live_pipeline=(
                 "Unstructured patient content is ingested and scored inside your "
                 "workspace (crawlers, RSS, Data Forge). Throughput numbers above "

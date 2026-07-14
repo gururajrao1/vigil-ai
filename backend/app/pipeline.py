@@ -382,11 +382,12 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     # here. A mass concurrent fan-out (hundreds of calls) tripped NCBI rate limits and
     # destabilized the worker, so enrichment is deferred to keep recompute fast + stable.
     if project_id is not None:
-        db.query(Signal).filter(Signal.project_id == project_id).delete(synchronize_session=False)
+        # Alerts first — FK alerts.signal_id → signals.id
         db.query(Alert).filter(Alert.project_id == project_id).delete(synchronize_session=False)
+        db.query(Signal).filter(Signal.project_id == project_id).delete(synchronize_session=False)
     else:
-        db.query(Signal).delete()
         db.query(Alert).delete()
+        db.query(Signal).delete()
 
     stored = []
     for sig in signals:
