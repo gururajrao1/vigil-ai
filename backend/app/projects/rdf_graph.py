@@ -259,7 +259,7 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
     that never formed a Signal or AE edge — selecting them showed an empty graph.
     Options are now limited to:
       • product / event labels on Signal rows (same strings as global KG nodes)
-      • entities on AE-flagged posts only (same population RDF/SPARQL ingests)
+      • conditions that co-occur with a signal drug on AE-flagged posts
       • geo from AE-flagged posts only
     """
     pid = project_id or 0
@@ -294,31 +294,22 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
             if ev:
                 symptoms.add(ev)
 
-        # AE-flagged posts: geography only. Product/event dropdowns stay Signal-backed
-        # so we never list NER mentions that have no disproportionality pair / KG edge.
+        # AE-flagged posts: geography + conditions that co-occur with a signal drug.
+        # Product/event dropdowns stay Signal-backed so NER-only ghosts (no KG edge) are excluded.
         post_q = (
-            db.query(RawPost)
-            .join(ProcessedPost, ProcessedPost.raw_id == RawPost.id)
+            db.query(ProcessedPost, RawPost)
+            .join(RawPost, ProcessedPost.raw_id == RawPost.id)
             .filter(ProcessedPost.ae_flag.is_(True))
         )
         if scope is not None:
             post_q = post_q.filter(_legacy_project_clause(RawPost.project_id, scope))
-        for raw in post_q.all():
+        known = {x.lower() for x in drugs}
+        for proc, raw in post_q.all():
             if raw.country:
                 countries.add(normalize_label(raw.country, kind="region") or raw.country)
             if raw.region:
                 regions.add(normalize_label(raw.region, kind="region") or raw.region)
-
-            # Conditions that co-occur on AE posts with a signal product can appear
-            # as indication edges in RDF; only keep if the post also names a known drug.
             try:
-                proc = (
-                    db.query(ProcessedPost)
-                    .filter(ProcessedPost.raw_id == raw.id)
-                    .first()
-                )
-                if not proc:
-                    continue
                 ent = json.loads(proc.entities_json or "{}")
             except json.JSONDecodeError:
                 continue
@@ -330,7 +321,6 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
                 canon = canonical_product(text)
                 if canon:
                     post_drugs.add(canon.lower())
-            known = {x.lower() for x in drugs}
             if not post_drugs.intersection(known):
                 continue
             for c in ent.get("conditions", []):
@@ -348,8 +338,9 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
         _collect(None)
 
     data = {
-        "drugs": dedupe_labels(list(drugs), kind="product"),
-        "symptoms": dedupe_labels(list(symptoms), kind="event"),
+        # Keep exact Signal labels (do not re-canonicalize) so they match graph node labels.
+        "drugs": sorted({d for d in drugs if d}, key=str.lower),
+        "symptoms": sorted({s for s in symptoms if s}, key=str.lower),
         "conditions": dedupe_labels(list(conditions), kind="condition"),
         "countries": dedupe_labels(list(countries), kind="region"),
         "regions": dedupe_labels(list(regions), kind="region"),
