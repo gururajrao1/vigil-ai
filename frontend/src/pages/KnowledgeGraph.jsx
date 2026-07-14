@@ -464,6 +464,28 @@ export default function KnowledgeGraph({ embedded = false }) {
     loadFilterOptions(project?.id).then(setFilterOpts);
   }, [project?.id, tick]);
 
+  // Prefer labels that actually exist as graph nodes so dropdowns never offer
+  // NER-only ghosts (mentioned in posts but no KG edge / signal pair).
+  const operableFilterOpts = useMemo(() => {
+    const nodes = rawKg?.nodes || [];
+    if (!nodes.length) return filterOpts;
+    const fromNodes = (type) =>
+      [...new Set(nodes.filter((n) => n.type === type).map((n) => n.label).filter(Boolean))].sort(
+        (a, b) => a.localeCompare(b),
+      );
+    const drugs = fromNodes('drug');
+    const symptoms = fromNodes('symptom');
+    const conditions = fromNodes('condition');
+    const geoNodes = fromNodes('region');
+    return {
+      drugs: drugs.length ? drugs : filterOpts.drugs,
+      symptoms: symptoms.length ? symptoms : filterOpts.symptoms,
+      conditions: conditions.length ? conditions : filterOpts.conditions,
+      countries: geoNodes.length ? geoNodes : filterOpts.countries,
+      regions: geoNodes.length ? geoNodes : filterOpts.regions,
+    };
+  }, [rawKg, filterOpts]);
+
   const loadBaseGraph = useCallback(async () => {
     const hasServerFilter = Boolean(drug || symptom || condition || country);
     // Only blank the canvas on first load / project switch — keep prior graph while refining filters
@@ -609,8 +631,8 @@ export default function KnowledgeGraph({ embedded = false }) {
   );
   const symptomFilterOptions = useMemo(() => {
     if (drug && drugAeCatalog.length) return drugAeCatalog.map((a) => a.symptom);
-    return filterOpts.symptoms;
-  }, [drug, drugAeCatalog, filterOpts.symptoms]);
+    return operableFilterOpts.symptoms;
+  }, [drug, drugAeCatalog, operableFilterOpts.symptoms]);
 
   const graphKey = `${drug}|${symptom}|${condition}|${country}|${strengthFilter}|${focusNode || ''}|${dims.w}|${canvasH}|${labelMode}|${hubsOnly}|${kg?.nodes?.length || 0}`;
 
@@ -787,7 +809,7 @@ export default function KnowledgeGraph({ embedded = false }) {
           <FilterSelect
             label="Drug"
             value={drug}
-            options={filterOpts.drugs}
+            options={operableFilterOpts.drugs}
             onChange={(v) => {
               setDrug(v);
               setSymptom('');
@@ -818,10 +840,10 @@ export default function KnowledgeGraph({ embedded = false }) {
               }
             }}
           />
-          <FilterSelect label="Condition" value={condition} options={filterOpts.conditions}
+          <FilterSelect label="Condition" value={condition} options={operableFilterOpts.conditions}
             onChange={(v) => { setCondition(v); setFocusNode(null); setSelectedNodeId(null); }} />
           <FilterSelect label="Country / region" value={country}
-            options={[...new Set([...filterOpts.countries, ...filterOpts.regions])].sort()}
+            options={[...new Set([...operableFilterOpts.countries, ...operableFilterOpts.regions])].sort()}
             onChange={(v) => { setCountry(v); setFocusNode(null); setSelectedNodeId(null); }} />
           <FilterSelect
             label="Signal strength"
@@ -1055,7 +1077,7 @@ export default function KnowledgeGraph({ embedded = false }) {
               targetDrug={storyTargetDrug || drug}
               contrastDrugs={storyFocus.contrastDrugLabels}
               targetAes={storyFocus.targetAeLabels}
-              drugOptions={filterOpts.drugs}
+              drugOptions={operableFilterOpts.drugs}
               onPickTarget={(v) => {
                 setStoryTargetDrug(v);
                 setDrug(v);

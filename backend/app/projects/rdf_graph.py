@@ -253,7 +253,15 @@ def _legacy_project_clause(col, project_id: Optional[int]):
 
 
 def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str, List[str]]:
-    """Dropdown values from ingested corpus (project-scoped + legacy rows)."""
+    """Dropdown values that are operable on the KG (have nodes / adverse edges).
+
+    Earlier versions harvested every NER hit on every post, so the UI listed drugs
+    that never formed a Signal or AE edge — selecting them showed an empty graph.
+    Options are now limited to:
+      • product / event labels on Signal rows (same strings as global KG nodes)
+      • entities on AE-flagged posts only (same population RDF/SPARQL ingests)
+      • geo from AE-flagged posts only
+    """
     pid = project_id or 0
     sig = _graph_signature(db, project_id)
     with _LOCK:
@@ -272,14 +280,26 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
         if scope is not None:
             sig_q = sig_q.filter(_legacy_project_clause(Signal.project_id, scope))
         for s in sig_q.all():
-            canon = canonical_product(s.drug or "")
+            # Exact Signal.drug string — matches pipeline.build_graph node labels.
+            raw_drug = (s.drug or "").strip()
+            if raw_drug:
+                drugs.add(raw_drug)
+            canon = canonical_product(raw_drug)
             if canon:
                 drugs.add(canon)
-            ev = canonical_event(s.meddra_pt or s.symptom or "")
+            ev_raw = (s.meddra_pt or s.symptom or "").strip()
+            if ev_raw:
+                symptoms.add(ev_raw)
+            ev = canonical_event(ev_raw)
             if ev:
                 symptoms.add(ev)
 
-        post_q = db.query(ProcessedPost, RawPost).join(RawPost, ProcessedPost.raw_id == RawPost.id)
+        # AE-flagged posts only (RDF layer adds these); skip non-AE NER noise.
+        post_q = (
+            db.query(ProcessedPost, RawPost)
+            .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+            .filter(ProcessedPost.ae_flag.is_(True))
+        )
         if scope is not None:
             post_q = post_q.filter(_legacy_project_clause(RawPost.project_id, scope))
         for proc, raw in post_q.all():
@@ -292,17 +312,26 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
             except json.JSONDecodeError:
                 continue
             for d in ent.get("drugs", []):
-                canon = canonical_product(d.get("normalized") or d.get("text") or "")
+                text = (d.get("normalized") or d.get("text") or "").strip()
+                if text:
+                    drugs.add(text)
+                canon = canonical_product(text)
                 if canon:
                     drugs.add(canon)
             for sym in ent.get("symptoms", []):
-                ev = canonical_event(sym.get("pt") or sym.get("normalized") or "")
+                text = (sym.get("pt") or sym.get("normalized") or "").strip()
+                if text:
+                    symptoms.add(text)
+                ev = canonical_event(text)
                 if ev:
                     symptoms.add(ev)
             for c in ent.get("conditions", []):
                 from ..nlp.condition_norm import canonical_condition
 
-                canon = canonical_condition(c.get("normalized") or c.get("text") or "")
+                text = (c.get("normalized") or c.get("text") or "").strip()
+                if text:
+                    conditions.add(text)
+                canon = canonical_condition(text)
                 if canon:
                     conditions.add(canon)
 
