@@ -536,7 +536,7 @@ Login form is blank (no demo-credential autofill). Homepage **Login** waits for 
 
 ---
 
-## 16. Disclaimers
+## 15. Disclaimers
 
 - Prototype / research UX — **not for clinical decision-making**  
 - Synthetic Forge data is **fictional**  
