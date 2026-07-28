@@ -81,6 +81,12 @@ def _make_source_fn(mode: str, query: str) -> Callable:
     if mode == "maude_live":
         from .ingestion.sources import crawl_maude_live
         return lambda: crawl_maude_live(limit=25, days_back=60)
+    if mode == "device_news":
+        from .ingestion.sources import crawl_device_news
+        return lambda: crawl_device_news(limit=30)
+    if mode == "device_recalls":
+        from .ingestion.sources import crawl_device_recalls
+        return lambda: crawl_device_recalls(limit=25)
     # default / stream / unknown
     return lambda: {"posts": stream_batch(3, seed=int(time.time())), "unique_fetched": 3}
 
@@ -98,7 +104,9 @@ _FALLBACK_CHAINS: Dict[str, List[str]] = {
     "pubmed_live":   ["pubmed_live",   "google_news",     "stream"],
     "fda_rss":       ["fda_rss",       "google_news",     "stream"],
     "mhra_devices":  ["mhra_devices",  "fda_rss",         "google_news", "stream"],
-    "maude_live":    ["maude_live",    "fda_rss",         "stream"],
+    "maude_live":    ["maude_live",    "device_recalls",  "device_news", "stream"],
+    "device_news":   ["device_news",   "device_recalls",  "maude_live", "stream"],
+    "device_recalls":["device_recalls","maude_live",      "device_news", "stream"],
     "hackernews":    ["hackernews",    "google_news",     "stream"],
     "life_science":  ["life_science",  "google_news",     "stream"],
     "youtube":       ["youtube",       "google_news",     "stream"],

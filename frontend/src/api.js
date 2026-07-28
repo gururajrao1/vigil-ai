@@ -193,6 +193,12 @@ export const api = {
     req(`/api/ingest/mhra-devices?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
   crawlMaudeLive: (limit = 30, { recompute = true } = {}) =>
     req(`/api/ingest/maude-live?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
+  crawlDeviceNews: (limit = 40, { recompute = true } = {}) =>
+    req(`/api/ingest/device-news?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
+  crawlDeviceRecalls: (limit = 30, { recompute = true } = {}) =>
+    req(`/api/ingest/device-recalls?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
+  reprocess: ({ recompute = true } = {}) =>
+    req(`/api/reprocess?recompute=${recompute}`, { method: 'POST' }),
   lookupEudamed: (device) =>
     req(`/api/device/eudamed?device=${encodeURIComponent(device)}`),
   crawlFdaRss: (feed, { recompute = true } = {}) => {

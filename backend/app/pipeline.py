@@ -43,7 +43,7 @@ from .analytics.vaccine import assess as vaccine_assess, is_vaccine, summarize a
 from .evidence.fda import query_evidence
 from .models import Alert, AuditLog, ProcessedPost, RawPost, Signal
 from .nlp.ae_detector import detect_ae
-from .nlp.devices import device_meta
+from .nlp.devices import device_meta, is_known_device
 from .nlp.drug_norm import canonical_product
 from .nlp.text_normalize import canonical_event
 from .nlp.entities import extract_entities
@@ -195,6 +195,15 @@ def _process_raw(db: Session, raw: RawPost, use_transformer: bool | None = None)
     sentiment = analyze_sentiment(text)
     ae = detect_ae(entities, sentiment, negation)
 
+    # Heal mis-tagged posts: if NLP found a known device product, mark as device.
+    if any(
+        d.get("is_device") or d.get("product_type") == "device" or is_known_device(
+            d.get("normalized") or d.get("generic") or ""
+        )
+        for d in (entities.get("drugs") or [])
+    ):
+        raw.product_type = "device"
+
     # ae["gate_trace"] is a list of per-gate dicts — nest it, do not **spread
     gate_payload = {
         "ae_gates": ae.get("gate_trace") or [],
@@ -283,7 +292,7 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
             all_ae_post_times[processed.id] = raw.posted_at
         entities = json.loads(processed.entities_json or "{}")
         negation = json.loads(processed.negation_json or "{}")
-        ptype = getattr(raw, "product_type", None) or "drug"
+        ptype_raw = getattr(raw, "product_type", None) or "drug"
         post_dims[processed.id] = dimensions_for_post(
             text=f"{raw.title or ''} {raw.body or ''}",
             entities=entities,
@@ -292,14 +301,33 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
                        "score": processed.sentiment_score},
             country=raw.country,
         )
-        drugs = set()
+        # Product → entity flags (device entities override a mislabeled raw.product_type)
+        drug_flags: Dict[str, dict] = {}
         for d in entities.get("drugs", []):
             canon = canonical_product(d.get("normalized") or d.get("text") or "")
             if not canon:
                 continue
-            drugs.add(canon)
-            if d.get("atc"):
-                drug_atc_map[canon] = d["atc"]
+            is_dev = (
+                bool(d.get("is_device"))
+                or d.get("product_type") == "device"
+                or is_known_device(canon)
+            )
+            # Raw rows tagged device only imply device for known-device products —
+            # never promote co-mentioned drugs (e.g. Accutane on a device thread).
+            if ptype_raw == "device" and is_known_device(canon):
+                is_dev = True
+            prev = drug_flags.get(canon)
+            if prev is None or (is_dev and not prev.get("is_device")):
+                drug_flags[canon] = {
+                    "is_device": is_dev,
+                    "atc": None if is_dev else d.get("atc"),
+                    "gmdn": d.get("gmdn"),
+                }
+            elif d.get("atc") and not drug_flags[canon].get("is_device"):
+                drug_flags[canon]["atc"] = d["atc"]
+        for canon, flags in drug_flags.items():
+            if flags.get("atc") and not flags.get("is_device"):
+                drug_atc_map[canon] = flags["atc"]
         symptoms = []
         for s in entities.get("symptoms", []):
             if negation.get(s["normalized"], False):
@@ -314,11 +342,19 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
                     "soc": s.get("soc"),
                     "soc_code": s.get("soc_code"),
                 }
-        for drug in drugs:
+        for drug, flags in drug_flags.items():
             for symptom in symptoms:
                 key = (drug, symptom)
                 reports.append(key)
-                pair_product[key] = ptype
+                # Once a pair is seen as device, keep it device (don't flip back to drug).
+                if flags.get("is_device") or pair_product.get(key) == "device":
+                    pair_product[key] = "device"
+                    pair_device[key] = device_meta(drug, symptom)
+                else:
+                    pair_product.setdefault(key, "drug")
+                # Heal mislabeled raw rows so future passes stay consistent.
+                if flags.get("is_device") and ptype_raw != "device":
+                    raw.product_type = "device"
                 meta = pair_meta.setdefault(
                     key, {"timestamps": [], "post_ids": [], "texts": [], "regions": [],
                           "countries": [], "authors": []})

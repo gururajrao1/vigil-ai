@@ -126,15 +126,26 @@ def canonical_product(surface: str) -> Optional[str]:
     if raw in _JUNK_PRODUCTS:
         return None
 
-    # Device first (insulin pump, stent, …)
-    if raw in DEVICE_TO_CANONICAL or raw in DEVICE_GMDN:
+    from .devices import BRAND_MODEL_TO_DEVICE, is_known_device
+
+    # Device first (insulin pump, stent, IUD, brand/model fragments …)
+    if raw in DEVICE_TO_CANONICAL or raw in DEVICE_GMDN or is_known_device(raw):
         return canonical_device(raw)
+    for frag, canon in sorted(BRAND_MODEL_TO_DEVICE.items(), key=lambda kv: -len(kv[0])):
+        if frag in raw and len(frag) >= 4:
+            return canon
+
+    # Bare analyte / ambiguous fragments are not products for signal pairing.
+    if raw in {"glucose", "blood glucose"}:
+        return None
 
     # Offline brand→generic only (never RxNorm here — KG rebuilds thousands of labels)
     info = _offline(raw)
     generic = (info.get("generic") or raw).strip().lower()
     if not generic or len(generic) < 3 or generic in _JUNK_PRODUCTS:
         return None
+    if is_known_device(generic):
+        return canonical_device(generic)
 
     # Symptom mis-tagged as drug (e.g. "acid reflux") — drop unless also a known product
     if generic in SYMPTOMS and generic not in GENERIC_DRUGS and generic not in DRUG_ATC:

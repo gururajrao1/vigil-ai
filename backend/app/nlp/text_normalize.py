@@ -158,7 +158,28 @@ def run_four_stage_event(surface: str) -> Optional[dict]:
     return None
 
 def canonical_event(surface: str) -> Optional[str]:
-    """Normalize an AE mention to one MedDRA-style PT, or None if junk."""
+    """Normalize an AE mention to one MedDRA-style PT, or None if junk.
+
+    Device failure modes (IMDRF surrogates) are accepted verbatim when they match
+    the offline device-failure lexicon — they are not MedDRA PTs.
+    """
+    raw = (surface or "").strip()
+    if not raw:
+        return None
+    low = raw.lower()
+    # Preserve already-coded IMDRF failure terms from extract_devices.
+    try:
+        from .devices import FAILURE_TO_IMDRF
+
+        if low in FAILURE_TO_IMDRF:
+            return (FAILURE_TO_IMDRF[low].get("term") or raw).strip()
+        for meta in FAILURE_TO_IMDRF.values():
+            term = (meta.get("term") or "").strip()
+            if term and term.lower() == low:
+                return term
+    except Exception:
+        pass
+
     result = run_four_stage_event(surface)
     if not result:
         return None

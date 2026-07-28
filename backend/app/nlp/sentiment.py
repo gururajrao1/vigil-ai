@@ -9,6 +9,9 @@ _analyzer = SentimentIntensityAnalyzer()
 _CLINICAL_NEG = [
     "side effect", "adverse", "reaction", "worse", "hospital", "emergency",
     "rash", "vomiting", "seizure", "bleeding", "allergic",
+    # Device-vigilance cues (MAUDE / FSNs are often dry but still adverse reports)
+    "malfunction", "device failure", "injury", "death", "recall",
+    "field safety notice", "overinfusion", "underinfusion",
 ]
 
 

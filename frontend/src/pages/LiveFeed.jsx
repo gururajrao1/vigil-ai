@@ -14,6 +14,8 @@ const MODES = [
   { id: 'youtube',      label: 'YouTube videos + comments', note: 'Titles/descriptions + AE comments — needs YOUTUBE_API_KEY' },
   { id: 'mhra_devices', label: 'MHRA device alerts (UK)', note: 'Field Safety Notices — pacemakers, stents, ventilators' },
   { id: 'maude_live',   label: 'MAUDE live (device MDRs)', note: 'Real FDA device adverse event reports' },
+  { id: 'device_news',  label: 'Device safety news',      note: 'CGM · pump · implant · CPAP Google News RSS' },
+  { id: 'device_recalls', label: 'FDA device recalls',    note: 'openFDA device/enforcement ongoing recalls' },
   { id: 'twitter',         label: 'X / Twitter (live)',             note: 'Live tweets — TWITTERAPI_IO_KEY configured' },
   { id: 'reddit_pullpush', label: 'Reddit via Pullpush (corp-safe)', note: '29 health subs via mirror — not blocked on work networks' },
   { id: 'reddit',          label: 'Reddit search (direct)',         note: 'Public RSS — may be blocked on corporate networks' },

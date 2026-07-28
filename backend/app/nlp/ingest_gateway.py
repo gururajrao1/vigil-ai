@@ -154,6 +154,24 @@ def filter_symptom_entity(
     ):
         return None, "gate3_negated"
 
+    # Device failure modes are IMDRF-coded (not MedDRA). Keep them as AE events so
+    # device vigilance pairs (pump→malfunction, CGM→inaccurate reading) survive.
+    if ent.get("is_device_failure") and (ent.get("pt") or ent.get("imdrf") or ent.get("normalized")):
+        from .stage3_ner_cui import assign_cui
+
+        out = dict(ent)
+        pt = out.get("pt") or (out.get("normalized") or surface).title()
+        out["pt"] = pt
+        out["normalized"] = (out.get("normalized") or pt).lower()
+        out.setdefault("soc", "Device / product issues")
+        out.setdefault("soc_code", "IMDRF")
+        out["norm_stage"] = out.get("norm_stage") or "device_imdrf"
+        out["cui"] = assign_cui(
+            kind="event", surface=surface, normalized=out["normalized"], pt=out["pt"]
+        )
+        out["gateway"] = "passed_device_failure"
+        return out, "ok"
+
     # Gate 1 + 4 fused: medical validation then vector/fuzzy MedDRA map
     resolved = _gate1_medical_entity(surface)
     if not resolved:

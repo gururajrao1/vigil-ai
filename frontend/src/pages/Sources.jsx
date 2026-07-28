@@ -65,6 +65,16 @@ const SOURCE_ACTIONS = {
     fn: () => api.crawlMaudeLive(),
     note: 'Real FDA device adverse event reports',
   },
+  device_news: {
+    label: '📡 Fetch device safety news',
+    fn: () => api.crawlDeviceNews(),
+    note: 'CGM · pump · implant · CPAP safety headlines',
+  },
+  device_recalls: {
+    label: '⚠️ Fetch FDA device recalls',
+    fn: () => api.crawlDeviceRecalls(),
+    note: 'openFDA device/enforcement Class I/II recalls',
+  },
   eudamed: null,
   fda_medwatch: {
     label: '🚨 Fetch MedWatch alerts',

@@ -24,6 +24,8 @@ from ..ingestion.fhir import sample_bundle
 from ..ingestion.sources import (
     SOURCES,
     crawl_dailymed_rss,
+    crawl_device_news,
+    crawl_device_recalls,
     crawl_faers,
     crawl_fda_all,
     crawl_fda_medwatch,
@@ -89,6 +91,18 @@ def recompute_only(db: Session = Depends(get_db)):
     """Run one corpus signal recompute (for DemoBar multi-source batches)."""
     stats = recompute_signals(db, use_fda=False, with_narrative=False)
     return {"status": "ok", "recomputed": True, **stats}
+
+
+@router.post("/reprocess")
+def reprocess_only(
+    recompute: bool = True,
+    db: Session = Depends(get_db),
+    _user=Depends(require_role("analyst")),
+):
+    """Re-run NLP on all stored posts (applies current device/drug lexicons), then recompute."""
+    n = reprocess_posts(db, use_transformer=False)
+    stats = _maybe_recompute(db, recompute) if recompute else {"recomputed": False}
+    return {"status": "ok", "reprocessed": n, **stats}
 
 
 @router.post("/ingest/seed")
@@ -434,6 +448,41 @@ def ingest_maude_live(
     stats = _maybe_recompute(db, recompute)
     return {
         "source": "maude_live",
+        "fetched": len(posts),
+        "unique_fetched": batch["unique_fetched"],
+        "ingested": new,
+        **stats,
+    }
+
+
+@router.post("/ingest/device-news")
+def ingest_device_news(limit: int = 40, recompute: bool = True, db: Session = Depends(get_db)):
+    """Ingest medical-device safety news (Google News RSS, no key)."""
+    batch = crawl_device_news(limit=limit)
+    posts = batch["posts"]
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "device_news",
+        "fetched": len(posts),
+        "unique_fetched": batch["unique_fetched"],
+        "queries_run": batch.get("queries_run"),
+        "ingested": new,
+        **stats,
+    }
+
+
+@router.post("/ingest/device-recalls")
+def ingest_device_recalls(limit: int = 30, recompute: bool = True, db: Session = Depends(get_db)):
+    """Ingest FDA device recalls (openFDA device/enforcement, no key)."""
+    batch = crawl_device_recalls(limit=limit)
+    posts = batch["posts"]
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "device_recalls",
         "fetched": len(posts),
         "unique_fetched": batch["unique_fetched"],
         "ingested": new,

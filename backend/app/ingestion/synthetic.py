@@ -169,13 +169,23 @@ _DEVICE_TEMPLATES = [
     ("insulin pump", "malfunction", "type 1 diabetes", "North America", "United States"),
     ("insulin pump", "malfunction", "type 1 diabetes", "Europe", "United Kingdom"),
     ("insulin pump", "malfunction", "type 1 diabetes", "Asia", "India"),
+    ("omnipod", "failure to deliver", "type 1 diabetes", "North America", "United States"),
     ("continuous glucose monitor", "inaccurate reading", "diabetes", "North America", "United States"),
+    ("dexcom", "inaccurate reading", "diabetes", "Europe", "United Kingdom"),
+    ("freestyle libre", "inaccurate reading", "diabetes", "Europe", "Germany"),
+    ("glucometer", "inaccurate reading", "diabetes", "Asia", "India"),
     ("pacemaker", "battery failure", "arrhythmia", "Europe", "Germany"),
+    ("pacemaker", "lead dislodgement", "arrhythmia", "North America", "United States"),
     ("hip implant", "device loosening", "osteoarthritis", "Oceania", "Australia"),
     ("knee implant", "device loosening", "osteoarthritis", "North America", "Canada"),
     ("coronary stent", "thrombosis", "coronary artery disease", "Asia", "Japan"),
     ("infusion pump", "overinfusion", "chemotherapy", "North America", "United States"),
     ("surgical mesh", "erosion", "hernia repair", "Europe", "France"),
+    ("intrauterine device", "device malfunction", "contraception", "North America", "United States"),
+    ("catheter", "occlusion", "urinary retention", "Europe", "United Kingdom"),
+    ("cpap machine", "device malfunction", "sleep apnea", "North America", "United States"),
+    ("dreamstation", "malfunction", "sleep apnea", "North America", "United States"),
+    ("breast implant", "rupture", "cosmetic reconstruction", "Europe", "France"),
 ]
 
 _DEVICE_TEXT = [
@@ -248,7 +258,12 @@ def _make_device_post(idx, posted_at, rng):
     fail_phrase = {"malfunction": "malfunction", "battery failure": "have a battery failure",
                    "device loosening": "show device loosening", "thrombosis": "cause thrombosis",
                    "overinfusion": "overinfusion", "erosion": "cause erosion",
-                   "inaccurate reading": "give an inaccurate reading"}.get(fail, fail)
+                   "inaccurate reading": "give an inaccurate reading",
+                   "failure to deliver": "failure to deliver insulin",
+                   "device malfunction": "malfunction",
+                   "lead dislodgement": "have lead dislodgement",
+                   "occlusion": "develop an occlusion",
+                   "rupture": "rupture"}.get(fail, fail)
     text = rng.choice(_DEVICE_TEXT).format(device=device, fail=fail_phrase, cond=cond)
     platform = rng.choice(_PLATFORMS)
     return {
@@ -303,11 +318,11 @@ def generate_corpus(days: int = 21, seed: int = 42) -> List[dict]:
                 posts.append(_make_multilingual(idx, ts, rng))
                 idx += 1
                 continue
-            if roll < 0.18:
+            if roll < 0.32:
                 posts.append(_make_device_post(idx, ts, rng))
                 idx += 1
                 continue
-            if roll < 0.46:
+            if roll < 0.52:
                 posts.append(_make_background(idx, ts, rng))
                 idx += 1
                 continue

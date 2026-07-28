@@ -79,6 +79,12 @@ SOURCES = [
     {"id": "maude_live", "name": "FDA MAUDE live (device AE reports)", "type": "regulatory",
      "scope": "United States", "key_required": False, "status": "live",
      "note": "Recent MDRs from MAUDE — device malfunctions, injuries, deaths — ingested as device signals"},
+    {"id": "device_recalls", "name": "FDA device recalls & enforcement", "type": "regulatory",
+     "scope": "United States", "key_required": False, "status": "live",
+     "note": "openFDA device/enforcement + device-recall news — Class I/II device recalls as device posts"},
+    {"id": "device_news", "name": "Medical device safety news", "type": "news",
+     "scope": "Worldwide", "key_required": False, "status": "live",
+     "note": "Google News RSS on CGM/pump/implant/CPAP/stent safety & recalls (no key)"},
     {"id": "eudamed", "name": "EUDAMED (EU device registry)", "type": "regulatory",
      "scope": "European Union", "key_required": False, "status": "live",
      "note": "EU device registration lookup — UDI, CE certificate, manufacturer, classification, no key"},
@@ -104,6 +110,13 @@ _HEALTH_SUBS: List[dict] = [
     {"sub": "epilepsy", "focus": "Anticonvulsants"},
     # Chronic disease (long-term drug exposure)
     {"sub": "diabetes", "focus": "Diabetes meds (metformin, GLP-1, insulin)"},
+    {"sub": "diabetes_t1", "focus": "Type 1 diabetes — pumps, CGM, glucometers"},
+    {"sub": "Type1Diabetes", "focus": "T1D devices (Omnipod, Dexcom, Tandem)"},
+    {"sub": "ContinuousGlucoseMon", "focus": "CGM device experiences"},
+    {"sub": "InsulinPump", "focus": "Insulin pump malfunctions / failures"},
+    {"sub": "SleepApnea", "focus": "CPAP / BiPAP device issues"},
+    {"sub": "HipReplacement", "focus": "Hip implant outcomes"},
+    {"sub": "KneeReplacement", "focus": "Knee implant outcomes"},
     {"sub": "thyroid", "focus": "Thyroid / levothyroxine"},
     {"sub": "MultipleSclerosis", "focus": "MS disease-modifying drugs"},
     {"sub": "CrohnsDisease", "focus": "IBD biologics / immunosuppressants"},
@@ -249,6 +262,12 @@ _GOOGLE_NEWS_QUERIES: List[dict] = [
      "focus": "Safety communications / label warnings"},
     {"key": "pv", "query": "pharmacovigilance OR drug safety signal",
      "focus": "Industry / regulatory PV news"},
+    {"key": "device_ae", "query": "medical device malfunction OR implant recall OR pacemaker failure",
+     "focus": "Medical device adverse events"},
+    {"key": "device_diabetes", "query": "insulin pump failure OR CGM inaccurate OR Dexcom Omnipod recall",
+     "focus": "Diabetes device safety"},
+    {"key": "device_cpap", "query": "CPAP recall OR Philips Respironics device safety",
+     "focus": "Respiratory device safety"},
 ]
 
 
@@ -286,6 +305,7 @@ def _news_entry_to_post(entry, query_key: str | None = None) -> dict:
         "posted_at": posted,
         "news_source": source_name,
         "news_query": query_key,
+        "product_type": "device" if (query_key or "").startswith("device_") else "drug",
     }
 
 
@@ -849,14 +869,23 @@ def crawl_mhra_devices(limit: int = 40) -> dict:
                 "field safety notice", "fsn", "device safety", "medical device",
                 "implant", "ventilator", "pump", "stent", "pacemaker", "catheter",
                 "infusion", "defibrillator", "imaging", "ultrasound", "endoscope",
+                "cgm", "glucose monitor", "glucometer", "cpap", "iud", "mesh",
+                "hip replacement", "knee replacement", "breast implant", "dialysis",
             ))
+            # Prefer device when the feed is the device-alerts Atom (not drug safety update)
+            if spec["key"] == "mhra_devices":
+                is_device = True
             posts.append({
                 "external_id": f"mhra_{_hash(eid)}",
                 "platform": "mhra_devices",
                 "url": link,
                 "author": _hash("mhra_gov_uk"),
                 "title": title[:500],
-                "body": body[:4000],
+                "body": (
+                    f"{body}. Medical device field safety notice — device malfunction "
+                    f"or adverse event requiring corrective action."
+                    if is_device else body
+                )[:4000],
                 "region": "Europe",
                 "country": "United Kingdom",
                 "posted_at": posted,
@@ -906,19 +935,28 @@ def crawl_maude_live(limit: int = 30, days_back: int = 60) -> dict:
                 if not report_id or report_id in seen:
                     continue
                 seen.add(report_id)
-                devices = ev.get("device", [])
-                texts = ev.get("mdr_text", [])
-                dev_name = next(
-                    (d.get("brand_name") or d.get("generic_name", "")
-                     for d in devices
-                     if d.get("brand_name") or d.get("generic_name")),
-                    ""
-                )
-                narrative = " ".join(
+                devices = ev.get("device", []) or []
+                texts = ev.get("mdr_text", []) or []
+                brand = ""
+                generic = ""
+                for d in devices:
+                    brand = brand or (d.get("brand_name") or "").strip()
+                    generic = generic or (d.get("generic_name") or "").strip()
+                    openfda = d.get("openfda") or {}
+                    if not generic:
+                        names = openfda.get("device_name") or []
+                        if names:
+                            generic = names[0]
+                dev_name = brand or generic or "Unknown device"
+                # Prefer longer narrative fields; fall back to any MDR text.
+                narratives = [
                     t.get("text", "") for t in texts
-                    if t.get("text_type_code") in ("2500", "1000", "3000")
-                )[:600]
-                event_type = ev.get("event_type", "unknown")
+                    if t.get("text_type_code") in ("2500", "1000", "3000") and t.get("text")
+                ]
+                if not narratives:
+                    narratives = [t.get("text", "") for t in texts if t.get("text")]
+                narrative = " ".join(narratives)[:800]
+                event_type = (ev.get("event_type") or "malfunction").strip().lower()
                 date_str = ev.get("date_received", "")
                 country = ev.get("manufacturer_g1_country", "")
                 posted = datetime.utcnow()
@@ -927,9 +965,19 @@ def crawl_maude_live(limit: int = 30, days_back: int = 60) -> dict:
                         posted = datetime.strptime(date_str, "%Y%m%d")
                     except ValueError:
                         pass
+                # Enrich so 4-gate AE can fire: explicit product + failure + adverse cue.
+                # Brand/model strings (MINIMED 780G, GUARDIAN4) map via device brand lexicon.
+                failure_cue = {
+                    "malfunction": "device malfunction and failure to operate",
+                    "injury": "patient injury adverse event from device malfunction",
+                    "death": "patient death adverse event associated with device failure",
+                }.get(event_type, "device malfunction adverse event")
+                alias = f"{brand} {generic}".strip()
                 body = (
-                    f"FDA MAUDE device report: {dev_name or 'Unknown device'} "
-                    f"reported {event_type}. {narrative}"
+                    f"FDA MAUDE adverse device report. Device product: {dev_name}. "
+                    f"{('Also known as: ' + alias + '. ') if alias and alias != dev_name else ''}"
+                    f"Reported event: {event_type} — {failure_cue}. "
+                    f"This was a serious negative patient experience. {narrative}"
                 ).strip()
                 posts.append({
                     "external_id": f"maude_{report_id}",
@@ -946,6 +994,123 @@ def crawl_maude_live(limit: int = 30, days_back: int = 60) -> dict:
                 })
         except Exception:
             continue
+
+    posts.sort(key=lambda p: p.get("posted_at") or datetime.min, reverse=True)
+    return {"posts": posts[:limit], "unique_fetched": len(posts)}
+
+
+# --------------------------------------------------------------------------- #
+# Device safety news + FDA device recalls (free, no key)
+# --------------------------------------------------------------------------- #
+_DEVICE_NEWS_QUERIES = [
+    q for q in _GOOGLE_NEWS_QUERIES if q["key"].startswith("device_")
+] + [
+    {"key": "device_implant", "query": "hip implant recall OR knee implant failure OR surgical mesh",
+     "focus": "Orthopedic / mesh device safety"},
+    {"key": "device_cardiac", "query": "pacemaker recall OR ICD malfunction OR defibrillator advisory",
+     "focus": "Cardiac rhythm device safety"},
+]
+
+
+def crawl_device_news(limit: int = 40) -> dict:
+    """Google News RSS focused on medical-device safety (no key).
+
+    Posts are tagged product_type=device and lightly enriched so AE gates can fire.
+    """
+    posts: List[dict] = []
+    seen: set[str] = set()
+    per = max(5, limit // max(1, len(_DEVICE_NEWS_QUERIES)))
+    for spec in _DEVICE_NEWS_QUERIES:
+        try:
+            q = quote(spec["query"])
+            url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
+            feed = _parse_rss_url(url)
+            for entry in feed.entries[:per]:
+                post = _news_entry_to_post(entry, query_key=spec["key"])
+                eid = post["external_id"]
+                if not eid or eid in seen:
+                    continue
+                seen.add(eid)
+                post["product_type"] = "device"
+                post["platform"] = "device_news"
+                # Adverse cue so dry headlines still pass Gate 3 when a device is named.
+                post["body"] = (
+                    f"{post.get('body') or ''}. Medical device adverse event / "
+                    f"malfunction or safety recall report."
+                )[:4000]
+                posts.append(post)
+        except Exception:
+            continue
+    posts.sort(key=lambda p: p.get("posted_at") or datetime.min, reverse=True)
+    return {
+        "posts": posts[:limit],
+        "unique_fetched": len(posts),
+        "queries_run": [q["key"] for q in _DEVICE_NEWS_QUERIES],
+    }
+
+
+def crawl_device_recalls(limit: int = 30) -> dict:
+    """FDA device recalls via openFDA device/enforcement + device-news fallback."""
+    import httpx
+
+    posts: List[dict] = []
+    seen: set[str] = set()
+    try:
+        r = httpx.get(
+            "https://api.fda.gov/device/enforcement.json",
+            params={
+                "search": "status:Ongoing",
+                "limit": limit,
+                "sort": "recall_initiation_date:desc",
+            },
+            headers={"User-Agent": _USER_AGENT},
+            timeout=12,
+        )
+        if r.status_code == 200:
+            for rec in r.json().get("results", []):
+                product = (rec.get("product_description") or "")[:120]
+                reason = (rec.get("reason_for_recall") or "")[:300]
+                firm = rec.get("recalling_firm") or ""
+                classification = rec.get("classification") or ""
+                date_str = rec.get("recall_initiation_date") or ""
+                rid = rec.get("recall_number") or rec.get("event_id") or product
+                if not rid or rid in seen:
+                    continue
+                seen.add(rid)
+                posted = datetime.utcnow()
+                try:
+                    posted = datetime.strptime(date_str, "%Y%m%d") if date_str else posted
+                except ValueError:
+                    pass
+                body = (
+                    f"FDA medical device recall ({classification}): {product}. "
+                    f"Reason: {reason}. Firm: {firm}. "
+                    f"This is a serious adverse device safety action involving "
+                    f"device malfunction or patient injury risk."
+                )
+                posts.append({
+                    "external_id": f"dev_recall_{_hash(str(rid))}",
+                    "platform": "device_recalls",
+                    "url": "https://www.fda.gov/medical-devices/medical-device-safety",
+                    "author": _hash("fda_device_enforcement"),
+                    "title": f"Device recall: {product[:80]}",
+                    "body": body[:4000],
+                    "region": "North America",
+                    "country": "United States",
+                    "posted_at": posted,
+                    "product_type": "device",
+                })
+    except Exception:
+        pass
+
+    if len(posts) < limit // 2:
+        news = crawl_device_news(limit=limit - len(posts))
+        for p in news.get("posts", []):
+            eid = p.get("external_id")
+            if eid and eid not in seen:
+                seen.add(eid)
+                p["platform"] = "device_recalls"
+                posts.append(p)
 
     posts.sort(key=lambda p: p.get("posted_at") or datetime.min, reverse=True)
     return {"posts": posts[:limit], "unique_fetched": len(posts)}

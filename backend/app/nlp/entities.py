@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List
 
-from .devices import extract_devices
+from .devices import AMBIGUOUS_BARE_PRODUCTS, extract_devices, is_known_device
 from .drug_norm import normalize as normalize_drug_full
 from .lexicons import (
     BRAND_TO_GENERIC,
@@ -129,9 +129,34 @@ def _lexicon_pass(text: str) -> Dict[str, List[dict]]:
     if dev["products"]:
         # Drop drug-lexicon hits that fall inside a device span (e.g. "insulin"
         # inside "insulin pump") so the device is the product, not its sub-token.
+        # Also drop bare ambiguous fragments (glucose/insulin) when a device is present.
         dev_spans = [(p["start"], p["end"]) for p in dev["products"]]
-        drugs = [d for d in drugs
-                 if not any(s <= d["start"] < e for s, e in dev_spans)]
+        drugs = [
+            d for d in drugs
+            if not any(s <= d["start"] < e for s, e in dev_spans)
+            and (d.get("normalized") or "").strip().lower() not in AMBIGUOUS_BARE_PRODUCTS
+        ]
+    else:
+        # Never treat bare "glucose" as a drug product (lab analyte, not a therapeutic).
+        drugs = [
+            d for d in drugs
+            if (d.get("normalized") or "").strip().lower() != "glucose"
+        ]
+    # Promote lexicon/transformer hits that are known devices (IUD, catheter, …).
+    promoted = []
+    for d in drugs:
+        canon = (d.get("normalized") or d.get("generic") or d.get("text") or "").strip().lower()
+        if is_known_device(canon) or d.get("is_device") or d.get("product_type") == "device":
+            d = {**d, "is_device": True, "product_type": "device", "atc": None}
+            if not d.get("gmdn"):
+                from .devices import DEVICE_GMDN, canonical_device
+                meta = DEVICE_GMDN.get(canonical_device(canon), {})
+                d["gmdn"] = meta.get("gmdn")
+                d["device_class"] = meta.get("class")
+                d["normalized"] = canonical_device(canon)
+                d["generic"] = d["normalized"]
+        promoted.append(d)
+    drugs = promoted
     drugs.extend(dev["products"])
     symptoms.extend(dev["failures"])
     return {"drugs": drugs, "symptoms": symptoms, "conditions": conditions}
