@@ -90,8 +90,20 @@ def _backfill_project_ids(db: Session, default_id: int) -> None:
 
 
 def project_stats(db: Session, project_id: int) -> dict:
-    posts = db.query(func.count(RawPost.id)).filter(RawPost.project_id == project_id).scalar() or 0
-    signals = db.query(func.count(Signal.id)).filter(Signal.project_id == project_id).scalar() or 0
+    from ..api.helpers import _project_scope
+
+    posts = (
+        db.query(func.count(RawPost.id))
+        .filter(_project_scope(RawPost.project_id, project_id))
+        .scalar()
+        or 0
+    )
+    signals = (
+        db.query(func.count(Signal.id))
+        .filter(_project_scope(Signal.project_id, project_id))
+        .scalar()
+        or 0
+    )
     return {"post_count": int(posts), "signal_count": int(signals)}
 
 

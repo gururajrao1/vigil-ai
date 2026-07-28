@@ -240,6 +240,9 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     if project_id is None:
         project_id = current_project_id()
 
+    # Heal legacy NULL-scoped signals so project-filtered UI can see them.
+    heal_orphan_project_ids(db, default_project_id=project_id or 1)
+
     ae_q = (
         db.query(ProcessedPost, RawPost)
         .join(RawPost, ProcessedPost.raw_id == RawPost.id)
@@ -727,10 +730,48 @@ def _attach_narratives(db: Session, signals: List[Signal]) -> None:
 
 
 def _infer_project_id(db: Session, post_ids: List[int]) -> int | None:
+    """Resolve workspace from supporting *processed* post ids → raw.project_id."""
     if not post_ids:
         return None
-    raw = db.query(RawPost.project_id).filter(RawPost.id.in_(post_ids[:8])).first()
-    return raw[0] if raw and raw[0] is not None else None
+    row = (
+        db.query(RawPost.project_id)
+        .join(ProcessedPost, ProcessedPost.raw_id == RawPost.id)
+        .filter(ProcessedPost.id.in_(post_ids[:16]))
+        .filter(RawPost.project_id.isnot(None))
+        .first()
+    )
+    return int(row[0]) if row and row[0] is not None else None
+
+
+def heal_orphan_project_ids(db: Session, default_project_id: int | None = None) -> dict:
+    """Attach NULL/0 project_id signal+alert rows to the default (or given) workspace.
+
+    Legacy recomputes stored signals with project_id=NULL because ``_infer_project_id``
+    incorrectly queried RawPost.id with ProcessedPost ids. The UI always sends
+    X-Project-Id, so those orphans never appear in /api/signals.
+    """
+    from sqlalchemy import or_
+
+    from .models import Project
+
+    pid = default_project_id
+    if pid is None:
+        pid = db.query(Project.id).order_by(Project.id.asc()).scalar()
+    if pid is None:
+        return {"signals": 0, "alerts": 0, "project_id": None}
+
+    n_sig = (
+        db.query(Signal)
+        .filter(or_(Signal.project_id.is_(None), Signal.project_id == 0))
+        .update({Signal.project_id: pid}, synchronize_session=False)
+    )
+    n_alert = (
+        db.query(Alert)
+        .filter(or_(Alert.project_id.is_(None), Alert.project_id == 0))
+        .update({Alert.project_id: pid}, synchronize_session=False)
+    )
+    db.commit()
+    return {"signals": int(n_sig or 0), "alerts": int(n_alert or 0), "project_id": int(pid)}
 
 
 def _maybe_alert(db: Session, sig: Signal) -> None:

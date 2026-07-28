@@ -52,7 +52,13 @@ from ..ingestion.synthetic import generate_corpus, stream_batch
 from ..llm import status as llm_status
 from ..analytics.lifecycle import LIFECYCLE_TRANSITIONS, compute_priority, is_valid_transition, valid_next_states
 from ..models import Alert, AuditLog, ProcessedPost, RawPost, Signal
-from ..pipeline import ingest_posts, knowledge_graph, recompute_signals, reprocess_posts
+from ..pipeline import (
+    heal_orphan_project_ids,
+    ingest_posts,
+    knowledge_graph,
+    recompute_signals,
+    reprocess_posts,
+)
 from ..scheduler import scheduler
 from .helpers import (
     alert_to_dict,
@@ -89,8 +95,9 @@ def _prewarm_background(limit: int = 12) -> None:
 @router.post("/recompute")
 def recompute_only(db: Session = Depends(get_db)):
     """Run one corpus signal recompute (for DemoBar multi-source batches)."""
+    healed = heal_orphan_project_ids(db)
     stats = recompute_signals(db, use_fda=False, with_narrative=False)
-    return {"status": "ok", "recomputed": True, **stats}
+    return {"status": "ok", "recomputed": True, "healed_projects": healed, **stats}
 
 
 @router.post("/reprocess")
@@ -100,9 +107,19 @@ def reprocess_only(
     _user=Depends(require_role("analyst")),
 ):
     """Re-run NLP on all stored posts (applies current device/drug lexicons), then recompute."""
+    healed = heal_orphan_project_ids(db)
     n = reprocess_posts(db, use_transformer=False)
     stats = _maybe_recompute(db, recompute) if recompute else {"recomputed": False}
-    return {"status": "ok", "reprocessed": n, **stats}
+    return {"status": "ok", "reprocessed": n, "healed_projects": healed, **stats}
+
+
+@router.post("/heal-projects")
+def heal_projects(
+    db: Session = Depends(get_db),
+    _user=Depends(require_role("analyst")),
+):
+    """Attach orphan NULL-scoped signals/alerts to the default project workspace."""
+    return {"status": "ok", **heal_orphan_project_ids(db)}
 
 
 @router.post("/ingest/seed")
@@ -847,11 +864,13 @@ def list_signals(
 ):
     from ..projects.scope import current_project_id
     from ..nlp.text_normalize import fold_key
+    from ..api.helpers import _project_scope
 
     qset = db.query(Signal)
     pid = current_project_id()
     if pid is not None:
-        qset = qset.filter(Signal.project_id == pid)
+        # Include legacy NULL/0 project_id rows (same rule as dashboard_stats).
+        qset = qset.filter(_project_scope(Signal.project_id, pid))
     if strength:
         qset = qset.filter(Signal.strength == strength.upper())
     if severity:
@@ -1295,12 +1314,13 @@ def get_post(post_id: int, db: Session = Depends(get_db)):
 # --------------------------- alerts ---------------------------------------- #
 @router.get("/alerts")
 def list_alerts(db: Session = Depends(get_db)):
+    from ..api.helpers import _project_scope
     from ..projects.scope import current_project_id
 
     q = db.query(Alert)
     pid = current_project_id()
     if pid is not None:
-        q = q.filter(Alert.project_id == pid)
+        q = q.filter(_project_scope(Alert.project_id, pid))
     alerts = q.order_by(Alert.created_at.desc()).all()
     return {"alerts": [alert_to_dict(a) for a in alerts]}
 

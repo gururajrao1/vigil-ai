@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
+import { useProject } from '../projectContext';
 import { Badge, Card, Spinner } from '../components/ui';
 import SeverityAuditPopover from '../components/SeverityAuditPopover';
 import BidirectionalProfilePanel from '../components/views/BidirectionalProfilePanel';
@@ -20,9 +21,11 @@ const NOVELTY_OPTIONS = [
 
 export default function Signals({ embedded = false }) {
   const { tick } = useRefresh();
+  const { project } = useProject();
   const nav = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [signals, setSignals] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState(searchParams.get('strength') || 'ALL');
   const [region, setRegion] = useState(searchParams.get('region') || 'Global');
   const [product, setProduct] = useState('ALL');
@@ -79,8 +82,15 @@ export default function Signals({ embedded = false }) {
     if (drugQ) params.drug = drugQ;
     if (symptomQ) params.symptom = symptomQ;
     if (socQ) params.soc = socQ;
-    api.signals(params).then((d) => setSignals(d.signals)).catch(() => setSignals([]));
-  }, [tick, filter, region, spikingOnly, noveltyFilter, drugQ, symptomQ, socQ]);
+    setSignals(null);
+    setLoadError('');
+    api.signals(params)
+      .then((d) => setSignals(d.signals || []))
+      .catch((err) => {
+        setSignals([]);
+        setLoadError(err?.message || 'Failed to load signals');
+      });
+  }, [tick, project?.id, filter, region, spikingOnly, noveltyFilter, drugQ, symptomQ, socQ]);
 
   const clearStoryContext = () => {
     setDrugQ('');
@@ -290,7 +300,13 @@ export default function Signals({ embedded = false }) {
             </thead>
             <tbody>
               {rows.length === 0 && (
-                <tr><td colSpan={13} className="px-4 py-8 text-center text-slate-500">No signals. Load the demo corpus.</td></tr>
+                <tr>
+                  <td colSpan={13} className="px-4 py-8 text-center text-slate-500">
+                    {loadError
+                      ? `Could not load signals: ${loadError}`
+                      : 'No signals for this project. Load the demo corpus or switch workspace.'}
+                  </td>
+                </tr>
               )}
               {rows.map((s) => {
                 const isPinned = pinNorm && (s.drug || '').toLowerCase() === pinNorm;
