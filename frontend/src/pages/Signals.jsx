@@ -84,12 +84,27 @@ export default function Signals({ embedded = false }) {
     if (socQ) params.soc = socQ;
     setSignals(null);
     setLoadError('');
-    api.signals(params)
-      .then((d) => setSignals(d.signals || []))
-      .catch((err) => {
-        setSignals([]);
-        setLoadError(err?.message || 'Failed to load signals');
-      });
+    let cancelled = false;
+    const load = (attempt = 1) => {
+      api.signals(params)
+        .then((d) => {
+          if (!cancelled) setSignals(d.signals || []);
+        })
+        .catch((err) => {
+          const msg = err?.message || 'Failed to load signals';
+          // Neon SSL drops / brief recompute races — one automatic retry.
+          if (attempt < 2 && /500|SSL|timeout|gateway/i.test(msg)) {
+            setTimeout(() => load(attempt + 1), 1200);
+            return;
+          }
+          if (!cancelled) {
+            setSignals([]);
+            setLoadError(msg);
+          }
+        });
+    };
+    load();
+    return () => { cancelled = true; };
   }, [tick, project?.id, filter, region, spikingOnly, noveltyFilter, drugQ, symptomQ, socQ]);
 
   const clearStoryContext = () => {

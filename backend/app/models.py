@@ -337,7 +337,7 @@ class Alert(Base):
 
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=True)
-    signal_id = Column(Integer, ForeignKey("signals.id"), index=True)
+    signal_id = Column(Integer, ForeignKey("signals.id", ondelete="CASCADE"), index=True)
     drug = Column(String(128))
     symptom = Column(String(128))
     severity = Column(String(16))

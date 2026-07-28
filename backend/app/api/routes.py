@@ -74,21 +74,32 @@ from .helpers import (
 
 router = APIRouter(prefix="/api")
 
+_recompute_lock = threading.Lock()
+_recompute_running = False
+
 
 def _run_recompute_job() -> None:
     """Fresh-session signal rebuild (safe for background threads)."""
+    global _recompute_running
+    import logging
+
+    log = logging.getLogger("vigilai.recompute")
     db = SessionLocal()
     try:
         heal_orphan_project_ids(db)
         recompute_signals(db, use_fda=False, with_narrative=False)
         db.commit()
+        log.info("background recompute finished")
     except Exception:
+        log.exception("background recompute failed")
         try:
             db.rollback()
         except Exception:
             pass
     finally:
         db.close()
+        with _recompute_lock:
+            _recompute_running = False
 
 
 def _maybe_recompute(db: Session, recompute: bool = False) -> dict:
@@ -97,9 +108,21 @@ def _maybe_recompute(db: Session, recompute: bool = False) -> dict:
     Sync rebuild on Neon (~1948 posts) exceeds Vercel→Render proxy timeouts and
     surfaces as 502/500 (or empty gateway errors) for Google News / device crawls.
     Ingest returns immediately; signals refresh in the background.
+    Only one rebuild runs at a time (extra requests are coalesced).
     """
+    global _recompute_running
     if not recompute:
         return {"signals": 0, "alerts": 0, "recomputed": False}
+    with _recompute_lock:
+        if _recompute_running:
+            return {
+                "signals": 0,
+                "alerts": 0,
+                "recomputed": False,
+                "recompute_queued": False,
+                "recompute_skipped": "already_running",
+            }
+        _recompute_running = True
     threading.Thread(
         target=_run_recompute_job,
         daemon=True,

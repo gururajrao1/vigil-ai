@@ -420,13 +420,28 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     # LAZILY per signal on first detail view (cached + persisted), NOT as a bulk burst
     # here. A mass concurrent fan-out (hundreds of calls) tripped NCBI rate limits and
     # destabilized the worker, so enrichment is deferred to keep recompute fast + stable.
+    # Wipe prior signal rows for this scope. Alerts FK → signals.id has no ON DELETE
+    # CASCADE (legacy SQLite→Postgres), and orphan alerts may have NULL/mismatched
+    # project_id — so delete by signal_id first, then by project, then signals.
     if project_id is not None:
-        # Alerts first — FK alerts.signal_id → signals.id
-        db.query(Alert).filter(Alert.project_id == project_id).delete(synchronize_session=False)
-        db.query(Signal).filter(Signal.project_id == project_id).delete(synchronize_session=False)
+        sig_ids = [
+            row[0]
+            for row in db.query(Signal.id).filter(Signal.project_id == project_id).all()
+        ]
+        if sig_ids:
+            db.query(Alert).filter(Alert.signal_id.in_(sig_ids)).delete(
+                synchronize_session=False
+            )
+        db.query(Alert).filter(Alert.project_id == project_id).delete(
+            synchronize_session=False
+        )
+        db.query(Signal).filter(Signal.project_id == project_id).delete(
+            synchronize_session=False
+        )
     else:
-        db.query(Alert).delete()
-        db.query(Signal).delete()
+        db.query(Alert).delete(synchronize_session=False)
+        db.query(Signal).delete(synchronize_session=False)
+    db.flush()
 
     stored = []
     for sig in signals:

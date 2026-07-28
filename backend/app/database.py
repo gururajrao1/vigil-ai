@@ -18,7 +18,17 @@ logger = logging.getLogger("vigilai.database")
 _is_sqlite = settings.database_url.startswith("sqlite")
 connect_args = {"check_same_thread": False, "timeout": 60} if _is_sqlite else {}
 
-engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
+# Neon/Postgres: recycle + pre-ping so idle SSL drops don't 500 /api/signals.
+_engine_kwargs: dict = {"connect_args": connect_args, "future": True}
+if not _is_sqlite:
+    _engine_kwargs.update(
+        pool_pre_ping=True,
+        pool_recycle=280,
+        pool_size=5,
+        max_overflow=10,
+    )
+
+engine = create_engine(settings.database_url, **_engine_kwargs)
 
 if _is_sqlite:
     @event.listens_for(engine, "connect")
@@ -86,6 +96,7 @@ def migrate_schema() -> None:
 
         if not _is_sqlite:
             _widen_postgres_varchars(conn)
+            _ensure_alerts_signal_cascade(conn)
 
 
 def _widen_postgres_varchars(conn) -> None:
@@ -105,7 +116,32 @@ def _widen_postgres_varchars(conn) -> None:
             logger.debug("migrate_schema widen skip %s.%s: %s", table, col, exc)
 
 
-def checkpoint_wal() -> None:
+def _ensure_alerts_signal_cascade(conn) -> None:
+    """Recreate alerts.signal_id FK with ON DELETE CASCADE (Neon/Postgres).
+
+    Legacy schema lacked CASCADE, so signal rebuilds failed with IntegrityError
+    when orphan alerts still pointed at deleted signal rows.
+    """
+    try:
+        rows = conn.execute(text(
+            """
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = 'alerts'::regclass AND contype = 'f'
+              AND pg_get_constraintdef(oid) ILIKE '%signal_id%'
+            """
+        )).fetchall()
+        for (conname,) in rows:
+            conn.execute(text(f'ALTER TABLE alerts DROP CONSTRAINT IF EXISTS "{conname}"'))
+        conn.execute(text(
+            """
+            ALTER TABLE alerts
+            ADD CONSTRAINT alerts_signal_id_fkey
+            FOREIGN KEY (signal_id) REFERENCES signals(id) ON DELETE CASCADE
+            """
+        ))
+        logger.info("migrate_schema: alerts.signal_id FK set to ON DELETE CASCADE")
+    except Exception as exc:
+        logger.debug("migrate_schema alerts cascade skip: %s", exc)
     """Force a full WAL checkpoint so pending writes are flushed into the main DB file.
 
     Must be called before `create_all` / `migrate_schema` so schema operations
