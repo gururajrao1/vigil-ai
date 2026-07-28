@@ -52,7 +52,12 @@ export default function Kpis({ embedded = false }) {
   const rev = kpis.review || {};
   const spc = kpis.spc || {};
   const comp = kpis.completeness || {};
-  const triage = kpis.triage_queue || [];
+  // Client-side priority filter (works even if API deploy is paused).
+  // Does not mutate DB — only what this queue displays.
+  const triage = (kpis.triage_queue || []).filter(
+    (row) => row.sdr_flag || row.strength === 'STRONG' || row.spike_flag,
+  );
+  const triageHidden = Math.max(0, (kpis.triage_queue || []).length - triage.length);
   const reviewedPct = kpis.signal_count
     ? Math.round(((rev.reviewed || 0) / kpis.signal_count) * 100)
     : 0;
@@ -167,6 +172,11 @@ export default function Kpis({ embedded = false }) {
             Open full signals →
           </Link>
         </div>
+        {triageHidden > 0 && (
+          <p className="px-4 text-[11px] text-amber-300/90">
+            Hiding {triageHidden} lower-priority item(s) from this queue (WEAK / non-spike). Full list unchanged on Signals.
+          </p>
+        )}
         {msg && <p className="px-4 text-xs text-sky-300">{msg}</p>}
         <div className="mt-2 app-table-scroll">
           <table className="w-full text-sm">
