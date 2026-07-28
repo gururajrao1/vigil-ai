@@ -68,6 +68,7 @@ from .helpers import (
     dashboard_stats,
     overview_timeseries,
     post_to_dict,
+    signal_list_dict,
     signal_to_dict,
     signal_trend_series,
 )
@@ -996,8 +997,17 @@ def list_signals(
     drug: str | None = None,
     symptom: str | None = None,
     q: str | None = None,
+    full: bool = False,
     db: Session = Depends(get_db),
 ):
+    """List signals for the active project.
+
+    Default payload is a compact list row (flags + badge tooltips). Pass
+    ``full=true`` only when a caller needs nested evidence blobs; detail views
+    should use ``GET /signals/{id}`` instead.
+    """
+    from sqlalchemy import or_
+
     from ..projects.scope import current_project_id
     from ..nlp.text_normalize import fold_key
     from ..api.helpers import _project_scope
@@ -1049,12 +1059,28 @@ def list_signals(
         qset = qset.filter(Signal.label_novelty == label_novelty.lower())
     if lifecycle_status:
         qset = qset.filter(Signal.lifecycle_status == lifecycle_status.lower())
+    # Push text filters into SQL so Neon does not ship the full corpus then filter.
+    if drug and drug.strip():
+        qset = qset.filter(Signal.drug.ilike(f"%{drug.strip()}%"))
+    if symptom and symptom.strip():
+        term = f"%{symptom.strip()}%"
+        qset = qset.filter(or_(Signal.symptom.ilike(term), Signal.meddra_pt.ilike(term)))
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        qset = qset.filter(or_(
+            Signal.drug.ilike(term),
+            Signal.symptom.ilike(term),
+            Signal.meddra_pt.ilike(term),
+        ))
+
     signals = qset.order_by(Signal.prr.desc(), Signal.post_count.desc()).all()
-    out = [signal_to_dict(s) for s in signals]
+    to_dict = signal_to_dict if full else signal_list_dict
+    out = [to_dict(s) for s in signals]
     if region and region.lower() != "global":
         out = [s for s in out if region in (s.get("regions") or {})]
     if smq:
         out = [s for s in out if any(m.get("smq") == smq for m in (s.get("smq") or []))]
+    # Keep fold_key refinement for fuzzy drug/symptom matches after ILIKE prefilter.
     if drug:
         dk = fold_key(drug)
         out = [s for s in out if dk and (dk in fold_key(s.get("drug") or "") or fold_key(s.get("drug") or "") in dk)]
@@ -1068,15 +1094,7 @@ def list_signals(
                 or fold_key(s.get("symptom") or "") in sk
             )
         ]
-    if q:
-        qq = (q or "").lower()
-        out = [
-            s for s in out
-            if qq in (s.get("drug") or "").lower()
-            or qq in (s.get("symptom") or "").lower()
-            or qq in ((s.get("meddra") or {}).get("pt") or "").lower()
-        ]
-    return {"signals": out}
+    return {"signals": out, "compact": not full}
 
 
 # --------------------------- labeling-gap summary -------------------------- #

@@ -46,8 +46,139 @@ def _gate_explainability(raw_json: str | None) -> dict:
     return {}
 
 
+def _safe_json(raw: str | None, default):
+    try:
+        if raw is None or raw == "":
+            return default
+        return json.loads(raw)
+    except Exception:
+        return default
+
+
+def signal_list_dict(s: Signal) -> dict:
+    """Compact row for /api/signals list — skips heavy nested blobs (~10× smaller)."""
+    regions = _safe_json(s.regions_json, {}) or {}
+    if not isinstance(regions, dict):
+        regions = {}
+    primary_region = max(regions, key=regions.get) if regions else "Global"
+
+    pgx = _safe_json(s.pgx_json, None)
+    boxed = _safe_json(s.boxed_json, None)
+    mechanism = _safe_json(s.mechanism_json, None)
+    class_info = _safe_json(s.class_json, None)
+    ac = _safe_json(s.active_comparator_json, None)
+    spatial = _safe_json(s.spatial_json, None)
+    vaccine = _safe_json(s.vaccine_json, None)
+    label_gap = _safe_json(s.label_gap_json, None)
+    maxsprt = _safe_json(s.maxsprt_json, None)
+    fda = _safe_json(s.fda_evidence_json, {}) or {}
+
+    def _slim(obj, keys):
+        if not isinstance(obj, dict):
+            return obj
+        return {k: obj.get(k) for k in keys if k in obj}
+
+    return {
+        "id": s.id,
+        "drug": s.drug,
+        "symptom": s.symptom,
+        "product_type": s.product_type or "drug",
+        "drug_atc": s.drug_atc,
+        "device_gmdn": s.device_gmdn,
+        "imdrf_code": s.imdrf_code,
+        "imdrf_term": s.imdrf_term,
+        "meddra": {
+            "pt": s.meddra_pt,
+            "soc": s.meddra_soc,
+            "soc_code": s.meddra_soc_code,
+        },
+        "regions": regions,
+        "primary_region": primary_region,
+        "post_count": s.post_count,
+        "expected": s.expected,
+        "prr": s.prr,
+        "prr_ci": [s.prr_ci_low, s.prr_ci_high],
+        "ror": s.ror,
+        "ror_ci": [s.ror_ci_low, s.ror_ci_high],
+        "chi_square": s.chi_square,
+        "ic": s.ic,
+        "ic025": s.ic025,
+        "ebgm": s.ebgm,
+        "eb05": s.eb05,
+        "strength": s.strength,
+        "sdr_flag": bool(s.sdr_flag),
+        "trend_score": s.trend_score,
+        "spike_flag": s.spike_flag,
+        "spike_z": s.spike_z,
+        "who_umc": s.who_umc,
+        "who_umc_score": s.who_umc_score,
+        "severity": s.severity,
+        "pgx_actionable": bool(s.pgx_actionable),
+        "pgx": _slim(pgx, ("gene", "allele", "phenotype")) if pgx else None,
+        "smq": _safe_json(s.smq_json, []) or [],
+        "boxed_warning": bool(s.boxed_warning),
+        "boxed": _slim(boxed, ("topics", "covers_event")) if boxed else None,
+        "mechanism_plausible": bool(s.mechanism_plausible),
+        "mechanism": _slim(mechanism, ("target_or_moa", "plausible")) if mechanism else None,
+        "class_effect": bool(s.class_effect),
+        "class_info": (
+            {
+                "class_name": class_info.get("class_name"),
+                "member_drugs": (class_info.get("member_drugs") or [])[:8],
+            }
+            if isinstance(class_info, dict) else None
+        ),
+        "stands_out_in_class": bool(s.stands_out_in_class),
+        "active_comparator": _slim(
+            ac, ("ac_ror", "ac_ror_ci", "comparator_class")
+        ) if ac else None,
+        "is_vaccine": bool(s.is_vaccine),
+        "aesi": s.aesi,
+        "vaccine": (
+            {
+                "vaccine_name": vaccine.get("vaccine_name"),
+                "brighton_level": vaccine.get("brighton_level"),
+                "scri": _slim(vaccine.get("scri") or {}, ("ri",)),
+            }
+            if isinstance(vaccine, dict) else None
+        ),
+        "spatial_cluster": bool(s.spatial_cluster),
+        "spatial": _slim(spatial, ("hotspot", "observed", "expected", "rr")) if spatial else None,
+        "calibrated_p": s.calibrated_p,
+        "calibrated_signal": bool(s.calibrated_signal),
+        "e_value": s.e_value,
+        "e_value_ci": s.e_value_ci,
+        "br_verdict": s.br_verdict,
+        "completeness": s.completeness,
+        "well_documented": bool(s.well_documented),
+        "fda_evidence": {
+            "available": bool(fda.get("available")),
+            "source": fda.get("source"),
+            "report_count": fda.get("report_count"),
+            "confidence_boost": fda.get("confidence_boost"),
+        } if fda else None,
+        "hr": s.hr,
+        "hr_ci": _safe_json(s.hr_ci_json, None),
+        "hr_p": s.hr_p,
+        "hr_elevated": bool(s.hr_elevated),
+        "maxsprt_llr": s.maxsprt_llr,
+        "maxsprt_crossed": bool(s.maxsprt_crossed),
+        "maxsprt": _slim(maxsprt, ("interpretation",)) if maxsprt else None,
+        "label_novelty": s.label_novelty or "unknown",
+        "label_gap": _slim(label_gap, ("note", "novelty_tier")) if label_gap else None,
+        "review_state": s.review_state or "unreviewed",
+        "trust_score": s.trust_score if s.trust_score is not None else 1.0,
+        "trust_label": s.trust_label or "high",
+        "detected_at": s.detected_at.isoformat() if s.detected_at else None,
+        "lifecycle_status": s.lifecycle_status or "new",
+        "priority_score": s.priority_score or 0.0,
+    }
+
+
 def signal_to_dict(s: Signal, fda: bool = True) -> dict:
-    regions = json.loads(s.regions_json or "{}")
+    regions = _safe_json(s.regions_json, {}) or {}
+    if not isinstance(regions, dict):
+        regions = {}
     primary_region = max(regions, key=regions.get) if regions else "Global"
     return {
         "id": s.id,
@@ -84,69 +215,69 @@ def signal_to_dict(s: Signal, fda: bool = True) -> dict:
         "spike_z": s.spike_z,
         "who_umc": s.who_umc,
         "who_umc_score": s.who_umc_score,
-        "who_umc_factors": json.loads(s.who_umc_factors_json or "[]"),
+        "who_umc_factors": _safe_json(s.who_umc_factors_json, []),
         "severity": s.severity,
         # pharmacogenomic risk overlay
         "pgx_actionable": bool(s.pgx_actionable),
-        "pgx": json.loads(s.pgx_json or "null"),
+        "pgx": _safe_json(s.pgx_json, None),
         # Standardised MedDRA Query (SMQ) syndrome membership
-        "smq": json.loads(s.smq_json or "[]"),
+        "smq": _safe_json(s.smq_json, []),
         # FDA boxed (black-box) warning overlay
         "boxed_warning": bool(s.boxed_warning),
-        "boxed": json.loads(s.boxed_json or "null"),
+        "boxed": _safe_json(s.boxed_json, None),
         # mechanistic plausibility (Bradford Hill biological plausibility)
         "mechanism_plausible": bool(s.mechanism_plausible),
-        "mechanism": json.loads(s.mechanism_json or "null"),
+        "mechanism": _safe_json(s.mechanism_json, None),
         # class effect (ATC roll-up) + chemical read-across
         "class_effect": bool(s.class_effect),
-        "class_info": json.loads(s.class_json or "null"),
-        "read_across": json.loads(s.read_across_json or "[]"),
+        "class_info": _safe_json(s.class_json, None),
+        "read_across": _safe_json(s.read_across_json, []),
         # active-comparator (same-class) disproportionality — confounding-by-indication control
         "stands_out_in_class": bool(s.stands_out_in_class),
-        "active_comparator": json.loads(s.active_comparator_json or "null"),
+        "active_comparator": _safe_json(s.active_comparator_json, None),
         # vaccine pharmacovigilance overlay (AESI / Brighton / SCRI surrogate)
         "is_vaccine": bool(s.is_vaccine),
         "aesi": s.aesi,
-        "vaccine": json.loads(s.vaccine_json or "null"),
+        "vaccine": _safe_json(s.vaccine_json, None),
         # spatial (geographic) cluster detection (Kulldorff-style scan statistic)
         "spatial_cluster": bool(s.spatial_cluster),
-        "spatial": json.loads(s.spatial_json or "null"),
+        "spatial": _safe_json(s.spatial_json, None),
         # empirical calibration (negative-control null) + E-values
         "calibrated_p": s.calibrated_p,
         "calibrated_signal": bool(s.calibrated_signal),
         "e_value": s.e_value,
         "e_value_ci": s.e_value_ci,
-        "calibration": json.loads(s.calibration_json or "null"),
+        "calibration": _safe_json(s.calibration_json, None),
         # quantitative benefit–risk (BRAT/MCDA + NNT vs NNH) — illustrative surrogate
         "br_verdict": s.br_verdict,
-        "benefit_risk": json.loads(s.benefit_risk_json or "null"),
+        "benefit_risk": _safe_json(s.benefit_risk_json, None),
         # UMC vigiGrade-style report completeness (documentation-quality surrogate)
         "completeness": s.completeness,
         "well_documented": bool(s.well_documented),
-        "completeness_detail": json.loads(s.completeness_json or "null"),
+        "completeness_detail": _safe_json(s.completeness_json, None),
         "narrative": s.narrative,
         "narrative_source": s.narrative_source,
-        "copilot": json.loads(s.copilot_json or "null"),
+        "copilot": _safe_json(s.copilot_json, None),
         "copilot_source": s.copilot_source,
-        "fda_evidence": json.loads(s.fda_evidence_json or "{}") if fda else None,
+        "fda_evidence": _safe_json(s.fda_evidence_json, {}) if fda else None,
         # additional keyless evidence connectors
-        "label_evidence": json.loads(s.label_evidence_json or "{}"),
-        "recall": json.loads(s.recall_json or "{}"),
-        "literature": json.loads(s.literature_json or "{}"),
-        "device_classification": json.loads(s.device_class_json or "{}"),
+        "label_evidence": _safe_json(s.label_evidence_json, {}),
+        "recall": _safe_json(s.recall_json, {}),
+        "literature": _safe_json(s.literature_json, {}),
+        "device_classification": _safe_json(s.device_class_json, {}),
         # Cox PH time-to-event surrogate (illustrative social-listening hazard ratio)
         "hr": s.hr,
-        "hr_ci": json.loads(s.hr_ci_json or "null"),
+        "hr_ci": _safe_json(s.hr_ci_json, None),
         "hr_p": s.hr_p,
         "hr_elevated": bool(s.hr_elevated),
-        "hr_detail": json.loads(s.hr_json or "null"),
+        "hr_detail": _safe_json(s.hr_json, None),
         # MaxSPRT sequential surveillance (Kulldorff 2011) — type-I-error-controlled signal detection
         "maxsprt_llr": s.maxsprt_llr,
         "maxsprt_crossed": bool(s.maxsprt_crossed),
-        "maxsprt": json.loads(s.maxsprt_json or "null"),
+        "maxsprt": _safe_json(s.maxsprt_json, None),
         # labeling-gap detection (DailyMed adverse-reaction classification)
         "label_novelty": s.label_novelty or "unknown",
-        "label_gap": json.loads(s.label_gap_json or "null"),
+        "label_gap": _safe_json(s.label_gap_json, None),
         # review / detection metadata (KPIs)
         "review_state": s.review_state or "unreviewed",
         "reviewed_by": s.reviewed_by,
