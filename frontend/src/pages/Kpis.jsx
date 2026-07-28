@@ -161,7 +161,7 @@ export default function Kpis({ embedded = false }) {
         <div className="px-4 pt-4 flex flex-wrap items-end justify-between gap-2">
           <CardHeader
             title="Triage queue"
-            subtitle="Highest-priority unreviewed signals — Confirm or Dismiss here to move the KPIs"
+            subtitle="SDR / STRONG / spike only — Confirm real pairs here. WEAK noise stays on Signals (unchanged)."
           />
           <Link to="/signals?strength=STRONG" className="text-[11px] text-sky-400 hover:underline">
             Open full signals →
@@ -183,7 +183,7 @@ export default function Kpis({ embedded = false }) {
               {triage.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
-                    Backlog clear — no unreviewed signals in this workspace.
+                    No unreviewed SDR / STRONG / spike items. WEAK backlog (if any) is still on Signals.
                   </td>
                 </tr>
               )}

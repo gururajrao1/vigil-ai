@@ -99,7 +99,8 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
     well_documented = sum(1 for s in signals if s.well_documented)
 
     # --- Triage queue: what an analyst should open next ---
-    # Priority: unreviewed + (SDR or STRONG or spike), then by PRR/post_count.
+    # Presentation-only: suggest SDR / STRONG / spike unreviewed first.
+    # Does not hide WEAK signals elsewhere or mutate review state / DB rows.
     def _priority(s: Signal) -> tuple:
         return (
             0 if s.sdr_flag else 1,
@@ -109,7 +110,11 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
             -(s.post_count or 0),
         )
 
-    triage_pool = [s for s in signals if (s.review_state or "unreviewed") == "unreviewed"]
+    triage_pool = [
+        s for s in signals
+        if (s.review_state or "unreviewed") == "unreviewed"
+        and (s.sdr_flag or s.strength == "STRONG" or s.spike_flag)
+    ]
     triage_pool.sort(key=_priority)
     triage_queue = [
         {
@@ -260,6 +265,10 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
             ),
         },
         "triage_queue": triage_queue,
+        "triage_note": (
+            "Queue lists unreviewed SDR / STRONG / spike only (read-time filter). "
+            "WEAK signals remain in /api/signals and are not deleted or auto-dismissed."
+        ),
         "spc": {
             **spc,
             "series": spc_series,
