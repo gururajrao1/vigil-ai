@@ -754,24 +754,29 @@ def heal_orphan_project_ids(db: Session, default_project_id: int | None = None) 
 
     from .models import Project
 
-    pid = default_project_id
-    if pid is None:
-        pid = db.query(Project.id).order_by(Project.id.asc()).scalar()
-    if pid is None:
-        return {"signals": 0, "alerts": 0, "project_id": None}
+    try:
+        pid = default_project_id
+        if pid is None:
+            pid = db.query(Project.id).order_by(Project.id.asc()).limit(1).scalar()
+        if pid is None:
+            return {"signals": 0, "alerts": 0, "project_id": None}
 
-    n_sig = (
-        db.query(Signal)
-        .filter(or_(Signal.project_id.is_(None), Signal.project_id == 0))
-        .update({Signal.project_id: pid}, synchronize_session=False)
-    )
-    n_alert = (
-        db.query(Alert)
-        .filter(or_(Alert.project_id.is_(None), Alert.project_id == 0))
-        .update({Alert.project_id: pid}, synchronize_session=False)
-    )
-    db.commit()
-    return {"signals": int(n_sig or 0), "alerts": int(n_alert or 0), "project_id": int(pid)}
+        orphan = or_(Signal.project_id.is_(None), Signal.project_id == 0)
+        n_sig = 0
+        for sig in db.query(Signal).filter(orphan).all():
+            sig.project_id = int(pid)
+            n_sig += 1
+        n_alert = 0
+        alert_orphan = or_(Alert.project_id.is_(None), Alert.project_id == 0)
+        for alert in db.query(Alert).filter(alert_orphan).all():
+            alert.project_id = int(pid)
+            n_alert += 1
+        if n_sig or n_alert:
+            db.commit()
+        return {"signals": n_sig, "alerts": n_alert, "project_id": int(pid)}
+    except Exception as exc:
+        db.rollback()
+        return {"signals": 0, "alerts": 0, "project_id": default_project_id, "error": str(exc)}
 
 
 def _maybe_alert(db: Session, sig: Signal) -> None:
