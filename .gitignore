@@ -15,6 +15,10 @@ backend/*.db-shm
 **/audit_key.pem
 **/audit_key.pub
 **/*.pem
+backend/*_url.tmp
+backend/neon_*.tmp
+backend/_render_token.tmp
+backend/migrate_out.log
 
 # Runtime / local artifacts
 backend/uvicorn.out.log

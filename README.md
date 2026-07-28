@@ -5,7 +5,7 @@
 > **Offline-first · zero required API keys · drugs, vaccines, and devices**
 
 **Live app:** https://vigil-ai-eight.vercel.app  
-**API:** Railway (`/api` proxied from Vercel) · wake `/api/health` once after idle (~30–60s cold start)  
+**API:** Render (`/api` proxied from Vercel) · wake `/api/health` once after idle (~30–60s cold start on free tier)
 **Corpus (production Postgres):** ~1.3k unique posts across projects · default **General PV** workspace shows ~1.1k (project filter, not a smaller DB)
 
 Deeper handouts: [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) · [`docs/DEPLOY_FREE.md`](docs/DEPLOY_FREE.md)
@@ -439,12 +439,12 @@ Plain labels: **Inbox → Looking into it → Looks real → High priority → W
 |-------|-----|
 | **App** | https://vigil-ai-eight.vercel.app |
 | **Login** | https://vigil-ai-eight.vercel.app/login |
-| **API health** | https://vigil-ai-eight.vercel.app/api/health (Vercel → Railway) |
-| **API (direct)** | https://api-production-87a1.up.railway.app/api/health |
+| **API health** | https://vigil-ai-eight.vercel.app/api/health (Vercel → Render) |
+| **API (direct)** | https://vigil-ai-api.onrender.com/api/health |
 
-Frontend: Vercel · Backend: Railway (Postgres) · `frontend/vercel.json` rewrites `/api/*` to the Railway API.
+Frontend: Vercel · Backend: Render + Neon Postgres · `frontend/vercel.json` rewrites `/api/*` to the Render API.
 
-**Same URLs after each deploy** — the production aliases do not change. Corpus lives on Railway Postgres (persistent). Homepage **Data integrity** section documents live vs surrogate sources (no “biotech honesty” label).
+**Same URLs after each deploy** — the production aliases do not change. Corpus lives on **Neon Postgres** (persistent across Render free-tier sleep). Homepage **Data integrity** section documents live vs surrogate sources (no “biotech honesty” label).
 
 **Project switcher vs total posts**
 
@@ -454,7 +454,7 @@ Frontend: Vercel · Backend: Railway (Postgres) · `frontend/vercel.json` rewrit
 | Oncology / Vaccine | Smaller area-specific counts |
 | All workspaces combined | ~1.3k unique posts |
 
-New crawls append into the same DB; content-hash / `external_id` dedupe skips true clones without wiping history. To merge a local `backend/vigilai.db` into Railway without truncate, use `backend/scripts/merge_sqlite_into_pg.py` with `DATABASE_PUBLIC_URL`.
+New crawls append into the same DB; content-hash / `external_id` dedupe skips true clones without wiping history. To merge a local `backend/vigilai.db` into Neon without truncate, use `backend/scripts/merge_sqlite_into_pg.py` with `DATABASE_URL` set to Neon.
 
 After a large merge, run `POST /api/recompute` as analyst/admin (alerts are deleted before signals to satisfy FKs).
 
@@ -524,7 +524,7 @@ docker-compose up --build
 | `TAVILY_API_KEY` / `EXA_API_KEY` | Pathfinder discovery (optional) |
 | `ALERT_WEBHOOK_URL` | Live Slack/Teams on Escalate |
 | `OPENROUTER_API_KEY` | Extra LLM fallback |
-| `DATABASE_URL` | Postgres in prod (Railway / Docker); SQLite locally |
+| `DATABASE_URL` | Postgres in prod (Neon via Render); SQLite locally |
 
 **LLM chain:** Ollama → Gemini → OpenRouter → deterministic templates.
 

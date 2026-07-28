@@ -1,42 +1,59 @@
 # Free / low-cost deploy
 
-Stack used for the live app:
+Production stack (Railway sunset):
 
 - **Frontend:** Vercel — https://vigil-ai-eight.vercel.app  
-- **Backend:** Railway Web Service (Docker) + Postgres — https://api-production-87a1.up.railway.app · proxied as `/api/*` from Vercel  
-- **Auth:** JWT roles admin / analyst / viewer (`backend/app/rbac.py`)  
-- **Corpus:** persisted on Railway Postgres (~1.3k unique posts). Dashboard is **project-scoped** (General PV ≈ 1.1k by default).
+- **Backend:** Render free Web Service (Docker) — https://vigil-ai-api.onrender.com  
+  Proxied as `/api/*` from Vercel ([`frontend/vercel.json`](../frontend/vercel.json))  
+- **Database:** Neon free Postgres (`DATABASE_URL`) — persists corpus across Render sleep  
+- **Auth:** JWT roles admin / analyst / viewer (`backend/app/rbac.py`)
 
-> Older notes mentioned Render free tier. Production `/api` now targets Railway (`frontend/vercel.json`). Prefer Railway for RBAC-current code.
+> Railway was the previous API+Postgres host. Do not rely on it after the trial ends.
+> Blueprint: [`render.yaml`](../render.yaml). Migrate scripts: `backend/scripts/migrate_pg_to_neon.py`.
 
 ## Empty dashboards / cold start?
 
-Postgres on Railway persists posts across deploys — deploys do **not** wipe the corpus. After idle, wake the API once via `/api/health`, then browse as usual. Use **Demo corpus** / Fetch only as an **analyst or admin** when you intentionally want more volume.
+Render free instances **sleep after ~15 minutes idle**. First request can take 30–60s.
 
-To merge unique rows from a local `backend/vigilai.db` without truncating production:
+1. Open https://vigil-ai-api.onrender.com/api/health once (or use the app’s wake path).  
+2. Then browse as usual — Neon keeps posts/signals while the API sleeps.
+
+Postgres on Neon persists across deploys and sleep. Deploys do **not** wipe the corpus.
+
+To merge unique rows from a local `backend/vigilai.db` into Neon:
 
 ```powershell
 cd backend
-# Set DATABASE_PUBLIC_URL from Railway Postgres vars (public proxy), then:
+# Set DATABASE_URL to Neon pooled URL, then:
 .\.venv\Scripts\python.exe scripts\merge_sqlite_into_pg.py
 # Then POST /api/recompute as admin/analyst
 ```
 
-## 1) Backend (Railway)
+To copy Railway (or any) Postgres → Neon before cutting over:
 
-1. Create/link a Railway project with a Postgres service + `api` service.  
-2. From `backend/`: set `DATABASE_URL` (Postgres), `SEED_ADMIN_*`, `AUTO_SEED_DEMO`, optional `TAVILY_API_KEY`, then `railway up -s api`.  
-3. Generate a public domain for `api` (e.g. `https://api-….up.railway.app`).  
-4. Point `frontend/vercel.json` rewrite `/api/:path*` → that host’s `/api/:path*`.
+```powershell
+cd backend
+.\.venv\Scripts\python.exe scripts\migrate_pg_to_neon.py --src-file railway_public_url.txt --dst-file neon_url.txt
+```
+
+## 1) Backend (Render + Neon)
+
+1. Create a Neon project → copy the **pooled** `postgresql://…` URL (`sslmode=require`).  
+2. Render Dashboard → Blueprint / GitHub connect using [`render.yaml`](../render.yaml), **or** update existing service `vigil-ai-api`.  
+3. Set env vars on the service:
+   - `DATABASE_URL` = Neon pooled URL  
+   - `JWT_SECRET`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`  
+   - `USE_TRANSFORMER_NER=false`, `AUTO_SEED_DEMO=true` (as in blueprint)  
+4. Confirm https://vigil-ai-api.onrender.com/api/health and login.
 
 ## 2) Frontend (Vercel)
+
+[`frontend/vercel.json`](../frontend/vercel.json) must rewrite `/api/:path*` → `https://vigil-ai-api.onrender.com/api/:path*`.
 
 ```powershell
 cd frontend
 vercel --prod
 ```
-
-Or: Vercel Dashboard → project root `frontend` → Deploy.
 
 ## 3) Demo credentials
 
@@ -50,4 +67,8 @@ Public Register → **viewer** only. Admins promote users on `/users`.
 
 ## Demo tip
 
-Before presenting, open `/api/health` once so the API is warm, then walk judges through homepage → Login → Signals.
+Before presenting, open `/api/health` once so Render is warm, then walk homepage → Login → Signals (General PV).
+
+## Sunset Railway
+
+After verifying Vercel → Render → Neon end-to-end, cancel or leave the Railway project idle so the 14-day cliff does not surprise you. Keep Neon as the source of truth.
