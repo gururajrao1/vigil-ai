@@ -142,6 +142,9 @@ def _ensure_alerts_signal_cascade(conn) -> None:
         logger.info("migrate_schema: alerts.signal_id FK set to ON DELETE CASCADE")
     except Exception as exc:
         logger.debug("migrate_schema alerts cascade skip: %s", exc)
+
+
+def checkpoint_wal() -> None:
     """Force a full WAL checkpoint so pending writes are flushed into the main DB file.
 
     Must be called before `create_all` / `migrate_schema` so schema operations
