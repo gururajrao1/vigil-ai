@@ -78,8 +78,10 @@ def pipeline_capabilities() -> dict:
         },
         "registries": {
             "kaers": "offline_fixture",
-            "cochrane_central": "offline_fixture+probe",
-            "medline_pubmed": "eutils_or_offline",
+            "cochrane_central": "europe_pmc_src_cctr_or_offline",
+            "medline_pubmed": "eutils_efetch_abstracts_or_offline",
+            "europe_pmc": "rest_or_offline",
+            "semantic_scholar": "graph_api_or_offline",
         },
         "disproportionality": {
             "prr": True,

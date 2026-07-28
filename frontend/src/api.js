@@ -4,6 +4,7 @@
 // Local Vite: empty BASE uses the dev proxy → 127.0.0.1:8010.
 const BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
 
+
 let _token = localStorage.getItem('vigilai_token') || '';
 let _projectId = localStorage.getItem('vigilai_project_id') || '';
 
@@ -164,10 +165,29 @@ export const api = {
     req(`/api/ingest/faers-live?limit=${limit}&days_back=${daysBack}&recompute=${recompute}`, { method: 'POST' }),
   crawlDailymedRss: (limit = 40, { recompute = true } = {}) =>
     req(`/api/ingest/dailymed-rss?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
-  crawlPubmedLive: (query, limit = 20, { recompute = true } = {}) => {
-    const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
+  crawlPubmedLive: (query, limit = 20, { recompute = true, daysBack = 730 } = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      recompute: String(recompute),
+      days_back: String(daysBack),
+    });
     if (query) params.set('query', query);
     return req(`/api/ingest/pubmed-live?${params}`, { method: 'POST' });
+  },
+  crawlEuropePmc: (query, limit = 20, { recompute = true } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
+    if (query) params.set('query', query);
+    return req(`/api/ingest/europe-pmc?${params}`, { method: 'POST' });
+  },
+  crawlSemanticScholar: (query, limit = 20, { recompute = true } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
+    if (query) params.set('query', query);
+    return req(`/api/ingest/semantic-scholar?${params}`, { method: 'POST' });
+  },
+  crawlCochraneCentral: (query, limit = 20, { recompute = true } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
+    if (query) params.set('query', query);
+    return req(`/api/ingest/cochrane-central?${params}`, { method: 'POST' });
   },
   crawlRedditPullpush: (query = 'side effect adverse reaction', { recompute = true } = {}) =>
     req(`/api/ingest/reddit-pullpush?query=${encodeURIComponent(query)}&recompute=${recompute}`, { method: 'POST' }),

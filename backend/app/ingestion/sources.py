@@ -37,9 +37,18 @@ SOURCES = [
     {"id": "dailymed_rss", "name": "DailyMed label RSS", "type": "regulatory",
      "scope": "United States", "key_required": False, "status": "live",
      "note": "New & revised drug labels from NLM DailyMed (no key)"},
-    {"id": "pubmed_live", "name": "PubMed literature (NCBI)", "type": "literature",
+    {"id": "pubmed_live", "name": "PubMed abstracts (NCBI)", "type": "literature",
      "scope": "Global", "key_required": False, "status": "live",
-     "note": "Recent PV / drug safety / vaccine AE articles via NCBI E-utilities (no key)"},
+     "note": "Full abstracts via efetch · MeSH PV queries · project-scoped · no key"},
+    {"id": "europe_pmc", "name": "Europe PMC abstracts", "type": "literature",
+     "scope": "Global", "key_required": False, "status": "live",
+     "note": "EMBL-EBI Europe PMC REST · title + abstract · offline fixtures if blocked"},
+    {"id": "semantic_scholar", "name": "Semantic Scholar papers", "type": "literature",
+     "scope": "Global", "key_required": False, "status": "live",
+     "note": "Academic Graph search · abstracts · optional SEMANTIC_SCHOLAR_API_KEY"},
+    {"id": "cochrane_central", "name": "Cochrane CENTRAL abstracts", "type": "literature",
+     "scope": "Global", "key_required": False, "status": "live",
+     "note": "Trial-register abstracts via Europe PMC SRC:cctr · offline fixtures fallback"},
     {"id": "fda_medwatch", "name": "FDA MedWatch / EMA / WHO alerts", "type": "regulatory",
      "scope": "Worldwide", "key_required": False, "status": "live",
      "note": "MedWatch, EMA, WHO, MHRA safety alerts via Google News (6 regulatory queries)"},
@@ -496,91 +505,51 @@ def crawl_dailymed_rss(limit: int = 40) -> dict:
     return {"posts": posts[:limit], "unique_fetched": len(posts)}
 
 
-def crawl_pubmed_live(query: str | None = None, limit: int = 20) -> dict:
-    """Pull recent PubMed literature via NCBI E-utilities (no key, no SSL issues).
+def crawl_pubmed_live(
+    query: str | None = None,
+    limit: int = 20,
+    days_back: int = 730,
+    project_hint: str | None = None,
+) -> dict:
+    """Pull PubMed records with full abstracts (esearch + efetch). See literature.py."""
+    from .literature import crawl_pubmed_abstracts
 
-    Uses curated PV search terms if query is omitted. Converts each article into
-    a post body mentioning drug + adverse reaction for NLP extraction.
-    Returns ``{posts, unique_fetched, query_count}``.
-    """
-    import httpx
+    return crawl_pubmed_abstracts(
+        query=query, limit=limit, days_back=days_back, project_hint=project_hint,
+    )
 
-    pv_queries = [
-        query or "pharmacovigilance adverse drug reaction",
-        "drug safety signal detection",
-        "vaccine adverse event",
-    ] if not query else [query]
 
-    posts: List[dict] = []
-    seen: set[str] = set()
-    per = max(3, limit // len(pv_queries))
+def crawl_europe_pmc(
+    query: str | None = None,
+    limit: int = 20,
+    project_hint: str | None = None,
+) -> dict:
+    """Europe PMC abstract ingest (EMBL-EBI REST, no key)."""
+    from .literature import crawl_europe_pmc as _epmc
 
-    for q in pv_queries:
-        try:
-            # Step 1: search for PMIDs
-            sr = httpx.get(
-                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-                params={"db": "pubmed", "term": q, "retmax": per,
-                        "sort": "pub date", "retmode": "json",
-                        **({"api_key": settings.ncbi_api_key} if settings.ncbi_api_key else {})},
-                headers={"User-Agent": _USER_AGENT}, timeout=12.0,
-            )
-            if sr.status_code != 200:
-                continue
-            ids = sr.json().get("esearchresult", {}).get("idlist", [])
-            if not ids:
-                continue
-            # Step 2: fetch summaries
-            ss = httpx.get(
-                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
-                params={"db": "pubmed", "id": ",".join(ids), "retmode": "json",
-                        **({"api_key": settings.ncbi_api_key} if settings.ncbi_api_key else {})},
-                headers={"User-Agent": _USER_AGENT}, timeout=12.0,
-            )
-            if ss.status_code != 200:
-                continue
-            result = ss.json().get("result", {})
-            for pmid in ids:
-                if pmid in seen or pmid not in result:
-                    continue
-                seen.add(pmid)
-                art = result[pmid]
-                title = art.get("title", "")
-                authors = ", ".join(
-                    a.get("name", "") for a in art.get("authors", [])[:3]
-                )
-                pub_date = art.get("pubdate", "")
-                journal = art.get("source", "")
-                body = (f"PubMed article: {title}. "
-                        f"Authors: {authors}. Journal: {journal}. "
-                        f"Published: {pub_date}.")
+    return _epmc(query=query, limit=limit, project_hint=project_hint)
 
-                posted = datetime.utcnow()
-                try:
-                    posted = datetime.strptime(pub_date[:4], "%Y")
-                except ValueError:
-                    pass
 
-                posts.append({
-                    "external_id": f"pubmed_{pmid}",
-                    "platform": "pubmed_live",
-                    "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                    "author": _hash(authors or "pubmed"),
-                    "title": _strip_html(title[:500]),
-                    "body": _strip_html(body[:4000]),
-                    "region": "Global",
-                    "posted_at": posted,
-                    "pmid": pmid,
-                })
-        except Exception:
-            continue
+def crawl_semantic_scholar(
+    query: str | None = None,
+    limit: int = 20,
+    project_hint: str | None = None,
+) -> dict:
+    """Semantic Scholar abstract ingest (Academic Graph; optional API key)."""
+    from .literature import crawl_semantic_scholar as _s2
 
-    posts.sort(key=lambda p: p.get("posted_at") or datetime.min, reverse=True)
-    return {
-        "posts": posts[:limit],
-        "unique_fetched": len(posts),
-        "query_count": len(pv_queries),
-    }
+    return _s2(query=query, limit=limit, project_hint=project_hint)
+
+
+def crawl_cochrane_central(
+    query: str | None = None,
+    limit: int = 20,
+    project_hint: str | None = None,
+) -> dict:
+    """Cochrane CENTRAL abstracts via Europe PMC SRC:cctr + offline fixtures."""
+    from .literature import crawl_cochrane_central as _cctr
+
+    return _cctr(query=query, limit=limit, project_hint=project_hint)
 
 
 def _country_to_region(code: str) -> str:

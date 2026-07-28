@@ -59,6 +59,15 @@ def _make_source_fn(mode: str, query: str) -> Callable:
     if mode == "pubmed_live":
         from .ingestion.sources import crawl_pubmed_live
         return lambda: crawl_pubmed_live(q, limit=20)
+    if mode == "europe_pmc":
+        from .ingestion.sources import crawl_europe_pmc
+        return lambda: crawl_europe_pmc(q, limit=20)
+    if mode == "semantic_scholar":
+        from .ingestion.sources import crawl_semantic_scholar
+        return lambda: crawl_semantic_scholar(q, limit=20)
+    if mode == "cochrane_central":
+        from .ingestion.sources import crawl_cochrane_central
+        return lambda: crawl_cochrane_central(q, limit=20)
     if mode == "fda_rss":
         from .ingestion.sources import crawl_fda_all
         return lambda: crawl_fda_all(limit=40)
@@ -101,7 +110,10 @@ _FALLBACK_CHAINS: Dict[str, List[str]] = {
     "google_news":   ["google_news",   "fda_rss",         "stream"],
     "faers_live":    ["faers_live",    "fda_rss",          "google_news", "stream"],
     "dailymed_rss":  ["dailymed_rss",  "pubmed_live",     "google_news", "stream"],
-    "pubmed_live":   ["pubmed_live",   "google_news",     "stream"],
+    "pubmed_live":   ["pubmed_live",   "europe_pmc",      "semantic_scholar", "stream"],
+    "europe_pmc":    ["europe_pmc",    "pubmed_live",     "semantic_scholar", "stream"],
+    "semantic_scholar": ["semantic_scholar", "europe_pmc", "pubmed_live", "stream"],
+    "cochrane_central": ["cochrane_central", "europe_pmc", "pubmed_live", "stream"],
     "fda_rss":       ["fda_rss",       "google_news",     "stream"],
     "mhra_devices":  ["mhra_devices",  "fda_rss",         "google_news", "stream"],
     "maude_live":    ["maude_live",    "device_recalls",  "device_news", "stream"],

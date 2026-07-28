@@ -6,13 +6,8 @@ Network calls degrade to empty lists; offline fixtures remain available for demo
 from __future__ import annotations
 
 import logging
-import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import Any, Optional
-
-import httpx
-
-from ..config import settings
+from typing import Any
 
 logger = logging.getLogger("vigilai.registry_adapters")
 
@@ -101,126 +96,39 @@ _COCHRANE_OFFLINE = [
 
 
 def fetch_cochrane_central(query: str = "adverse event", limit: int = 20) -> list[dict[str, Any]]:
-    """Cochrane CENTRAL adapter — offline fixtures; optional HTTP probe when online."""
-    q = (query or "adverse").lower()
-    # Optional live probe (often blocked / HTML-only) — never hard-fail
-    try:
-        with httpx.Client(timeout=8.0, follow_redirects=True) as client:
-            r = client.get(
-                "https://www.cochranelibrary.com/central",
-                params={"q": query},
-                headers={"User-Agent": "VigilAI-Registry/1.0"},
-            )
-            if r.status_code == 200 and "trial" in r.text.lower():
-                logger.debug("Cochrane CENTRAL reachable; using offline structured fixtures for NLP quality")
-    except Exception as exc:
-        logger.debug("Cochrane live probe skipped: %s", exc)
+    """Cochrane CENTRAL — Europe PMC SRC:cctr with offline fixtures."""
+    from .literature import crawl_cochrane_central
 
-    rows = [r for r in _COCHRANE_OFFLINE if q in r["title"].lower() or q in r["abstract"].lower() or True]
-    out = []
-    for r in rows[:limit]:
-        out.append(
-            _post(
-                external_id=f"cochrane:{r['id']}",
-                platform="cochrane_central",
-                title=r["title"],
-                body=r["abstract"],
-                url=f"https://www.cochranelibrary.com/central/doi/{r['id']}",
-                region="Global",
-                language="en",
-            )
-        )
-    return out
+    return list((crawl_cochrane_central(query=query, limit=limit).get("posts") or []))
 
 
 # --------------------------------------------------------------------------- #
 # MEDLINE / PubMed — E-utilities (no key required; NCBI key raises rate limit)
 # --------------------------------------------------------------------------- #
 def fetch_medline_pubmed(query: str = "drug adverse effects", limit: int = 20) -> list[dict[str, Any]]:
-    """Fetch PubMed abstracts via NCBI E-utilities; empty on network failure."""
-    base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
-    params_search: dict[str, Any] = {
-        "db": "pubmed",
-        "term": query,
-        "retmax": min(limit, 50),
-        "retmode": "json",
-    }
-    if settings.ncbi_api_key:
-        params_search["api_key"] = settings.ncbi_api_key
-    try:
-        with httpx.Client(timeout=8.0) as client:
-            s = client.get(f"{base}/esearch.fcgi", params=params_search)
-            s.raise_for_status()
-            ids = (s.json().get("esearchresult") or {}).get("idlist") or []
-            if not ids:
-                return []
-            params_fetch = {
-                "db": "pubmed",
-                "id": ",".join(ids),
-                "retmode": "xml",
-            }
-            if settings.ncbi_api_key:
-                params_fetch["api_key"] = settings.ncbi_api_key
-            f = client.get(f"{base}/efetch.fcgi", params=params_fetch)
-            f.raise_for_status()
-            return _parse_pubmed_xml(f.text)
-    except Exception as exc:
-        logger.warning("PubMed/MEDLINE fetch failed: %s", exc)
-        return _medline_offline(query, limit)
+    """Fetch PubMed abstracts via literature module (efetch); offline on failure."""
+    from .literature import crawl_pubmed_abstracts
+
+    posts = list((crawl_pubmed_abstracts(query=query, limit=limit).get("posts") or []))
+    for p in posts:
+        p["platform"] = "medline_pubmed"
+        ext = p.get("external_id") or ""
+        if ext.startswith("pubmed_"):
+            p["external_id"] = ext.replace("pubmed_", "pubmed:", 1)
+    return posts
 
 
 def _parse_pubmed_xml(xml_text: str) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    try:
-        root = ET.fromstring(xml_text)
-    except ET.ParseError:
-        return out
-    for art in root.findall(".//PubmedArticle"):
-        pmid = (art.findtext(".//PMID") or "").strip()
-        title = (art.findtext(".//ArticleTitle") or "").strip()
-        abstract_parts = [n.text or "" for n in art.findall(".//AbstractText")]
-        abstract = " ".join(abstract_parts).strip()
-        if not pmid or not (title or abstract):
-            continue
-        out.append(
-            _post(
-                external_id=f"pubmed:{pmid}",
-                platform="medline_pubmed",
-                title=title or f"PMID {pmid}",
-                body=abstract or title,
-                url=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                region="Global",
-                language="en",
-            )
-        )
-    return out
+    """Legacy helper; prefer literature._parse_pubmed_xml."""
+    from .literature import _parse_pubmed_xml as _lit_parse
+
+    return _lit_parse(xml_text, platform="medline_pubmed")
 
 
 def _medline_offline(query: str, limit: int) -> list[dict[str, Any]]:
-    fixtures = [
-        {
-            "pmid": "00000001",
-            "title": "Disproportionality analysis of immune-related colitis with PD-1 inhibitors",
-            "abstract": "MEDLINE surrogate: pembrolizumab and nivolumab associated with colitis in FAERS-linked literature review.",
-        },
-        {
-            "pmid": "00000002",
-            "title": "Statin-associated muscle symptoms: a systematic review",
-            "abstract": "MEDLINE surrogate: myalgia and rhabdomyolysis signals with high-intensity simvastatin and atorvastatin.",
-        },
-    ]
-    q = (query or "").lower()
-    rows = [f for f in fixtures if not q or q in f["title"].lower() or q in f["abstract"].lower()]
-    return [
-        _post(
-            external_id=f"pubmed:{f['pmid']}",
-            platform="medline_pubmed",
-            title=f["title"],
-            body=f["abstract"],
-            url=f"https://pubmed.ncbi.nlm.nih.gov/{f['pmid']}/",
-        )
-        for f in rows[:limit]
-    ]
+    from .literature import crawl_pubmed_abstracts
+
+    return list((crawl_pubmed_abstracts(query=query, limit=limit).get("posts") or []))
 
 
 def fetch_multi_registry(query: str = "adverse event", limit_per: int = 10) -> dict[str, list[dict[str, Any]]]:

@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session
 
 from ..ingestion.sources import (
     crawl_dailymed_rss,
+    crawl_cochrane_central,
+    crawl_europe_pmc,
     crawl_faers,
     crawl_google_news,
     crawl_hackernews,
@@ -27,6 +29,7 @@ from ..ingestion.sources import (
     crawl_pubmed_live,
     crawl_reddit_health,
     crawl_reddit_pullpush,
+    crawl_semantic_scholar,
     crawl_youtube,
 )
 from ..pipeline import ingest_posts
@@ -43,7 +46,11 @@ _SOURCE_ALIASES: List[Tuple[str, Tuple[str, ...]]] = [
     ("hackernews", ("hackernews", "hacker news", "hn")),
     ("youtube", ("youtube", "yt comments", "youtube comments", "yt")),
     ("faers", ("faers", "openfda", "icsr", "fda ae", "fda adverse")),
-    ("pubmed", ("pubmed", "literature", "papers", "ncbi")),
+    ("pubmed", ("pubmed", "medline", "ncbi", "papers")),
+    ("europe_pmc", ("europe pmc", "europepmc", "epmc")),
+    ("semantic_scholar", ("semantic scholar", "semanticscholar", "s2 papers")),
+    ("cochrane", ("cochrane central", "cochrane", "cctr")),
+    ("literature", ("literature", "abstracts", "medical abstract")),
     ("reddit", ("reddit", "pullpush", "subreddit", "r/")),
     ("maude", ("maude", "device adverse", "device event")),
     ("mhra", ("mhra", "yellow card", "uk device")),
@@ -76,14 +83,16 @@ _HELP_REPLY = (
     "• fetch reddit for accutane depression\n"
     "• pull faers\n"
     "• search pubmed for myocarditis vaccine\n"
+    "• europe pmc abstracts about statin myalgia\n"
+    "• semantic scholar pharmacovigilance signal\n"
+    "• cochrane central vaccine safety\n"
     "• youtube vaccine side effects\n"
     "• life science news\n"
     "• hacker news about drug safety\n"
     "• pull maude / mhra / dailymed\n"
-    "Sources: google_news · life_science · reddit · faers · pubmed · "
-    "youtube · hackernews · maude · mhra · dailymed.\n"
-    "Tip: add `limit 10` to keep batches small. Signals refresh on the next "
-    "recompute (not on every chat turn)."
+    "Sources: google_news · life_science · reddit · faers · pubmed · europe_pmc · "
+    "semantic_scholar · cochrane · youtube · hackernews · maude · mhra · dailymed.\n"
+    "Tip: literature sources ingest abstracts (not ICSRs). Add `limit 10` for small batches."
 )
 
 
@@ -186,8 +195,14 @@ def _run_crawl(source: str, query: Optional[str], limit: int) -> dict:
         return crawl_youtube(query=query, limit=min(limit, 10))
     if source == "faers":
         return crawl_faers(limit=limit)
-    if source == "pubmed":
+    if source == "pubmed" or source == "literature":
         return crawl_pubmed_live(query=query, limit=limit)
+    if source == "europe_pmc":
+        return crawl_europe_pmc(query=query, limit=limit)
+    if source == "semantic_scholar":
+        return crawl_semantic_scholar(query=query, limit=limit)
+    if source == "cochrane":
+        return crawl_cochrane_central(query=query, limit=limit)
     if source == "reddit":
         q = query or "side effect adverse reaction"
         batch = crawl_reddit_pullpush(query=q, limit=limit)

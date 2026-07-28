@@ -36,7 +36,10 @@ from ..ingestion.sources import (
     crawl_life_science_news,
     crawl_maude_live,
     crawl_mhra_devices,
+    crawl_cochrane_central,
+    crawl_europe_pmc,
     crawl_pubmed_live,
+    crawl_semantic_scholar,
     crawl_reddit_health,
     crawl_reddit_pullpush,
     crawl_reddit_rss,
@@ -242,20 +245,96 @@ def ingest_fda_rss(
 
 @router.post("/ingest/pubmed-live")
 def ingest_pubmed_live(
-    query: str | None = None, limit: int = 20, recompute: bool = True, db: Session = Depends(get_db)
+    query: str | None = None,
+    limit: int = 20,
+    days_back: int = 730,
+    recompute: bool = True,
+    db: Session = Depends(get_db),
 ):
-    """Ingest recent PubMed articles via NCBI E-utilities (no key).
+    """Ingest PubMed abstracts via NCBI esearch + efetch (no key).
 
-    Uses curated pharmacovigilance search terms by default; pass ``query``
-    to override. Article title + metadata run through the NLP pipeline.
+    Default queries use MeSH PV terms and respect the active project workspace
+    (Oncology / Vaccine / device keywords). Literature posts are tagged
+    ``content_type=literature`` so they stay distinct from spontaneous ICSRs.
     """
-    batch = crawl_pubmed_live(query=query, limit=limit)
+    batch = crawl_pubmed_live(query=query, limit=limit, days_back=days_back)
     posts = batch["posts"]
     new = ingest_posts(db, posts, use_transformer=False,
                        use_presidio=False, online_translation=False)
     stats = _maybe_recompute(db, recompute)
     return {
         "source": "pubmed_live",
+        "content_type": "literature",
+        "fetched": len(posts),
+        "unique_fetched": batch["unique_fetched"],
+        "query_count": batch.get("query_count"),
+        "ingested": new,
+        **stats,
+    }
+
+
+@router.post("/ingest/europe-pmc")
+def ingest_europe_pmc(
+    query: str | None = None,
+    limit: int = 20,
+    recompute: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Ingest Europe PMC abstracts (EMBL-EBI REST, no key; offline fixtures if blocked)."""
+    batch = crawl_europe_pmc(query=query, limit=limit)
+    posts = batch["posts"]
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "europe_pmc",
+        "content_type": "literature",
+        "fetched": len(posts),
+        "unique_fetched": batch["unique_fetched"],
+        "ingested": new,
+        **stats,
+    }
+
+
+@router.post("/ingest/semantic-scholar")
+def ingest_semantic_scholar(
+    query: str | None = None,
+    limit: int = 20,
+    recompute: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Ingest Semantic Scholar paper abstracts (optional SEMANTIC_SCHOLAR_API_KEY)."""
+    batch = crawl_semantic_scholar(query=query, limit=limit)
+    posts = batch["posts"]
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "semantic_scholar",
+        "content_type": "literature",
+        "fetched": len(posts),
+        "unique_fetched": batch["unique_fetched"],
+        "ingested": new,
+        **stats,
+    }
+
+
+@router.post("/ingest/cochrane-central")
+def ingest_cochrane_central(
+    query: str | None = None,
+    limit: int = 20,
+    recompute: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Ingest Cochrane CENTRAL abstracts via Europe PMC SRC:cctr (+ offline fixtures)."""
+    batch = crawl_cochrane_central(query=query, limit=limit)
+    posts = batch["posts"]
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "cochrane_central",
+        "content_type": "literature",
         "fetched": len(posts),
         "unique_fetched": batch["unique_fetched"],
         "ingested": new,

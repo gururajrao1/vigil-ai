@@ -35,9 +35,24 @@ const SOURCE_ACTIONS = {
     note: 'New & revised drug labels from NLM',
   },
   pubmed_live: {
-    label: '🔬 Fetch PubMed articles',
+    label: '🔬 Fetch PubMed abstracts',
     fn: () => api.crawlPubmedLive(),
-    note: 'PV / drug safety / vaccine AE literature via NCBI',
+    note: 'Full abstracts via efetch · MeSH PV / project-scoped queries',
+  },
+  europe_pmc: {
+    label: '📗 Fetch Europe PMC abstracts',
+    fn: () => api.crawlEuropePmc(),
+    note: 'EMBL-EBI literature REST · offline fixtures if blocked',
+  },
+  semantic_scholar: {
+    label: '🎓 Fetch Semantic Scholar',
+    fn: () => api.crawlSemanticScholar(),
+    note: 'Academic Graph abstracts · optional SEMANTIC_SCHOLAR_API_KEY',
+  },
+  cochrane_central: {
+    label: '📘 Fetch Cochrane CENTRAL',
+    fn: () => api.crawlCochraneCentral(),
+    note: 'Trial-register abstracts via Europe PMC SRC:cctr',
   },
   hackernews: {
     label: '🔶 Crawl HackerNews',

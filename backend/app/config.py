@@ -70,6 +70,8 @@ class Settings:
         self.pubmed_base_url: str = os.getenv(
             "PUBMED_BASE_URL", "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
         ).strip()
+        # Optional — raises Semantic Scholar rate limits; works without a key.
+        self.semantic_scholar_api_key: str = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "").strip()
         # Master switch for label/recall/literature/device-class enrichment.
         # Enrichment runs LAZILY per signal on first detail view (<=4 cached calls),
         # never as a bulk burst, so it is safe to leave ON. Set false to fully disable
