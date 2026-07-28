@@ -180,7 +180,9 @@ export default function Sources({ embedded = false }) {
     try {
       const r = await fn();
       setCrawlResults((prev) => ({ ...prev, [id]: r }));
-      loadStats(); // refresh per-source stats after crawl
+      loadStats();
+      // Queue signal rebuild off the request path (avoids Vercel proxy timeouts).
+      api.recompute().catch(() => {});
     } catch (e) {
       setCrawlResults((prev) => ({ ...prev, [id]: { error: e.message } }));
     }

@@ -59,6 +59,11 @@ async function req(path, opts = {}, _attempt = 1) {
       const d = _errDetail(j.detail);
       if (d) msg = d;
     } catch { /* ignore */ }
+    if ([502, 503, 504].includes(res.status)) {
+      msg = 'API gateway timeout while crawling (Render may still be working). Retry with one source; signals refresh in the background.';
+    } else if (res.status === 404 || /not found/i.test(msg)) {
+      msg = 'Endpoint not found on API — hard-refresh the app (Ctrl+Shift+R). If it persists, the Render deploy may be stale.';
+    }
     throw new Error(msg);
   }
   const ct = res.headers.get('content-type') || '';
@@ -150,22 +155,22 @@ export const api = {
   recompute: () => req('/api/recompute', { method: 'POST' }),
   streamTick: (n = 3, recompute = false) =>
     req(`/api/stream/tick?n=${n}&recompute=${recompute}`, { method: 'POST' }),
-  crawlReddit: (query, { recompute = true } = {}) =>
+  crawlReddit: (query, { recompute = false } = {}) =>
     req(`/api/ingest/reddit?query=${encodeURIComponent(query)}&recompute=${recompute}`, { method: 'POST' }),
-  crawlRedditHealth: (query, { recompute = true } = {}) =>
+  crawlRedditHealth: (query, { recompute = false } = {}) =>
     req(`/api/ingest/reddit-health?query=${encodeURIComponent(query)}&recompute=${recompute}`, { method: 'POST' }),
   redditHealthSubs: () => req('/api/ingest/reddit-health/subs'),
-  crawlGoogleNews: (query, { recompute = true } = {}) => {
+  crawlGoogleNews: (query, { recompute = false } = {}) => {
     const params = new URLSearchParams({ recompute: String(recompute) });
     if (query) params.set('query', query);
     return req(`/api/ingest/google-news?${params}`, { method: 'POST' });
   },
   googleNewsQueries: () => req('/api/ingest/google-news/queries'),
-  crawlFaersLive: (limit = 30, daysBack = 90, { recompute = true } = {}) =>
+  crawlFaersLive: (limit = 30, daysBack = 90, { recompute = false } = {}) =>
     req(`/api/ingest/faers-live?limit=${limit}&days_back=${daysBack}&recompute=${recompute}`, { method: 'POST' }),
-  crawlDailymedRss: (limit = 40, { recompute = true } = {}) =>
+  crawlDailymedRss: (limit = 40, { recompute = false } = {}) =>
     req(`/api/ingest/dailymed-rss?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
-  crawlPubmedLive: (query, limit = 20, { recompute = true, daysBack = 730 } = {}) => {
+  crawlPubmedLive: (query, limit = 20, { recompute = false, daysBack = 730 } = {}) => {
     const params = new URLSearchParams({
       limit: String(limit),
       recompute: String(recompute),
@@ -174,54 +179,54 @@ export const api = {
     if (query) params.set('query', query);
     return req(`/api/ingest/pubmed-live?${params}`, { method: 'POST' });
   },
-  crawlEuropePmc: (query, limit = 20, { recompute = true } = {}) => {
+  crawlEuropePmc: (query, limit = 20, { recompute = false } = {}) => {
     const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
     if (query) params.set('query', query);
     return req(`/api/ingest/europe-pmc?${params}`, { method: 'POST' });
   },
-  crawlSemanticScholar: (query, limit = 20, { recompute = true } = {}) => {
+  crawlSemanticScholar: (query, limit = 20, { recompute = false } = {}) => {
     const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
     if (query) params.set('query', query);
     return req(`/api/ingest/semantic-scholar?${params}`, { method: 'POST' });
   },
-  crawlCochraneCentral: (query, limit = 20, { recompute = true } = {}) => {
+  crawlCochraneCentral: (query, limit = 20, { recompute = false } = {}) => {
     const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
     if (query) params.set('query', query);
     return req(`/api/ingest/cochrane-central?${params}`, { method: 'POST' });
   },
-  crawlRedditPullpush: (query = 'side effect adverse reaction', { recompute = true } = {}) =>
+  crawlRedditPullpush: (query = 'side effect adverse reaction', { recompute = false } = {}) =>
     req(`/api/ingest/reddit-pullpush?query=${encodeURIComponent(query)}&recompute=${recompute}`, { method: 'POST' }),
-  crawlTwitter: (query = 'drug side effect adverse reaction', { recompute = true } = {}) =>
+  crawlTwitter: (query = 'drug side effect adverse reaction', { recompute = false } = {}) =>
     req(`/api/ingest/twitter?query=${encodeURIComponent(query)}&recompute=${recompute}`, { method: 'POST' }),
-  crawlHackerNews: (query, limit = 30, { recompute = true } = {}) => {
+  crawlHackerNews: (query, limit = 30, { recompute = false } = {}) => {
     const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
     if (query) params.set('query', query);
     return req(`/api/ingest/hackernews?${params}`, { method: 'POST' });
   },
-  crawlLifeScience: (feedId, limit = 50, { recompute = true } = {}) => {
+  crawlLifeScience: (feedId, limit = 50, { recompute = false } = {}) => {
     const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
     if (feedId) params.set('feed_id', feedId);
     return req(`/api/ingest/life-science?${params}`, { method: 'POST' });
   },
   lifeScienceFeeds: () => req('/api/ingest/life-science/feeds'),
-  crawlYoutube: (query, limit = 20, { recompute = true } = {}) => {
+  crawlYoutube: (query, limit = 20, { recompute = false } = {}) => {
     const params = new URLSearchParams({ limit: String(limit), recompute: String(recompute) });
     if (query) params.set('query', query);
     return req(`/api/ingest/youtube?${params}`, { method: 'POST' });
   },
-  crawlMhraDevices: (limit = 40, { recompute = true } = {}) =>
+  crawlMhraDevices: (limit = 40, { recompute = false } = {}) =>
     req(`/api/ingest/mhra-devices?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
-  crawlMaudeLive: (limit = 30, { recompute = true } = {}) =>
+  crawlMaudeLive: (limit = 30, { recompute = false } = {}) =>
     req(`/api/ingest/maude-live?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
-  crawlDeviceNews: (limit = 40, { recompute = true } = {}) =>
+  crawlDeviceNews: (limit = 40, { recompute = false } = {}) =>
     req(`/api/ingest/device-news?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
-  crawlDeviceRecalls: (limit = 30, { recompute = true } = {}) =>
+  crawlDeviceRecalls: (limit = 30, { recompute = false } = {}) =>
     req(`/api/ingest/device-recalls?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
-  reprocess: ({ recompute = true } = {}) =>
+  reprocess: ({ recompute = false } = {}) =>
     req(`/api/reprocess?recompute=${recompute}`, { method: 'POST' }),
   lookupEudamed: (device) =>
     req(`/api/device/eudamed?device=${encodeURIComponent(device)}`),
-  crawlFdaRss: (feed, { recompute = true } = {}) => {
+  crawlFdaRss: (feed, { recompute = false } = {}) => {
     const params = new URLSearchParams({ recompute: String(recompute) });
     if (feed) params.set('feed', feed);
     return req(`/api/ingest/fda-rss?${params}`, { method: 'POST' });

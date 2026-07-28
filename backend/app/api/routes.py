@@ -73,11 +73,44 @@ from .helpers import (
 )
 
 router = APIRouter(prefix="/api")
-def _maybe_recompute(db: Session, recompute: bool = True) -> dict:
-    """Skip expensive corpus recompute when batching multiple ingests from the DemoBar."""
+
+
+def _run_recompute_job() -> None:
+    """Fresh-session signal rebuild (safe for background threads)."""
+    db = SessionLocal()
+    try:
+        heal_orphan_project_ids(db)
+        recompute_signals(db, use_fda=False, with_narrative=False)
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
+def _maybe_recompute(db: Session, recompute: bool = False) -> dict:
+    """Queue corpus recompute off-request when asked.
+
+    Sync rebuild on Neon (~1948 posts) exceeds Vercel→Render proxy timeouts and
+    surfaces as 502/500 (or empty gateway errors) for Google News / device crawls.
+    Ingest returns immediately; signals refresh in the background.
+    """
     if not recompute:
         return {"signals": 0, "alerts": 0, "recomputed": False}
-    return {**recompute_signals(db, use_fda=False, with_narrative=False), "recomputed": True}
+    threading.Thread(
+        target=_run_recompute_job,
+        daemon=True,
+        name="vigilai-recompute",
+    ).start()
+    return {
+        "signals": 0,
+        "alerts": 0,
+        "recomputed": False,
+        "recompute_queued": True,
+    }
 
 
 
@@ -97,15 +130,16 @@ def _prewarm_background(limit: int = 12) -> None:
 
 @router.post("/recompute")
 def recompute_only(db: Session = Depends(get_db)):
-    """Run one corpus signal recompute (for DemoBar multi-source batches)."""
+    """Queue one corpus signal recompute (DemoBar / Sources post-ingest)."""
     healed = heal_orphan_project_ids(db)
-    stats = recompute_signals(db, use_fda=False, with_narrative=False)
-    return {"status": "ok", "recomputed": True, "healed_projects": healed, **stats}
+    db.commit()
+    stats = _maybe_recompute(db, True)
+    return {"status": "ok", "healed_projects": healed, **stats}
 
 
 @router.post("/reprocess")
 def reprocess_only(
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
     _user=Depends(require_role("analyst")),
 ):
@@ -171,7 +205,7 @@ def ingest_seed(days: int = 21, ml: bool = False, demo: bool = True,
 
 @router.post("/ingest/reddit")
 def ingest_reddit(query: str = Query(..., min_length=2), limit: int = 25,
-                  recompute: bool = True, db: Session = Depends(get_db)):
+                  recompute: bool = False, db: Session = Depends(get_db)):
     posts = crawl_reddit_rss(query, limit)
     new = ingest_posts(db, posts)
     stats = _maybe_recompute(db, recompute)
@@ -180,7 +214,7 @@ def ingest_reddit(query: str = Query(..., min_length=2), limit: int = 25,
 
 @router.post("/ingest/faers-live")
 def ingest_faers_live(
-    limit: int = 30, days_back: int = 90, recompute: bool = True, db: Session = Depends(get_db)
+    limit: int = 30, days_back: int = 90, recompute: bool = False, db: Session = Depends(get_db)
 ):
     """Ingest recent serious AE reports from openFDA FAERS as pipeline posts (no key).
 
@@ -212,7 +246,7 @@ def list_fda_rss_feeds():
 def ingest_fda_rss(
     feed: str | None = None,
     limit: int = 60,
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Ingest FDA RSS feeds (MedWatch, recalls, press releases) — no key.
@@ -248,7 +282,7 @@ def ingest_pubmed_live(
     query: str | None = None,
     limit: int = 20,
     days_back: int = 730,
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Ingest PubMed abstracts via NCBI esearch + efetch (no key).
@@ -277,7 +311,7 @@ def ingest_pubmed_live(
 def ingest_europe_pmc(
     query: str | None = None,
     limit: int = 20,
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Ingest Europe PMC abstracts (EMBL-EBI REST, no key; offline fixtures if blocked)."""
@@ -300,7 +334,7 @@ def ingest_europe_pmc(
 def ingest_semantic_scholar(
     query: str | None = None,
     limit: int = 20,
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Ingest Semantic Scholar paper abstracts (optional SEMANTIC_SCHOLAR_API_KEY)."""
@@ -323,7 +357,7 @@ def ingest_semantic_scholar(
 def ingest_cochrane_central(
     query: str | None = None,
     limit: int = 20,
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Ingest Cochrane CENTRAL abstracts via Europe PMC SRC:cctr (+ offline fixtures)."""
@@ -344,7 +378,7 @@ def ingest_cochrane_central(
 
 @router.post("/ingest/hackernews")
 def ingest_hackernews(
-    query: str | None = None, limit: int = 30, recompute: bool = True, db: Session = Depends(get_db)
+    query: str | None = None, limit: int = 30, recompute: bool = False, db: Session = Depends(get_db)
 ):
     """Ingest HackerNews drug safety discussions via Algolia API (no key)."""
     batch = crawl_hackernews(query=query, limit=limit)
@@ -371,7 +405,7 @@ def list_life_science_feeds():
 
 @router.post("/ingest/life-science")
 def ingest_life_science(
-    feed_id: str | None = None, limit: int = 50, recompute: bool = True, db: Session = Depends(get_db)
+    feed_id: str | None = None, limit: int = 50, recompute: bool = False, db: Session = Depends(get_db)
 ):
     """Ingest curated life-science news RSS pack (ScienceDaily, STAT, Nature Medicine…)."""
     batch = crawl_life_science_news(feed_id=feed_id, limit=limit)
@@ -393,7 +427,7 @@ def ingest_life_science(
 
 @router.post("/ingest/youtube")
 def ingest_youtube(
-    query: str | None = None, limit: int = 30, recompute: bool = True, db: Session = Depends(get_db)
+    query: str | None = None, limit: int = 30, recompute: bool = False, db: Session = Depends(get_db)
 ):
     """Ingest YouTube video titles/descriptions + comment threads (needs YOUTUBE_API_KEY)."""
     batch = crawl_youtube(query=query, limit=limit)
@@ -507,7 +541,7 @@ def get_signal_trust(signal_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/ingest/mhra-devices")
-def ingest_mhra_devices(limit: int = 40, recompute: bool = True, db: Session = Depends(get_db)):
+def ingest_mhra_devices(limit: int = 40, recompute: bool = False, db: Session = Depends(get_db)):
     """Ingest UK MHRA device alerts and Field Safety Notices (no key).
 
     Pulls from gov.uk Atom feeds — device FSNs tagged product_type=device,
@@ -530,7 +564,7 @@ def ingest_mhra_devices(limit: int = 40, recompute: bool = True, db: Session = D
 
 @router.post("/ingest/maude-live")
 def ingest_maude_live(
-    limit: int = 30, days_back: int = 60, recompute: bool = True, db: Session = Depends(get_db)
+    limit: int = 30, days_back: int = 60, recompute: bool = False, db: Session = Depends(get_db)
 ):
     """Ingest live device MDR reports from FDA MAUDE (no key).
 
@@ -552,7 +586,7 @@ def ingest_maude_live(
 
 
 @router.post("/ingest/device-news")
-def ingest_device_news(limit: int = 40, recompute: bool = True, db: Session = Depends(get_db)):
+def ingest_device_news(limit: int = 40, recompute: bool = False, db: Session = Depends(get_db)):
     """Ingest medical-device safety news (Google News RSS, no key)."""
     batch = crawl_device_news(limit=limit)
     posts = batch["posts"]
@@ -570,7 +604,7 @@ def ingest_device_news(limit: int = 40, recompute: bool = True, db: Session = De
 
 
 @router.post("/ingest/device-recalls")
-def ingest_device_recalls(limit: int = 30, recompute: bool = True, db: Session = Depends(get_db)):
+def ingest_device_recalls(limit: int = 30, recompute: bool = False, db: Session = Depends(get_db)):
     """Ingest FDA device recalls (openFDA device/enforcement, no key)."""
     batch = crawl_device_recalls(limit=limit)
     posts = batch["posts"]
@@ -597,7 +631,7 @@ def lookup_eudamed(device: str, db: Session = Depends(get_db)):
 
 
 @router.post("/ingest/dailymed-rss")
-def ingest_dailymed_rss(limit: int = 40, recompute: bool = True, db: Session = Depends(get_db)):
+def ingest_dailymed_rss(limit: int = 40, recompute: bool = False, db: Session = Depends(get_db)):
     """Ingest new/revised drug labels from DailyMed RSS (no key).
 
     Label text is run through the NLP pipeline; the drug name in the title
@@ -628,7 +662,7 @@ def list_google_news_queries():
 def ingest_google_news(
     query: str | None = None,
     limit: int = 40,
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Ingest live health-safety articles from Google News RSS (no API key).
@@ -657,7 +691,7 @@ def ingest_google_news(
 def ingest_reddit_pullpush(
     query: str = Query(default="side effect adverse reaction", min_length=2),
     limit: int = 50,
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Ingest Reddit posts via Pullpush.io archive API — works when reddit.com is blocked.
@@ -689,7 +723,7 @@ def list_reddit_health_subs():
 
 @router.post("/ingest/reddit-health")
 def ingest_reddit_health(query: str = Query(..., min_length=2), limit: int = 60,
-                         recompute: bool = True, db: Session = Depends(get_db)):
+                         recompute: bool = False, db: Session = Depends(get_db)):
     batch = crawl_reddit_health(query, limit)
     posts = batch["posts"]
     new = ingest_posts(db, posts)
@@ -707,7 +741,7 @@ def ingest_reddit_health(query: str = Query(..., min_length=2), limit: int = 60,
 
 @router.post("/ingest/twitter")
 def ingest_twitter(query: str = Query(..., min_length=2), limit: int = 25,
-                   recompute: bool = True, db: Session = Depends(get_db)):
+                   recompute: bool = False, db: Session = Depends(get_db)):
     posts = crawl_twitter(query, limit)
     new = ingest_posts(db, posts)
     stats = _maybe_recompute(db, recompute)
@@ -717,7 +751,7 @@ def ingest_twitter(query: str = Query(..., min_length=2), limit: int = 25,
 
 
 @router.post("/ingest/fhir")
-def ingest_fhir(payload: dict, recompute: bool = True, db: Session = Depends(get_db)):
+def ingest_fhir(payload: dict, recompute: bool = False, db: Session = Depends(get_db)):
     """Ingest a FHIR R4 Bundle or single AdverseEvent / MedicationStatement resource.
 
     Parses the submitted JSON into VigilAI post format (platform='fhir'),
@@ -1337,7 +1371,7 @@ def get_story_pdf(
 def ingest_multi_registries(
     query: str = Query("adverse event"),
     limit_per: int = Query(10, ge=1, le=50),
-    recompute: bool = True,
+    recompute: bool = False,
     db: Session = Depends(get_db),
 ):
     """Cross-sectional mining: KAERS + Cochrane CENTRAL + MEDLINE/PubMed → privacy gateway → NLP."""
@@ -1349,12 +1383,13 @@ def ingest_multi_registries(
     for rows in bundles.values():
         posts.extend(rows)
     count = ingest_posts(db, posts) if posts else 0
-    stats = recompute_signals(db) if recompute and count else {"signals": 0, "alerts": 0}
+    stats = _maybe_recompute(db, recompute and bool(count))
     return {
         "ingested": count,
         "by_source": {k: len(v) for k, v in bundles.items()},
         "signals": stats.get("signals", 0),
         "alerts": stats.get("alerts", 0),
+        "recompute_queued": stats.get("recompute_queued", False),
     }
 
 
