@@ -49,7 +49,7 @@ Deeper handouts: [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.
 
 **The answer**
 
-Ingest → scrub → extract → 4-gate AE → PRR/ROR/EBGM/BCPNN → WHO-UMC → corroborate (openFDA…) → Workflow → E2B/CIOMS
+Ingest → scrub → extract → 4-gate AE → PRR/ROR/EBGM/BCPNN → remine / DDI / pregnancy overlays → WHO-UMC → corroborate (openFDA…) → Workflow → SAR / E2B / CIOMS
 
 ---
 
@@ -57,14 +57,15 @@ Ingest → scrub → extract → 4-gate AE → PRR/ROR/EBGM/BCPNN → WHO-UMC �
 
 | Capability | In plain language |
 |------------|-------------------|
-| **Social + regulatory listening** | Reddit, news, FAERS, PubMed, labels, devices, optional YouTube/X |
+| **Social + regulatory listening** | Reddit, news, FAERS, VAERS, PubMed, labels, devices, optional YouTube/X |
 | **Clinical NLP** | Drugs→generic/ATC, symptoms→MedDRA-style PT/SOC, devices→GMDN/IMDRF |
 | **AE validation** | Explainable **4-gate** engine (drug · symptom · negative sentiment · non-negated) |
 | **Signal detection** | PRR, ROR, Yates χ², EBGM/EB05, BCPNN IC025, SDR, spikes, MaxSPRT |
-| **Analytic lenses** | SMQ, class effects, vaccine AESI, geo clusters, vs FAERS |
-| **Evidence** | Knowledge graph, story mode, term glossary |
+| **Analytic lenses** | Remine lab, DDI findings, pregnancy cohort, SMQ, class effects, vaccine AESI, geo, vs FAERS |
+| **Competition-bias remine** | Mask competitor products → recompute PRR/ROR/χ² (read-only sensitivity; does **not** overwrite stored SDR) |
+| **Evidence** | Knowledge graph, story mode, term glossary, casefile trajectory, SAR (GVP Module IX-shaped) |
 | **Ops** | Priority score, GVP-style lifecycle, alert inbox, KPIs / SPC |
-| **Export** | ICH E2B R2/R3 (demo), CIOMS I (demo) |
+| **Export** | ICH E2B R2/R3 (demo), CIOMS I (demo), SAR PDF/Markdown |
 
 **Product types:** drugs · vaccines · medical devices / combination products  
 
@@ -110,7 +111,7 @@ Ingest → scrub → extract → 4-gate AE → PRR/ROR/EBGM/BCPNN → WHO-UMC �
 | API | FastAPI | Routes, auth, jobs |
 | Persistence | SQLAlchemy · SQLite (dev) / Postgres (Docker) | Posts, signals, alerts, audit |
 | NLP | Lexicons + optional transformer NER · VADER · negation windows | Entities + AE flag |
-| Analytics | `app/analytics/*` | DMA, lifecycle, completeness, HR surrogate, MaxSPRT |
+| Analytics | `app/analytics/*` | DMA, masking/remine, DDI, pregnancy, SAR, casefile, lifecycle, MaxSPRT |
 | Evidence | openFDA FAERS/MAUDE, DailyMed, PubMed, RxNorm | Corroboration |
 
 ---
@@ -207,6 +208,12 @@ vigil-ai/
 | CUI / UMLS-style IDs | `backend/app/nlp/stage3_ner_cui.py` |
 | Brand→generic / ATC | `backend/app/nlp/lexicons.py`, `drug_norm.py` |
 | PRR / EBGM / SDR | `backend/app/analytics/disproportionality.py` |
+| Competition-bias masking / remine | `backend/app/analytics/masking.py`, `corpus.py`, `remine_lab.py` |
+| DDI co-mention findings | `backend/app/analytics/ddi.py` |
+| Pregnancy / teratogen cohort | `backend/app/analytics/pregnancy.py` |
+| SAR (GVP IX-shaped) | `backend/app/analytics/sar.py` |
+| Casefile trajectory / snapshots | `backend/app/analytics/casefile.py` · `SignalSnapshot` in `models.py` |
+| VAERS / FAERS bulk sample | `backend/app/ingestion/srs_bulk.py` · `fixtures/` |
 | Lifecycle transitions | `backend/app/analytics/lifecycle.py` |
 | Alert → workflow | `backend/app/analytics/alert_actions.py` |
 | Slack/Teams notify | `backend/app/analytics/outbound.py` |
@@ -233,7 +240,7 @@ Sidebar is intentionally **small**. Related views are **tabs inside hubs**.
 |-----|-------|------|---------|
 | **Dashboard** | `/dashboard` | Corpus metrics · Ops KPIs & SPC | Volume, AE rate, triage quality |
 | **Safety Signals** | `/signals` | Detect · Workflow · Alert inbox | Find → manage → escalate |
-| **Analytic Lenses** | `/lenses` | SMQ · Class · Vaccine · Geo · vs FAERS | Overlays on core DMA |
+| **Analytic Lenses** | `/lenses` | Remine · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS | Sensitivity + overlays on core DMA |
 | **Evidence Explorer** | `/graph` | Drug↔AE graph · Compare story · Glossary | Relationships & narrative |
 
 ### Workspace
@@ -269,19 +276,24 @@ Legacy URLs (`/lifecycle`, `/alerts`, `/smq`, …) **redirect** into the hubs ab
 | **Workflow** | Kanban: Inbox → Looking into it → … → Done / Not a concern | Same states as Signal Detail |
 | **Alert inbox** | Spike / strong / high-severity pings · Escalate / Investigate / False alarm | Escalate ≠ Workflow assign alone |
 
-**Signal Detail** (click any row): gates, DMA, WHO-UMC, completeness (vigiGrade-style), HR surrogate, evidence, thread score, E2B/CIOMS, workflow panel.
+**Signal Detail** (click any row): gates, DMA, WHO-UMC, completeness (vigiGrade-style), HR surrogate, evidence, thread score, **competition-bias masking** (when peers share the event), **casefile trajectory**, **SAR** PDF/MD + GVP preview, E2B/CIOMS, workflow panel.
 
 ### Analytic Lenses
 
 | Lens | Question it answers |
 |------|---------------------|
+| **Remine lab** | If we hide competitor products for this event, does PRR/χ² strengthen or collapse? (always runnable; pick a signal card) |
+| **DDI findings** | Which drug pairs co-mention the same AE more than chance — and which look clinically risky? |
+| **Pregnancy** | Exposure + congenital / pregnancy-context events; fixture blend when the live cohort is thin |
 | **SMQ** | Do member PTs pool into a syndrome signal? |
 | **Class effects** | Same event across an ATC class? |
 | **Vaccine** | AESI / Brighton-style vaccine focus? |
 | **Geo clusters** | Spatially concentrated beyond expected share? |
 | **vs FAERS** | Social signal vs openFDA FAERS pattern? |
 
-Lenses are **overlays** — they do not replace PRR/SDR.
+Lenses are **overlays / sensitivity analyses** — they do **not** replace or overwrite stored PRR/SDR on the Detect table. Remine shows before→after in the lab / masking panel only.
+
+**Demo seed:** Data Sources → **Load PV demo pack** (`POST /api/ingest/pv-demo`) loads VAERS + FAERS bulk samples so Remine / DDI / Pregnancy have peers and co-mentions.
 
 ### Evidence Explorer
 
@@ -295,7 +307,7 @@ Lenses are **overlays** — they do not replace PRR/SDR.
 
 | Tab | Does |
 |-----|------|
-| **Source catalog** | One-click crawls + AE-yield view |
+| **Source catalog** | One-click crawls + AE-yield view (includes VAERS / FAERS bulk sample + **Load PV demo pack**) |
 | **Live stream** | Timed continuous ingest (runs server-side) |
 | **Network registry** | Live connectors vs licensed **surrogates** + VigiLyze-style explorer on *our* signals |
 | **Agent chat** | NL → crawl dispatch (login required) |
@@ -325,6 +337,7 @@ Lenses are **overlays** — they do not replace PRR/SDR.
 | **Strength** | STRONG / MODERATE / WEAK tiers |
 | **Spike** | Daily z-score ≥ 2 vs history |
 | **MaxSPRT** | Sequential boundary (type-I control over repeated looks) |
+| **Competition-bias remine** | Mask peer products for the same event → recompute 2×2 (read-only; stored Detect row unchanged) |
 | **WHO-UMC** | Deterministic causality cues (temporal, de/rechallenge…) |
 | **Priority 0–100** | Strength × severity × novelty × velocity × MaxSPRT… |
 
@@ -393,6 +406,7 @@ Offline-first: every optional package (rapidfuzz, faiss, transformers, spacy) ha
 |--------|------|-------|
 | Google News · life-science RSS · HN | No | Demo-safe |
 | FAERS live · PubMed · DailyMed · FDA RSS | No | Regulatory / literature |
+| VAERS sample · FAERS bulk sample | No | Offline fixtures + optional openFDA download; use **Load PV demo pack** for Remine/DDI/Pregnancy demos |
 | MAUDE · MHRA devices | No | Device vigilance |
 | Reddit Pullpush | No | Slow — avoid mid-demo |
 | YouTube · X/Twitter | Optional keys | Enrichment |
