@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useRefresh } from '../App';
-import { Badge, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 
 function SignalRows({ rows, empty }) {
   if (!rows?.length) {
@@ -42,12 +42,29 @@ function SignalRows({ rows, empty }) {
 
 /** Pregnancy / teratogen cohort stratified DMA. */
 export default function Pregnancy({ embedded = false }) {
-  const { tick } = useRefresh();
+  const { tick, bump } = useRefresh();
   const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
 
-  useEffect(() => {
+  const load = () => {
     api.pregnancy().then(setData).catch(() => setData(null));
-  }, [tick]);
+  };
+
+  useEffect(() => { load(); }, [tick]);
+
+  const loadDemo = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.ingestPvDemo({ recompute: true });
+      bump?.();
+      load();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    }
+    setBusy(false);
+  };
 
   if (!data) return <Spinner label="Building pregnancy cohort…" />;
 
@@ -58,10 +75,18 @@ export default function Pregnancy({ embedded = false }) {
           <h2 className="text-xl font-bold text-slate-100">Pregnancy / teratogen surveillance</h2>
           <p className="text-sm text-slate-400 mt-1">
             Lexicon pregnancy-exposure cohort with stratified disproportionality on congenital
-            anomaly outcomes. Registry links remain surrogates.
+            anomaly outcomes — the same idea as FAERS pregnancy analyses.
           </p>
         </div>
       )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-slate-200 flex-1">{data.verdict}</p>
+        <Button variant="primary" disabled={busy} onClick={loadDemo}>
+          {busy ? 'Loading…' : 'Load pregnancy + PV demo pack'}
+        </Button>
+      </div>
+      {err && <p className="text-sm text-rose-300">{err}</p>}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-3">
@@ -88,7 +113,10 @@ export default function Pregnancy({ embedded = false }) {
           subtitle="DMA restricted to pregnancy-cohort posts with congenital / teratogen outcome PTs"
         />
         <div className="mt-3">
-          <SignalRows rows={data.congenital_signals} empty="No congenital-anomaly signals in cohort yet." />
+          <SignalRows
+            rows={data.congenital_signals}
+            empty="No congenital-anomaly signals yet — load the pregnancy demo pack."
+          />
         </div>
       </Card>
 

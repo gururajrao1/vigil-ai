@@ -176,10 +176,12 @@ export const api = {
     const q = new URLSearchParams();
     (excludeDrugs || []).forEach((d) => q.append('exclude_drugs', d));
     const qs = q.toString();
-    return req(`/api/signals/${id}/unmask${qs ? `?${qs}` : ''}`, { method: 'POST' });
+    // GET — remine is read-only sensitivity analysis (no analyst write role required)
+    return req(`/api/signals/${id}/unmask${qs ? `?${qs}` : ''}`);
   },
   signalCasefile: (id) => req(`/api/signals/${id}/casefile`),
   signalDdi: (id) => req(`/api/signals/${id}/ddi`),
+  signalSar: (id) => req(`/api/signals/${id}/sar`),
   ddi: (params = {}) => {
     const q = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== false))
@@ -187,6 +189,8 @@ export const api = {
     return req(`/api/ddi${q ? `?${q}` : ''}`);
   },
   pregnancy: () => req('/api/pregnancy'),
+  ingestPvDemo: ({ recompute = true } = {}) =>
+    req(`/api/ingest/pv-demo?recompute=${recompute}`, { method: 'POST' }),
 
   // demo controls
   seed: (days = 21) => req(`/api/ingest/seed?days=${days}`, { method: 'POST' }),

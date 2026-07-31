@@ -1,19 +1,36 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useRefresh } from '../App';
-import { Badge, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, Spinner } from '../components/ui';
 
 /** Drug–drug interaction co-mention mining (Ω + plausibility gate). */
 export default function Ddi({ embedded = false }) {
-  const { tick } = useRefresh();
+  const { tick, bump } = useRefresh();
   const [data, setData] = useState(null);
   const [plausibleOnly, setPlausibleOnly] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
 
-  useEffect(() => {
-    api.ddi({ plausible_only: plausibleOnly, min_count: 2 })
+  const load = () => {
+    api.ddi({ plausible_only: plausibleOnly || undefined, min_count: 1 })
       .then(setData)
-      .catch(() => setData({ pairs: [], n_posts: 0 }));
-  }, [tick, plausibleOnly]);
+      .catch(() => setData({ pairs: [], n_posts: 0, needs_demo_seed: true }));
+  };
+
+  useEffect(() => { load(); }, [tick, plausibleOnly]);
+
+  const loadDemo = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.ingestPvDemo({ recompute: true });
+      bump?.();
+      load();
+    } catch (e) {
+      setErr(e?.message || String(e));
+    }
+    setBusy(false);
+  };
 
   if (!data) return <Spinner label="Mining DDI co-mentions…" />;
   const pairs = data.pairs || [];
@@ -25,7 +42,7 @@ export default function Ddi({ embedded = false }) {
           <h2 className="text-xl font-bold text-slate-100">Drug–drug interaction signals</h2>
           <p className="text-sm text-slate-400 mt-1">
             Co-mention disproportionality (Ω) on multi-product AE posts, gated by mechanistic
-            plausibility / curated DDI patterns. Hypothesis generator only.
+            plausibility. Use this to spot polypharmacy hypotheses (e.g. anticoagulant + NSAID → bleed).
           </p>
         </div>
       )}
@@ -42,11 +59,18 @@ export default function Ddi({ embedded = false }) {
           />
           Plausible only
         </label>
+        <Button variant="primary" disabled={busy} onClick={loadDemo}>
+          {busy ? 'Loading…' : 'Load PV demo pack'}
+        </Button>
       </div>
+
+      {data.verdict && <p className="text-sm text-slate-200">{data.verdict}</p>}
+      {err && <p className="text-sm text-rose-300">{err}</p>}
 
       {pairs.length === 0 ? (
         <Card className="p-4 text-sm text-slate-400">
-          No co-mention DDI candidates yet. Ingest FAERS bulk (polypharmacy) or multi-drug social posts, then recompute.
+          No co-mention DDI candidates yet. Click <span className="text-slate-200">Load PV demo pack</span> to
+          ingest FAERS polypharmacy fixtures (warfarin+ibuprofen, sertraline+tramadol, etc.).
         </Card>
       ) : (
         <div className="space-y-2">

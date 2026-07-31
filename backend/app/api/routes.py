@@ -311,6 +311,36 @@ def ingest_faers_bulk(
     }
 
 
+@router.post("/ingest/pv-demo")
+def ingest_pv_demo(recompute: bool = True, db: Session = Depends(get_db)):
+    """Load offline packs that make DDI, pregnancy, and masking remine demo-ready.
+
+    Pulls FAERS-bulk fixtures (polypharmacy), VAERS fixtures, and pregnancy/teratogen
+    demo ICSRs. Recomputes signals by default so lenses update immediately.
+    """
+    from ..analytics.pregnancy import pregnancy_demo_posts
+    from ..ingestion.srs_bulk import crawl_faers_bulk, crawl_vaers
+
+    posts = []
+    posts.extend(crawl_faers_bulk(limit=50, force_fixture=True)["posts"])
+    posts.extend(crawl_vaers(limit=40, force_fixture=True)["posts"])
+    posts.extend(pregnancy_demo_posts())
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "pv_demo",
+        "fetched": len(posts),
+        "ingested": new,
+        "packs": ["faers_bulk_fixture", "vaers_fixture", "pregnancy_demo"],
+        "note": (
+            "Demo pack for DDI co-mentions, pregnancy/teratogen cohort, and "
+            "competition-bias remine. Prototype data — not for clinical use."
+        ),
+        **stats,
+    }
+
+
 @router.get("/ingest/fda-rss/feeds")
 def list_fda_rss_feeds():
     """All FDA RSS feeds available for pharmacovigilance ingestion."""
@@ -1313,19 +1343,23 @@ def signal_masking_report(signal_id: int, db: Session = Depends(get_db)):
     sig = db.get(Signal, signal_id)
     if not sig:
         raise HTTPException(404, "signal not found")
+    # Prefer MedDRA PT when present so soft-matching aligns with corpus events
+    event = sig.meddra_pt or sig.symptom
     corpus = build_ae_reports(db, project_id=sig.project_id or current_project_id())
-    return analyze_masking(corpus["reports"], sig.drug, sig.symptom)
+    return analyze_masking(corpus["reports"], sig.drug, event)
 
 
+@router.get("/signals/{signal_id}/unmask")
 @router.post("/signals/{signal_id}/unmask")
 def signal_unmask_remine(
     signal_id: int,
     db: Session = Depends(get_db),
     exclude_drugs: list[str] | None = Query(None),
 ):
-    """Remine DMA after excluding selected masker drugs (sensitivity analysis).
+    """Remine DMA after excluding selected masker drugs (read-only sensitivity analysis).
 
-    Pass ``exclude_drugs`` as repeated query params, or omit to auto-pick likely maskers.
+    GET or POST — does not mutate the database (safe for viewers). Pass
+    ``exclude_drugs`` as repeated query params, or omit to auto-pick suggested maskers.
     """
     from ..analytics.corpus import build_ae_reports
     from ..analytics.masking import analyze_masking, remine_unmasked
@@ -1334,15 +1368,16 @@ def signal_unmask_remine(
     sig = db.get(Signal, signal_id)
     if not sig:
         raise HTTPException(404, "signal not found")
+    event = sig.meddra_pt or sig.symptom
     corpus = build_ae_reports(db, project_id=sig.project_id or current_project_id())
     exclude = list(exclude_drugs or [])
     if not exclude:
-        report = analyze_masking(corpus["reports"], sig.drug, sig.symptom)
-        exclude = [m["drug"] for m in report.get("maskers") or [] if m.get("likely_masker")]
+        report = analyze_masking(corpus["reports"], sig.drug, event)
+        exclude = list(report.get("suggested_exclude") or [])
         if not exclude and report.get("maskers"):
             exclude = [report["maskers"][0]["drug"]]
     return remine_unmasked(
-        corpus["posts"], sig.drug, sig.symptom, exclude, full_reports=corpus["reports"]
+        corpus["posts"], sig.drug, event, exclude, full_reports=corpus["reports"]
     )
 
 
@@ -1413,7 +1448,7 @@ def signal_casefile(signal_id: int, db: Session = Depends(get_db)):
 @router.get("/ddi")
 def ddi_signals(
     drug: str | None = None,
-    min_count: int = 2,
+    min_count: int = 1,
     plausible_only: bool = False,
     limit: int = 50,
     db: Session = Depends(get_db),
@@ -1424,13 +1459,21 @@ def ddi_signals(
     from ..projects.scope import current_project_id
 
     corpus = build_ae_reports(db, project_id=current_project_id())
-    return mine_ddi(
+    out = mine_ddi(
         corpus["posts"],
         min_count=min_count,
         require_plausible=plausible_only,
         focus_drug=drug,
         limit=limit,
     )
+    pairs = out.get("pairs") or []
+    out["needs_demo_seed"] = len(pairs) < 3
+    out["verdict"] = (
+        "Few co-mention pairs yet — click Load PV demo pack (FAERS bulk polypharmacy)."
+        if out["needs_demo_seed"]
+        else f"{len(pairs)} interaction candidate(s) from {out.get('n_multi_drug', 0)} multi-drug posts."
+    )
+    return out
 
 
 @router.get("/signals/{signal_id}/ddi")
@@ -1443,7 +1486,14 @@ def signal_ddi(signal_id: int, db: Session = Depends(get_db)):
     if not sig:
         raise HTTPException(404, "signal not found")
     corpus = build_ae_reports(db, project_id=sig.project_id)
-    return mine_ddi(corpus["posts"], focus_drug=sig.drug, min_count=2, limit=30)
+    out = mine_ddi(corpus["posts"], focus_drug=sig.drug, min_count=1, limit=30)
+    out["needs_demo_seed"] = len(out.get("pairs") or []) == 0
+    out["verdict"] = (
+        f"No co-mentioned partners for {sig.drug} yet — load the PV demo pack or FAERS bulk."
+        if out["needs_demo_seed"]
+        else f"{len(out['pairs'])} co-mention pair(s) involving {sig.drug}."
+    )
+    return out
 
 
 @router.get("/pregnancy")

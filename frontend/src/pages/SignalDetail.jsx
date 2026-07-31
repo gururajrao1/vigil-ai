@@ -384,24 +384,30 @@ export default function SignalDetail() {
   const [masking, setMasking] = useState(null);
   const [unmask, setUnmask] = useState(null);
   const [unmasking, setUnmasking] = useState(false);
+  const [unmaskErr, setUnmaskErr] = useState(null);
   const [casefile, setCasefile] = useState(null);
   const [ddi, setDdi] = useState(null);
+  const [sarPreview, setSarPreview] = useState(null);
   const [selectedMaskers, setSelectedMaskers] = useState([]);
+  const [pvDemoBusy, setPvDemoBusy] = useState(false);
 
   useEffect(() => {
     api.signal(id).then(setSig).catch(() => setSig(null));
     setAssessment(null);
     setUnmask(null);
+    setUnmaskErr(null);
     setMasking(null);
     setCasefile(null);
     setDdi(null);
+    setSarPreview(null);
     setSelectedMaskers([]);
     api.signalMasking(id).then((m) => {
       setMasking(m);
-      setSelectedMaskers((m.maskers || []).filter((x) => x.likely_masker).map((x) => x.drug));
+      setSelectedMaskers(m.suggested_exclude || (m.maskers || []).filter((x) => x.likely_masker).map((x) => x.drug));
     }).catch(() => setMasking(null));
     api.signalCasefile(id).then(setCasefile).catch(() => setCasefile(null));
     api.signalDdi(id).then(setDdi).catch(() => setDdi(null));
+    api.signalSar(id).then(setSarPreview).catch(() => setSarPreview(null));
   }, [id]);
 
   if (!sig) return <Spinner label="Loading signal…" />;
@@ -635,12 +641,12 @@ export default function SignalDetail() {
       </Card>
 
       {/* Competition-bias masking / unmask remine */}
-      {masking && (
-        <Card className="p-4 border-orange-700/40 bg-orange-500/[0.03]">
-          <CardHeader
-            title="Competition-bias masking"
-            subtitle="Dominant drug–event mass can suppress PRR/IC for other products sharing this event. Remine drops posts mentioning selected maskers."
-            right={
+      <Card className="p-4 border-orange-700/40 bg-orange-500/[0.03]">
+        <CardHeader
+          title="Competition-bias masking"
+          subtitle="See which other products dominate this event, then remine without them — does this signal strengthen?"
+          right={
+            masking ? (
               <Badge
                 value={`risk: ${masking.masking_risk || 'none'}`}
                 className={
@@ -651,78 +657,112 @@ export default function SignalDetail() {
                       : 'bg-slate-600/20 text-slate-400 border-slate-600/30'
                 }
               />
-            }
-          />
-          <div className="mt-2 text-[11px] text-slate-500">
-            Event total={masking.event_total} · target share={(masking.target_share * 100).toFixed(1)}%
-          </div>
-          {(masking.maskers || []).length > 0 && (
-            <div className="mt-3 space-y-1.5">
-              {masking.maskers.map((m) => (
-                <label key={m.drug} className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedMaskers.includes(m.drug)}
-                    onChange={(e) => {
-                      setSelectedMaskers((prev) =>
-                        e.target.checked ? [...prev, m.drug] : prev.filter((d) => d !== m.drug)
-                      );
-                    }}
+            ) : null
+          }
+        />
+        {!masking ? (
+          <div className="mt-3 text-sm text-slate-400">Loading masking analysis…</div>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-slate-200 leading-relaxed">{masking.verdict}</p>
+            <div className="mt-2 text-[11px] text-slate-500">
+              Event reports={masking.event_total} · this product={masking.target_count}
+              {' '}({((masking.target_share || 0) * 100).toFixed(0)}% of event)
+            </div>
+            {(masking.maskers || []).length > 0 ? (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-[11px] uppercase tracking-wide text-slate-500">Competitors on this event — select to exclude</div>
+                {masking.maskers.map((m) => (
+                  <label key={m.drug} className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedMaskers.includes(m.drug)}
+                      onChange={(e) => {
+                        setSelectedMaskers((prev) =>
+                          e.target.checked ? [...prev, m.drug] : prev.filter((d) => d !== m.drug)
+                        );
+                      }}
+                    />
+                    <span className="capitalize">{m.drug}</span>
+                    <span className="text-[11px] text-slate-500">
+                      n={m.count} · {(m.event_share * 100).toFixed(0)}% of event · ×{m.vs_target_ratio} vs this product
+                    </span>
+                    {m.likely_masker && (
+                      <Badge value="likely masker" className="bg-orange-500/15 text-orange-200 border-orange-500/30" />
+                    )}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 text-sm text-slate-400">
+                Tip: open a signal that shares an event with other products (e.g. suicidal ideation, hypertension, device loosening) — or run <span className="text-slate-300">Load PV demo pack</span> from Analytic Lenses.
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
+              <Button
+                variant="primary"
+                disabled={unmasking || !(masking.can_remine || selectedMaskers.length)}
+                onClick={async () => {
+                  setUnmasking(true);
+                  setUnmaskErr(null);
+                  try {
+                    const picks = selectedMaskers.length
+                      ? selectedMaskers
+                      : (masking.suggested_exclude || []);
+                    setUnmask(await api.signalUnmask(sig.id, picks));
+                  } catch (e) {
+                    setUnmaskErr(e?.message || String(e));
+                  }
+                  setUnmasking(false);
+                }}
+              >
+                {unmasking ? 'Remining…' : 'Remine without selected products'}
+              </Button>
+              {(masking.suggested_exclude || []).length > 0 && (
+                <Button
+                  variant="ghost"
+                  disabled={unmasking}
+                  onClick={() => setSelectedMaskers(masking.suggested_exclude || [])}
+                >
+                  Select suggested
+                </Button>
+              )}
+            </div>
+            {unmaskErr && <div className="mt-2 text-sm text-rose-300">{unmaskErr}</div>}
+            {unmask && (
+              <div className="mt-3 rounded-lg border border-orange-600/30 bg-slate-950/50 p-3 space-y-3">
+                <p className="text-sm text-slate-100 leading-relaxed">{unmask.interpretation}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Metric label="Before PRR" value={fmt(unmask.baseline?.prr)} />
+                  <Metric
+                    label="After PRR"
+                    value={unmask.unmasked ? fmt(unmask.unmasked.prr) : '—'}
+                    accent={unmask.signal_strengthened ? 'text-emerald-300' : unmask.signal_attenuated ? 'text-sky-300' : 'text-slate-100'}
                   />
-                  <span className="capitalize">{m.drug}</span>
-                  <span className="text-[11px] text-slate-500">
-                    n={m.count} · share={(m.event_share * 100).toFixed(1)}% · vs target ×{m.vs_target_ratio}
-                  </span>
-                  {m.likely_masker && (
-                    <Badge value="likely masker" className="bg-orange-500/15 text-orange-200 border-orange-500/30" />
-                  )}
-                </label>
-              ))}
-            </div>
-          )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              disabled={unmasking || selectedMaskers.length === 0}
-              onClick={async () => {
-                setUnmasking(true);
-                try {
-                  setUnmask(await api.signalUnmask(sig.id, selectedMaskers));
-                } catch (e) { console.error(e); }
-                setUnmasking(false);
-              }}
-            >
-              {unmasking ? 'Remining…' : 'Remine without maskers'}
-            </Button>
-          </div>
-          {unmask?.unmasked && (
-            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Metric label="Unmasked PRR" value={fmt(unmask.unmasked.prr)}
-                      accent={unmask.signal_strengthened ? 'text-emerald-300' : 'text-slate-100'} />
-              <Metric label="Unmasked IC025" value={fmt(unmask.unmasked.ic025)} />
-              <Metric label="Unmasked EB05" value={fmt(unmask.unmasked.eb05)} />
-              <Metric label="Reports after" value={unmask.reports_after} />
-            </div>
-          )}
-          {unmask?.delta && (
-            <div className="mt-2 text-[11px] text-slate-400">
-              ΔPRR={unmask.delta.prr_delta} · ΔIC025={unmask.delta.ic025_delta} · ΔEB05={unmask.delta.eb05_delta}
-              {unmask.signal_strengthened ? ' · signal strengthened after unmasking' : ''}
-            </div>
-          )}
-          {unmask?.disclaimer && (
-            <p className="mt-2 text-[10px] text-slate-500">{unmask.disclaimer}</p>
-          )}
-        </Card>
-      )}
+                  <Metric label="Before IC025" value={fmt(unmask.baseline?.ic025)} />
+                  <Metric label="After IC025" value={unmask.unmasked ? fmt(unmask.unmasked.ic025) : '—'} />
+                </div>
+                {unmask.delta && (
+                  <div className="text-[11px] text-slate-400">
+                    ΔPRR={unmask.delta.prr_delta} · ΔIC025={unmask.delta.ic025_delta} · ΔEB05={unmask.delta.eb05_delta}
+                    {' · excluded: '}{(unmask.excluded_maskers || []).join(', ') || '—'}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
 
       {/* Longitudinal casefile */}
-      {casefile && (
-        <Card className="p-4 border-teal-700/40">
-          <CardHeader
-            title="Signal casefile (trajectory)"
-            subtitle="Weekly DMA memory — new vs strengthening vs weakening"
-            right={
+      <Card className="p-4 border-teal-700/40">
+        <CardHeader
+          title="Signal casefile (trajectory)"
+          subtitle={casefile?.timeline_source === 'reconstructed_from_case_dates'
+            ? 'Reconstructed from case dates until weekly snapshots accumulate'
+            : 'Weekly DMA memory — new vs strengthening vs weakening'}
+          right={
+            casefile ? (
               <Badge
                 value={casefile.trajectory || 'unknown'}
                 className={
@@ -735,66 +775,112 @@ export default function SignalDetail() {
                         : 'bg-slate-600/20 text-slate-400 border-slate-600/30'
                 }
               />
-            }
-          />
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="text-slate-500">
-                <tr>
-                  <th className="py-1 pr-3">Week</th>
-                  <th className="py-1 pr-3">n</th>
-                  <th className="py-1 pr-3">PRR</th>
-                  <th className="py-1 pr-3">IC025</th>
-                  <th className="py-1 pr-3">EB05</th>
-                  <th className="py-1">Strength</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(casefile.timeline || []).map((t) => (
-                  <tr key={t.week_start} className="border-t border-slate-800 text-slate-300">
-                    <td className="py-1.5 pr-3">{(t.week_start || '').slice(0, 10)}{t.live ? ' (live)' : ''}</td>
-                    <td className="py-1.5 pr-3">{t.post_count}</td>
-                    <td className="py-1.5 pr-3">{t.prr ?? '—'}</td>
-                    <td className="py-1.5 pr-3">{t.ic025 ?? '—'}</td>
-                    <td className="py-1.5 pr-3">{t.eb05 ?? '—'}</td>
-                    <td className="py-1.5">{t.strength || '—'}</td>
+            ) : null
+          }
+        />
+        {!casefile ? (
+          <div className="mt-3 text-sm text-slate-400">Loading casefile…</div>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-slate-200">{casefile.verdict}</p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="text-slate-500">
+                  <tr>
+                    <th className="py-1 pr-3">Week</th>
+                    <th className="py-1 pr-3">n</th>
+                    <th className="py-1 pr-3">PRR</th>
+                    <th className="py-1 pr-3">IC025</th>
+                    <th className="py-1 pr-3">EB05</th>
+                    <th className="py-1">Strength</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {casefile.label_change_heuristic && (
-            <div className="mt-3 text-[11px] text-slate-400">
-              Label-change heuristic: <span className="text-slate-200">{casefile.label_change_heuristic.likelihood_band}</span>
-              {' '}(score {casefile.label_change_heuristic.score})
-              {(casefile.label_change_heuristic.reasons || []).length
-                ? ` — ${casefile.label_change_heuristic.reasons.join('; ')}`
-                : ''}
-              <div className="text-[10px] text-slate-500 mt-1">{casefile.label_change_heuristic.disclaimer}</div>
+                </thead>
+                <tbody>
+                  {(casefile.timeline || []).map((t) => (
+                    <tr key={t.week_start} className="border-t border-slate-800 text-slate-300">
+                      <td className="py-1.5 pr-3">
+                        {(t.week_start || '').slice(0, 10)}
+                        {t.live ? ' (live)' : ''}
+                        {t.reconstructed ? ' ≈' : ''}
+                      </td>
+                      <td className="py-1.5 pr-3">{t.post_count}</td>
+                      <td className="py-1.5 pr-3">{t.prr ?? '—'}</td>
+                      <td className="py-1.5 pr-3">{t.ic025 ?? '—'}</td>
+                      <td className="py-1.5 pr-3">{t.eb05 ?? '—'}</td>
+                      <td className="py-1.5">{t.strength || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </Card>
-      )}
+            {casefile.label_change_heuristic && (
+              <div className="mt-3 text-[11px] text-slate-400">
+                Label-change heuristic: <span className="text-slate-200">{casefile.label_change_heuristic.likelihood_band}</span>
+                {' '}(score {casefile.label_change_heuristic.score})
+                {(casefile.label_change_heuristic.reasons || []).length
+                  ? ` — ${casefile.label_change_heuristic.reasons.join('; ')}`
+                  : ''}
+                <div className="text-[10px] text-slate-500 mt-1">{casefile.label_change_heuristic.disclaimer}</div>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
 
       {/* DDI pairs involving this product */}
-      {ddi?.pairs?.length > 0 && (
-        <Card className="p-4 border-violet-700/40">
-          <CardHeader
-            title="DDI co-mentions for this product"
-            subtitle="Ω interaction metric + plausibility gate on multi-drug AE posts"
-          />
-          <div className="mt-3 space-y-2">
-            {ddi.pairs.slice(0, 8).map((p) => (
-              <div key={`${p.drug_a}|${p.drug_b}|${p.event}`} className="flex flex-wrap justify-between gap-2 text-sm text-slate-300">
-                <span className="capitalize">{p.drug_a} + {p.drug_b} → {p.event}</span>
-                <span className="text-[11px] text-slate-500">
-                  Ω={p.omega} · n={p.count}
-                  {p.plausibility?.plausible ? ' · plausible' : ' · review'}
-                </span>
+      <Card className="p-4 border-violet-700/40">
+        <CardHeader
+          title="DDI co-mentions for this product"
+          subtitle="Other products co-reported with this one on the same AE post"
+        />
+        {!ddi ? (
+          <div className="mt-3 text-sm text-slate-400">Loading DDI…</div>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-slate-200">{ddi.verdict}</p>
+            {(ddi.pairs || []).length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {ddi.pairs.slice(0, 8).map((p) => (
+                  <div key={`${p.drug_a}|${p.drug_b}|${p.event}`} className="flex flex-wrap justify-between gap-2 text-sm text-slate-300">
+                    <span className="capitalize">{p.drug_a} + {p.drug_b} → {p.event}</span>
+                    <span className="text-[11px] text-slate-500">
+                      Ω={p.omega} · n={p.count}
+                      {p.plausibility?.plausible ? ' · plausible' : ' · review'}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="mt-3">
+                <Button variant="ghost" disabled={pvDemoBusy} onClick={async () => {
+                  setPvDemoBusy(true);
+                  try {
+                    await api.ingestPvDemo({ recompute: true });
+                    setDdi(await api.signalDdi(sig.id));
+                  } catch (e) { console.error(e); }
+                  setPvDemoBusy(false);
+                }}>
+                  {pvDemoBusy ? 'Loading demo pack…' : 'Load PV demo pack (DDI + pregnancy)'}
+                </Button>
+              </div>
+            )}
+            {ddi.disclaimer && <p className="mt-2 text-[10px] text-slate-500">{ddi.disclaimer}</p>}
+          </>
+        )}
+      </Card>
+
+      {/* SAR preview */}
+      {sarPreview && (
+        <Card className="p-4 border-emerald-700/40">
+          <CardHeader
+            title="GVP IX Signal Assessment Report"
+            subtitle="Structured assessment pack — download PDF/MD from the header buttons"
+          />
+          <p className="mt-2 text-sm text-slate-200">{sarPreview.recommended_action}</p>
+          <div className="mt-2 text-[11px] text-slate-500">
+            Lifecycle: {sarPreview.lifecycle?.status || '—'} · WHO-UMC: {sarPreview.causality?.who_umc || '—'}
+            {' · '}SDR: {String(sarPreview.detection?.sdr_flag)} · strength: {sarPreview.detection?.strength}
           </div>
-          {ddi.disclaimer && <p className="mt-2 text-[10px] text-slate-500">{ddi.disclaimer}</p>}
         </Card>
       )}
 
