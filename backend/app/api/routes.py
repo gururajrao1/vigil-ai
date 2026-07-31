@@ -1336,6 +1336,8 @@ def export_cioms_text(signal_id: int, db: Session = Depends(get_db)):
 @router.get("/signals/{signal_id}/masking")
 def signal_masking_report(signal_id: int, db: Session = Depends(get_db)):
     """Competition-bias masking report + top masker drugs for this signal."""
+    from collections import Counter, defaultdict
+
     from ..analytics.corpus import build_ae_reports
     from ..analytics.masking import analyze_masking
     from ..projects.scope import current_project_id
@@ -1345,8 +1347,75 @@ def signal_masking_report(signal_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "signal not found")
     # Prefer MedDRA PT when present so soft-matching aligns with corpus events
     event = sig.meddra_pt or sig.symptom
-    corpus = build_ae_reports(db, project_id=sig.project_id or current_project_id())
-    return analyze_masking(corpus["reports"], sig.drug, event)
+    pid = sig.project_id or current_project_id()
+    corpus = build_ae_reports(db, project_id=pid)
+    out = analyze_masking(corpus["reports"], sig.drug, event)
+
+    # When this pair monopolizes the event, point the analyst to remineable examples
+    # (events in the corpus that have ≥2 products) so remine is one click away.
+    examples = []
+    if not out.get("can_remine"):
+        by_event: dict[str, Counter] = defaultdict(Counter)
+        for d, e in corpus["reports"]:
+            by_event[e][(d or "").lower()] += 1
+        # Prefer events where a secondary product would strengthen if the dominant is removed
+        candidates = []
+        for ev, counts in by_event.items():
+            if len(counts) < 2:
+                continue
+            ranked = counts.most_common()
+            dominant, dom_n = ranked[0]
+            for other, n in ranked[1:4]:
+                if n < 1:
+                    continue
+                candidates.append((n, dom_n, other, dominant, ev))
+        candidates.sort(reverse=True)
+        seen = set()
+        for _n, _dom_n, other, dominant, ev in candidates:
+            key = (other, ev.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            row = (
+                db.query(Signal)
+                .filter(Signal.drug.ilike(other))
+                .filter(
+                    (Signal.symptom.ilike(ev)) | (Signal.meddra_pt.ilike(ev))
+                )
+            )
+            if pid is not None:
+                row = row.filter(Signal.project_id == pid)
+            row = row.first()
+            if not row:
+                # Fallback: match drug only, then check event soft-equality in Python
+                q2 = db.query(Signal).filter(Signal.drug.ilike(other))
+                if pid is not None:
+                    q2 = q2.filter(Signal.project_id == pid)
+                for cand in q2.limit(20).all():
+                    ev_l = (ev or "").lower()
+                    if (cand.symptom or "").lower() == ev_l or (cand.meddra_pt or "").lower() == ev_l:
+                        row = cand
+                        break
+            if not row:
+                continue
+            examples.append({
+                "signal_id": row.id,
+                "drug": row.drug,
+                "event": row.meddra_pt or row.symptom,
+                "masker_hint": dominant,
+                "why": f"Shares “{ev}” with {dominant} — remine can exclude the competitor.",
+            })
+            if len(examples) >= 4:
+                break
+    out["remineable_examples"] = examples
+    out["try_next"] = (
+        None if out.get("can_remine")
+        else (
+            "This product owns the whole event — remine has nothing to remove. "
+            "Open one of the example signals below, or load the PV demo pack."
+        )
+    )
+    return out
 
 
 @router.get("/signals/{signal_id}/unmask")

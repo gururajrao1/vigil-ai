@@ -694,8 +694,49 @@ export default function SignalDetail() {
                 ))}
               </div>
             ) : (
-              <div className="mt-3 text-sm text-slate-400">
-                Tip: open a signal that shares an event with other products (e.g. suicidal ideation, hypertension, device loosening) — or run <span className="text-slate-300">Load PV demo pack</span> from Analytic Lenses.
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-amber-200/90">
+                  {masking.try_next || 'No competing products on this event — remine cannot change the 2×2 table.'}
+                </p>
+                {(masking.remineable_examples || []).length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">
+                      Open a signal where remine works
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {masking.remineable_examples.map((ex) => (
+                        <Link
+                          key={ex.signal_id}
+                          to={`/signals/${ex.signal_id}`}
+                          className="text-sm text-sky-300 hover:underline capitalize"
+                        >
+                          {ex.drug} → {ex.event}
+                          <span className="text-slate-500 normal-case"> — {ex.why}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <Button
+                  variant="primary"
+                  disabled={pvDemoBusy}
+                  onClick={async () => {
+                    setPvDemoBusy(true);
+                    setUnmaskErr(null);
+                    try {
+                      await api.ingestPvDemo({ recompute: true });
+                      const m = await api.signalMasking(sig.id);
+                      setMasking(m);
+                      setSelectedMaskers(m.suggested_exclude || []);
+                      setDdi(await api.signalDdi(sig.id));
+                    } catch (e) {
+                      setUnmaskErr(e?.message || String(e));
+                    }
+                    setPvDemoBusy(false);
+                  }}
+                >
+                  {pvDemoBusy ? 'Loading demo pack…' : 'Load PV demo pack (then open a remineable signal)'}
+                </Button>
               </div>
             )}
             <div className="mt-3 flex flex-wrap gap-2 items-center">
