@@ -132,6 +132,27 @@ export const api = {
   e2bUrl: (id) => `${BASE}/api/signals/${id}/e2b`,
   e2bR2Url: (id) => `${BASE}/api/signals/${id}/e2b-r2`,
   ciomsUrl: (id) => `${BASE}/api/signals/${id}/cioms`,
+  sarMdUrl: (id) => `${BASE}/api/signals/${id}/sar.md`,
+  sarPdfUrl: (id) => `${BASE}/api/signals/${id}/sar.pdf`,
+  downloadSar: async (id, drug, event, format = 'pdf') => {
+    const headers = {};
+    if (_token) headers.Authorization = `Bearer ${_token}`;
+    if (_projectId) headers['X-Project-Id'] = _projectId;
+    const ext = format === 'md' ? 'md' : 'pdf';
+    const res = await fetch(`${BASE}/api/signals/${id}/sar.${ext}`, { headers });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const drugSlug = (drug || 'drug').replace(/\s+/g, '_').toLowerCase().slice(0, 20);
+    const eventSlug = (event || 'event').replace(/\s+/g, '_').toLowerCase().slice(0, 20);
+    a.href = url;
+    a.download = `sar_${drugSlug}_${eventSlug}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
   downloadCioms: async (id, drug, event) => {
     const headers = {};
     if (_token) headers.Authorization = `Bearer ${_token}`;
@@ -149,6 +170,23 @@ export const api = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+
+  signalMasking: (id) => req(`/api/signals/${id}/masking`),
+  signalUnmask: (id, excludeDrugs = []) => {
+    const q = new URLSearchParams();
+    (excludeDrugs || []).forEach((d) => q.append('exclude_drugs', d));
+    const qs = q.toString();
+    return req(`/api/signals/${id}/unmask${qs ? `?${qs}` : ''}`, { method: 'POST' });
+  },
+  signalCasefile: (id) => req(`/api/signals/${id}/casefile`),
+  signalDdi: (id) => req(`/api/signals/${id}/ddi`),
+  ddi: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== false))
+    ).toString();
+    return req(`/api/ddi${q ? `?${q}` : ''}`);
+  },
+  pregnancy: () => req('/api/pregnancy'),
 
   // demo controls
   seed: (days = 21) => req(`/api/ingest/seed?days=${days}`, { method: 'POST' }),
@@ -168,6 +206,10 @@ export const api = {
   googleNewsQueries: () => req('/api/ingest/google-news/queries'),
   crawlFaersLive: (limit = 30, daysBack = 90, { recompute = false } = {}) =>
     req(`/api/ingest/faers-live?limit=${limit}&days_back=${daysBack}&recompute=${recompute}`, { method: 'POST' }),
+  crawlVaers: (limit = 40, { recompute = false, forceFixture = false } = {}) =>
+    req(`/api/ingest/vaers?limit=${limit}&recompute=${recompute}&force_fixture=${forceFixture}`, { method: 'POST' }),
+  crawlFaersBulk: (limit = 50, { recompute = false, forceFixture = false } = {}) =>
+    req(`/api/ingest/faers-bulk?limit=${limit}&recompute=${recompute}&force_fixture=${forceFixture}`, { method: 'POST' }),
   crawlDailymedRss: (limit = 40, { recompute = false } = {}) =>
     req(`/api/ingest/dailymed-rss?limit=${limit}&recompute=${recompute}`, { method: 'POST' }),
   crawlPubmedLive: (query, limit = 20, { recompute = false, daysBack = 730 } = {}) => {

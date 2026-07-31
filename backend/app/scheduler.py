@@ -53,6 +53,12 @@ def _make_source_fn(mode: str, query: str) -> Callable:
     if mode == "faers_live":
         from .ingestion.sources import crawl_faers
         return lambda: crawl_faers(limit=25, days_back=90)
+    if mode == "faers_bulk":
+        from .ingestion.srs_bulk import crawl_faers_bulk
+        return lambda: crawl_faers_bulk(limit=40)
+    if mode == "vaers":
+        from .ingestion.srs_bulk import crawl_vaers
+        return lambda: crawl_vaers(limit=30)
     if mode == "dailymed_rss":
         from .ingestion.sources import crawl_dailymed_rss
         return lambda: crawl_dailymed_rss(limit=40)
@@ -108,7 +114,9 @@ _FALLBACK_CHAINS: Dict[str, List[str]] = {
     "reddit_health": ["reddit_health", "reddit_pullpush", "google_news", "stream"],
     "reddit_pullpush":["reddit_pullpush","google_news",   "stream"],
     "google_news":   ["google_news",   "fda_rss",         "stream"],
-    "faers_live":    ["faers_live",    "fda_rss",          "google_news", "stream"],
+    "faers_live":    ["faers_live",    "faers_bulk",       "fda_rss", "stream"],
+    "faers_bulk":    ["faers_bulk",    "faers_live",       "fda_rss", "stream"],
+    "vaers":         ["vaers",         "faers_live",       "google_news", "stream"],
     "dailymed_rss":  ["dailymed_rss",  "pubmed_live",     "google_news", "stream"],
     "pubmed_live":   ["pubmed_live",   "europe_pmc",      "semantic_scholar", "stream"],
     "europe_pmc":    ["europe_pmc",    "pubmed_live",     "semantic_scholar", "stream"],

@@ -1,0 +1,66 @@
+[
+  {
+    "external_id": "vaers:fix:1001",
+    "vaccine": "COVID-19 mRNA vaccine",
+    "reaction": "myocarditis",
+    "country": "US",
+    "posted_at": "2024-06-15T00:00:00",
+    "body": "VAERS fixture: adolescent male received COVID-19 mRNA vaccine. Two days later chest pain and elevated troponin consistent with myocarditis. Recovered after supportive care."
+  },
+  {
+    "external_id": "vaers:fix:1002",
+    "vaccine": "Influenza vaccine",
+    "reaction": "guillain-barre syndrome",
+    "country": "US",
+    "posted_at": "2024-11-02T00:00:00",
+    "body": "VAERS fixture: adult received seasonal influenza vaccine. Progressive ascending weakness and areflexia; Guillain-Barre syndrome diagnosed. Hospitalized."
+  },
+  {
+    "external_id": "vaers:fix:1003",
+    "vaccine": "MMR vaccine",
+    "reaction": "febrile seizure",
+    "country": "US",
+    "posted_at": "2024-03-20T00:00:00",
+    "body": "VAERS fixture: toddler received MMR vaccine. Fever and brief febrile seizure within 24 hours. No lasting sequelae noted."
+  },
+  {
+    "external_id": "vaers:fix:1004",
+    "vaccine": "COVID-19 mRNA vaccine",
+    "reaction": "anaphylaxis",
+    "country": "US",
+    "posted_at": "2024-01-08T00:00:00",
+    "body": "VAERS fixture: adult with known allergy history developed anaphylaxis minutes after COVID-19 mRNA vaccine. Epinephrine administered; recovered."
+  },
+  {
+    "external_id": "vaers:fix:1005",
+    "vaccine": "HPV vaccine",
+    "reaction": "syncope",
+    "country": "US",
+    "posted_at": "2024-09-12T00:00:00",
+    "body": "VAERS fixture: adolescent female experienced syncope shortly after HPV vaccine administration. Observed and discharged."
+  },
+  {
+    "external_id": "vaers:fix:1006",
+    "vaccine": "Shingles vaccine",
+    "reaction": "injection site reaction",
+    "country": "US",
+    "posted_at": "2025-02-01T00:00:00",
+    "body": "VAERS fixture: older adult reported severe injection site reaction and fever after recombinant shingles vaccine."
+  },
+  {
+    "external_id": "vaers:fix:1007",
+    "vaccine": "COVID-19 mRNA vaccine",
+    "reaction": "myocarditis",
+    "country": "US",
+    "posted_at": "2024-07-22T00:00:00",
+    "body": "VAERS fixture: young adult male; COVID-19 mRNA vaccine dose 2; myocarditis with chest pain and abnormal ECG. Improved with NSAIDs."
+  },
+  {
+    "external_id": "vaers:fix:1008",
+    "vaccine": "Tdap vaccine",
+    "reaction": "arm pain",
+    "country": "US",
+    "posted_at": "2024-05-05T00:00:00",
+    "body": "VAERS fixture: pregnant patient received Tdap; significant arm pain and swelling at injection site for several days."
+  }
+]

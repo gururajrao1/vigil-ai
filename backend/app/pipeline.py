@@ -715,6 +715,13 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
 
     db.commit()
 
+    # Longitudinal casefile: persist weekly DMA snapshots for trajectory UI
+    try:
+        from .analytics.casefile import snapshot_signals
+        snapshot_signals(db, stored, project_id=project_id)
+    except Exception:
+        pass
+
     # Narratives: generate for the most important signals (keeps LLM usage bounded).
     if with_narrative and stored:
         _attach_narratives(db, stored)

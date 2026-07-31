@@ -1,0 +1,82 @@
+[
+  {
+    "external_id": "faers_bulk:fix:2001",
+    "drugs": ["Isotretinoin", "Ibuprofen"],
+    "reactions": ["depression", "dry skin"],
+    "country": "US",
+    "posted_at": "2024-04-10T00:00:00",
+    "body": "FAERS quarterly fixture DEMO/DRUG/REAC slice. Suspect Isotretinoin with concomitant Ibuprofen. Reactions: depression, dry skin. Serious psychiatric outcome flagged."
+  },
+  {
+    "external_id": "faers_bulk:fix:2002",
+    "drugs": ["Atorvastatin", "Clarithromycin"],
+    "reactions": ["rhabdomyolysis", "myalgia"],
+    "country": "US",
+    "posted_at": "2024-05-18T00:00:00",
+    "body": "FAERS bulk fixture. Products: Atorvastatin, Clarithromycin. Reactions: rhabdomyolysis, myalgia. CYP3A4 interaction context noted in narrative."
+  },
+  {
+    "external_id": "faers_bulk:fix:2003",
+    "drugs": ["Warfarin", "Ibuprofen"],
+    "reactions": ["gastrointestinal bleeding", "haemorrhage"],
+    "country": "US",
+    "posted_at": "2024-06-01T00:00:00",
+    "body": "FAERS bulk fixture. Anticoagulant Warfarin with NSAID Ibuprofen. Gastrointestinal bleeding and haemorrhage reported."
+  },
+  {
+    "external_id": "faers_bulk:fix:2004",
+    "drugs": ["Sertraline", "Tramadol"],
+    "reactions": ["serotonin syndrome", "agitation", "tremor"],
+    "country": "US",
+    "posted_at": "2024-07-14T00:00:00",
+    "body": "FAERS bulk fixture. Sertraline plus Tramadol co-medication. Serotonin syndrome with agitation and tremor."
+  },
+  {
+    "external_id": "faers_bulk:fix:2005",
+    "drugs": ["Valproate"],
+    "reactions": ["birth defect", "neural tube defect"],
+    "country": "US",
+    "posted_at": "2024-08-20T00:00:00",
+    "body": "FAERS bulk fixture. Valproate exposure in pregnancy. Congenital anomaly: neural tube defect / birth defect reported."
+  },
+  {
+    "external_id": "faers_bulk:fix:2006",
+    "drugs": ["Isotretinoin"],
+    "reactions": ["birth defect", "teratogenicity"],
+    "country": "US",
+    "posted_at": "2024-09-03T00:00:00",
+    "body": "FAERS bulk fixture. Isotretinoin pregnancy exposure with teratogenicity and birth defect. iPLEDGE context."
+  },
+  {
+    "external_id": "faers_bulk:fix:2007",
+    "drugs": ["Amiodarone", "Haloperidol"],
+    "reactions": ["qt prolongation", "torsade de pointes"],
+    "country": "US",
+    "posted_at": "2024-10-11T00:00:00",
+    "body": "FAERS bulk fixture. Dual QT-prolonging agents Amiodarone and Haloperidol. QT prolongation and torsade de pointes."
+  },
+  {
+    "external_id": "faers_bulk:fix:2008",
+    "drugs": ["Metformin"],
+    "reactions": ["lactic acidosis"],
+    "country": "US",
+    "posted_at": "2024-11-22T00:00:00",
+    "body": "FAERS bulk fixture. Metformin-associated lactic acidosis in setting of renal impairment."
+  },
+  {
+    "external_id": "faers_bulk:fix:2009",
+    "drugs": ["Apixaban", "Naproxen"],
+    "reactions": ["haemorrhage", "bruising"],
+    "country": "US",
+    "posted_at": "2025-01-05T00:00:00",
+    "body": "FAERS bulk fixture. Apixaban with Naproxen. Haemorrhage and bruising."
+  },
+  {
+    "external_id": "faers_bulk:fix:2010",
+    "drugs": ["Simvastatin", "Gemfibrozil"],
+    "reactions": ["rhabdomyolysis", "ck elevation"],
+    "country": "US",
+    "posted_at": "2025-02-14T00:00:00",
+    "body": "FAERS bulk fixture. Simvastatin plus Gemfibrozil. Rhabdomyolysis with CK elevation."
+  }
+]

@@ -29,6 +29,16 @@ const SOURCE_ACTIONS = {
     fn: () => api.crawlFaersLive(),
     note: 'Last 90 days serious AE reports from openFDA',
   },
+  faers_bulk: {
+    label: '📦 Fetch FAERS bulk subset',
+    fn: () => api.crawlFaersBulk(),
+    note: 'Quarterly ASCII-style slice + fixtures · polypharmacy for DDI',
+  },
+  vaers: {
+    label: '💉 Fetch VAERS reports',
+    fn: () => api.crawlVaers(),
+    note: 'Vaccine AE reports · offline fixtures when CDC blocked',
+  },
   dailymed_rss: {
     label: '💊 Fetch label updates',
     fn: () => api.crawlDailymedRss(),

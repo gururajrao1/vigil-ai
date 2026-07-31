@@ -259,6 +259,58 @@ def ingest_faers_live(
     }
 
 
+@router.post("/ingest/vaers")
+def ingest_vaers(
+    limit: int = 40,
+    force_fixture: bool = False,
+    recompute: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Ingest VAERS vaccine AE reports (CDC when reachable, else offline fixtures)."""
+    from ..ingestion.srs_bulk import crawl_vaers
+
+    batch = crawl_vaers(limit=limit, force_fixture=force_fixture)
+    posts = batch["posts"]
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "vaers",
+        "mode": batch.get("mode"),
+        "fetched": len(posts),
+        "unique_fetched": batch["unique_fetched"],
+        "ingested": new,
+        "note": batch.get("note"),
+        **stats,
+    }
+
+
+@router.post("/ingest/faers-bulk")
+def ingest_faers_bulk(
+    limit: int = 50,
+    force_fixture: bool = False,
+    recompute: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Ingest FAERS quarterly bulk subset (openFDA slice or ASCII fixtures)."""
+    from ..ingestion.srs_bulk import crawl_faers_bulk
+
+    batch = crawl_faers_bulk(limit=limit, force_fixture=force_fixture)
+    posts = batch["posts"]
+    new = ingest_posts(db, posts, use_transformer=False,
+                       use_presidio=False, online_translation=False)
+    stats = _maybe_recompute(db, recompute)
+    return {
+        "source": "faers_bulk",
+        "mode": batch.get("mode"),
+        "fetched": len(posts),
+        "unique_fetched": batch["unique_fetched"],
+        "ingested": new,
+        "note": batch.get("note"),
+        **stats,
+    }
+
+
 @router.get("/ingest/fda-rss/feeds")
 def list_fda_rss_feeds():
     """All FDA RSS feeds available for pharmacovigilance ingestion."""
@@ -1248,6 +1300,161 @@ def export_cioms_text(signal_id: int, db: Session = Depends(get_db)):
         media_type="text/plain",
         headers={"Content-Disposition": f"attachment; filename=cioms_{drug_slug}_{event_slug}.txt"},
     )
+
+
+# -------------------- Phase A/B PV overlays (masking, DDI, SAR, casefile) --- #
+@router.get("/signals/{signal_id}/masking")
+def signal_masking_report(signal_id: int, db: Session = Depends(get_db)):
+    """Competition-bias masking report + top masker drugs for this signal."""
+    from ..analytics.corpus import build_ae_reports
+    from ..analytics.masking import analyze_masking
+    from ..projects.scope import current_project_id
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    corpus = build_ae_reports(db, project_id=sig.project_id or current_project_id())
+    return analyze_masking(corpus["reports"], sig.drug, sig.symptom)
+
+
+@router.post("/signals/{signal_id}/unmask")
+def signal_unmask_remine(
+    signal_id: int,
+    db: Session = Depends(get_db),
+    exclude_drugs: list[str] | None = Query(None),
+):
+    """Remine DMA after excluding selected masker drugs (sensitivity analysis).
+
+    Pass ``exclude_drugs`` as repeated query params, or omit to auto-pick likely maskers.
+    """
+    from ..analytics.corpus import build_ae_reports
+    from ..analytics.masking import analyze_masking, remine_unmasked
+    from ..projects.scope import current_project_id
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    corpus = build_ae_reports(db, project_id=sig.project_id or current_project_id())
+    exclude = list(exclude_drugs or [])
+    if not exclude:
+        report = analyze_masking(corpus["reports"], sig.drug, sig.symptom)
+        exclude = [m["drug"] for m in report.get("maskers") or [] if m.get("likely_masker")]
+        if not exclude and report.get("maskers"):
+            exclude = [report["maskers"][0]["drug"]]
+    return remine_unmasked(
+        corpus["posts"], sig.drug, sig.symptom, exclude, full_reports=corpus["reports"]
+    )
+
+
+@router.get("/signals/{signal_id}/sar.md")
+def export_sar_markdown(signal_id: int, db: Session = Depends(get_db)):
+    """GVP Module IX Signal Assessment Report as Markdown."""
+    from ..analytics.sar import build_sar_payload, render_sar_markdown
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    md = render_sar_markdown(build_sar_payload(db, sig))
+    fname = f"sar_{sig.drug}_{sig.symptom}.md".replace(" ", "_")[:80]
+    return Response(
+        content=md,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+@router.get("/signals/{signal_id}/sar.pdf")
+def export_sar_pdf(signal_id: int, db: Session = Depends(get_db)):
+    """GVP Module IX Signal Assessment Report as PDF."""
+    from ..analytics.sar import build_sar_payload, render_sar_pdf
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    try:
+        pdf = render_sar_pdf(build_sar_payload(db, sig))
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    fname = f"sar_{sig.drug}_{sig.symptom}.pdf".replace(" ", "_")[:80]
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={fname}"},
+    )
+
+
+@router.get("/signals/{signal_id}/sar")
+def signal_sar_json(signal_id: int, db: Session = Depends(get_db)):
+    """Structured SAR payload (JSON) for UI preview."""
+    from ..analytics.sar import build_sar_payload
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    return build_sar_payload(db, sig)
+
+
+@router.get("/signals/{signal_id}/casefile")
+def signal_casefile(signal_id: int, db: Session = Depends(get_db)):
+    """Longitudinal DMA snapshots + trajectory for this signal."""
+    from ..analytics.casefile import get_casefile, snapshot_signals
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    # Ensure at least the current week is persisted when the analyst opens the casefile
+    try:
+        snapshot_signals(db, [sig], project_id=sig.project_id)
+    except Exception:
+        pass
+    return get_casefile(db, sig)
+
+
+@router.get("/ddi")
+def ddi_signals(
+    drug: str | None = None,
+    min_count: int = 2,
+    plausible_only: bool = False,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    """Drug–drug interaction co-mention disproportionality + plausibility gate."""
+    from ..analytics.corpus import build_ae_reports
+    from ..analytics.ddi import mine_ddi
+    from ..projects.scope import current_project_id
+
+    corpus = build_ae_reports(db, project_id=current_project_id())
+    return mine_ddi(
+        corpus["posts"],
+        min_count=min_count,
+        require_plausible=plausible_only,
+        focus_drug=drug,
+        limit=limit,
+    )
+
+
+@router.get("/signals/{signal_id}/ddi")
+def signal_ddi(signal_id: int, db: Session = Depends(get_db)):
+    """DDI pairs involving this signal's product."""
+    from ..analytics.corpus import build_ae_reports
+    from ..analytics.ddi import mine_ddi
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    corpus = build_ae_reports(db, project_id=sig.project_id)
+    return mine_ddi(corpus["posts"], focus_drug=sig.drug, min_count=2, limit=30)
+
+
+@router.get("/pregnancy")
+def pregnancy_cohort(db: Session = Depends(get_db)):
+    """Pregnancy / teratogen cohort mode with stratified DMA."""
+    from ..analytics.corpus import build_ae_reports
+    from ..analytics.pregnancy import stratified_pregnancy_dma
+    from ..projects.scope import current_project_id
+
+    corpus = build_ae_reports(db, project_id=current_project_id())
+    return stratified_pregnancy_dma(corpus["posts"])
 
 
 @router.post("/signals/{signal_id}/narrative")

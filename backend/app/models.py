@@ -330,6 +330,29 @@ class Signal(Base):
     project = relationship("Project", back_populates="signals")
 
 
+class SignalSnapshot(Base):
+    """Weekly DMA snapshot for longitudinal signal casefile / trajectory UI."""
+
+    __tablename__ = "signal_snapshots"
+
+    id = Column(Integer, primary_key=True)
+    signal_id = Column(Integer, index=True)  # may go stale after recompute; key is authoritative
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=True)
+    signal_key = Column(String(280), index=True)  # "drug||symptom"
+    drug = Column(String(128), index=True)
+    symptom = Column(String(128), index=True)
+    week_start = Column(DateTime, index=True)  # Monday 00:00 UTC of ISO week
+    post_count = Column(Integer, default=0)
+    prr = Column(Float)
+    ic025 = Column(Float)
+    eb05 = Column(Float)
+    ror = Column(Float)
+    strength = Column(String(16))
+    sdr_flag = Column(Boolean, default=False)
+    label_novelty = Column(String(16))
+    captured_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Alert(Base):
     """Emitted when a signal crosses severity/confidence thresholds."""
 

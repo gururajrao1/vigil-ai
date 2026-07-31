@@ -6,6 +6,8 @@ import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 const MODES = [
   { id: 'google_news',  label: 'Google News (live)',        note: '5 curated PV queries — works on work laptops' },
   { id: 'faers_live',   label: 'FDA FAERS live reports',    note: 'Real AE reports from openFDA — regulatory-grade' },
+  { id: 'faers_bulk',   label: 'FAERS bulk subset',         note: 'Quarterly ASCII slice + fixtures · polypharmacy' },
+  { id: 'vaers',        label: 'VAERS vaccine AEs',         note: 'CDC VAERS-style · offline fixtures when blocked' },
   { id: 'dailymed_rss', label: 'DailyMed label updates',   note: 'New/revised drug labels from NLM RSS' },
   { id: 'pubmed_live',  label: 'PubMed abstracts',         note: 'Full abstracts · MeSH PV queries via NCBI' },
   { id: 'europe_pmc',   label: 'Europe PMC abstracts',     note: 'EMBL-EBI literature · title + abstract' },
