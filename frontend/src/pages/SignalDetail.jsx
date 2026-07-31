@@ -404,6 +404,17 @@ export default function SignalDetail() {
     api.signalMasking(id).then((m) => {
       setMasking(m);
       setSelectedMaskers(m.suggested_exclude || (m.maskers || []).filter((x) => x.likely_masker).map((x) => x.drug));
+      // Auto-run remine when competitors exist so the user sees before/after immediately
+      if (m.can_remine) {
+        const picks = m.suggested_exclude || (m.maskers || []).slice(0, 1).map((x) => x.drug);
+        if (picks?.length) {
+          setUnmasking(true);
+          api.signalUnmask(id, picks)
+            .then(setUnmask)
+            .catch((e) => setUnmaskErr(e?.message || String(e)))
+            .finally(() => setUnmasking(false));
+        }
+      }
     }).catch(() => setMasking(null));
     api.signalCasefile(id).then(setCasefile).catch(() => setCasefile(null));
     api.signalDdi(id).then(setDdi).catch(() => setDdi(null));
@@ -696,12 +707,36 @@ export default function SignalDetail() {
             ) : (
               <div className="mt-3 space-y-3">
                 <p className="text-sm text-amber-200/90">
-                  {masking.try_next || 'No competing products on this event — remine cannot change the 2×2 table.'}
+                  {masking.try_next || 'This product owns the whole event — remine has nothing to remove here.'}
                 </p>
+                <div className="flex flex-wrap gap-2">
+                  <Link to="/lenses?tab=remine">
+                    <Button variant="primary">Open Remine lab (always works)</Button>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    disabled={pvDemoBusy}
+                    onClick={async () => {
+                      setPvDemoBusy(true);
+                      setUnmaskErr(null);
+                      try {
+                        await api.ingestPvDemo({ recompute: true });
+                        const m = await api.signalMasking(sig.id);
+                        setMasking(m);
+                        setSelectedMaskers(m.suggested_exclude || []);
+                      } catch (e) {
+                        setUnmaskErr(e?.message || String(e));
+                      }
+                      setPvDemoBusy(false);
+                    }}
+                  >
+                    {pvDemoBusy ? 'Loading…' : 'Load PV demo pack'}
+                  </Button>
+                </div>
                 {(masking.remineable_examples || []).length > 0 && (
                   <div>
                     <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">
-                      Open a signal where remine works
+                      Or jump to a remineable signal
                     </div>
                     <div className="flex flex-col gap-1.5">
                       {masking.remineable_examples.map((ex) => (
@@ -717,58 +752,43 @@ export default function SignalDetail() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+            {masking.can_remine && (
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
                 <Button
                   variant="primary"
-                  disabled={pvDemoBusy}
+                  disabled={unmasking}
                   onClick={async () => {
-                    setPvDemoBusy(true);
+                    setUnmasking(true);
                     setUnmaskErr(null);
                     try {
-                      await api.ingestPvDemo({ recompute: true });
-                      const m = await api.signalMasking(sig.id);
-                      setMasking(m);
-                      setSelectedMaskers(m.suggested_exclude || []);
-                      setDdi(await api.signalDdi(sig.id));
+                      const picks = selectedMaskers.length
+                        ? selectedMaskers
+                        : (masking.suggested_exclude || []);
+                      setUnmask(await api.signalUnmask(sig.id, picks));
                     } catch (e) {
                       setUnmaskErr(e?.message || String(e));
                     }
-                    setPvDemoBusy(false);
+                    setUnmasking(false);
                   }}
                 >
-                  {pvDemoBusy ? 'Loading demo pack…' : 'Load PV demo pack (then open a remineable signal)'}
+                  {unmasking ? 'Remining…' : 'Remine without selected products'}
                 </Button>
+                {(masking.suggested_exclude || []).length > 0 && (
+                  <Button
+                    variant="ghost"
+                    disabled={unmasking}
+                    onClick={() => setSelectedMaskers(masking.suggested_exclude || [])}
+                  >
+                    Select suggested
+                  </Button>
+                )}
+                <Link to="/lenses?tab=remine" className="text-xs text-sky-300 hover:underline">
+                  Remine lab →
+                </Link>
               </div>
             )}
-            <div className="mt-3 flex flex-wrap gap-2 items-center">
-              <Button
-                variant="primary"
-                disabled={unmasking || !(masking.can_remine || selectedMaskers.length)}
-                onClick={async () => {
-                  setUnmasking(true);
-                  setUnmaskErr(null);
-                  try {
-                    const picks = selectedMaskers.length
-                      ? selectedMaskers
-                      : (masking.suggested_exclude || []);
-                    setUnmask(await api.signalUnmask(sig.id, picks));
-                  } catch (e) {
-                    setUnmaskErr(e?.message || String(e));
-                  }
-                  setUnmasking(false);
-                }}
-              >
-                {unmasking ? 'Remining…' : 'Remine without selected products'}
-              </Button>
-              {(masking.suggested_exclude || []).length > 0 && (
-                <Button
-                  variant="ghost"
-                  disabled={unmasking}
-                  onClick={() => setSelectedMaskers(masking.suggested_exclude || [])}
-                >
-                  Select suggested
-                </Button>
-              )}
-            </div>
             {unmaskErr && <div className="mt-2 text-sm text-rose-300">{unmaskErr}</div>}
             {unmask && (
               <div className="mt-3 rounded-lg border border-orange-600/30 bg-slate-950/50 p-3 space-y-3">

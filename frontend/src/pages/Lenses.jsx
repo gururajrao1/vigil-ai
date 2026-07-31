@@ -6,30 +6,33 @@ import Spatial from './Spatial';
 import Divergence from './Divergence';
 import Ddi from './Ddi';
 import Pregnancy from './Pregnancy';
+import RemineLab from './RemineLab';
 
 const TABS = [
+  { id: 'remine', label: 'Remine lab' },
+  { id: 'ddi', label: 'DDI findings' },
+  { id: 'pregnancy', label: 'Pregnancy' },
   { id: 'smq', label: 'SMQ syndromes' },
   { id: 'class', label: 'Class effects' },
-  { id: 'ddi', label: 'DDI pairs' },
-  { id: 'pregnancy', label: 'Pregnancy' },
   { id: 'vaccine', label: 'Vaccine' },
   { id: 'spatial', label: 'Geo clusters' },
   { id: 'divergence', label: 'vs FAERS' },
 ];
 
-/** Analytic lenses that used to be five separate nav items. */
+/** Analytic lenses hub. */
 export default function Lenses() {
   return (
     <HubShell
       title="Analytic Lenses"
-      subtitle="Syndrome pooling, ATC class effects, DDI co-mentions, pregnancy cohort, vaccine AESI, geographic scan, and social↔FAERS divergence."
+      subtitle="Remine competition bias, DDI findings, pregnancy/teratogen cohort, SMQ, class effects, vaccine AESI, geo scan, and vs FAERS."
       tabDefs={TABS}
-      defaultTab="smq"
+      defaultTab="remine"
     >
       {(tab) => {
-        if (tab === 'class') return <ClassEffects embedded />;
+        if (tab === 'remine') return <RemineLab embedded />;
         if (tab === 'ddi') return <Ddi embedded />;
         if (tab === 'pregnancy') return <Pregnancy embedded />;
+        if (tab === 'class') return <ClassEffects embedded />;
         if (tab === 'vaccine') return <Vaccine embedded />;
         if (tab === 'spatial') return <Spatial embedded />;
         if (tab === 'divergence') return <Divergence embedded />;

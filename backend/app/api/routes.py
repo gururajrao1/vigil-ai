@@ -1514,6 +1514,15 @@ def signal_casefile(signal_id: int, db: Session = Depends(get_db)):
     return get_casefile(db, sig)
 
 
+@router.get("/remine/lab")
+def remine_lab(limit: int = 8, db: Session = Depends(get_db)):
+    """Always-on competition-bias remine cards (before/after PRR) for the active project."""
+    from ..analytics.remine_lab import build_remine_lab
+    from ..projects.scope import current_project_id
+
+    return build_remine_lab(db, project_id=current_project_id(), limit=limit)
+
+
 @router.get("/ddi")
 def ddi_signals(
     drug: str | None = None,
@@ -1536,12 +1545,47 @@ def ddi_signals(
         limit=limit,
     )
     pairs = out.get("pairs") or []
-    out["needs_demo_seed"] = len(pairs) < 3
-    out["verdict"] = (
-        "Few co-mention pairs yet — click Load PV demo pack (FAERS bulk polypharmacy)."
-        if out["needs_demo_seed"]
-        else f"{len(pairs)} interaction candidate(s) from {out.get('n_multi_drug', 0)} multi-drug posts."
+    # Actionable findings first: plausible / known pattern / STRONG
+    def _rank(p):
+        pl = p.get("plausibility") or {}
+        return (
+            1 if pl.get("plausible") else 0,
+            1 if pl.get("known_pattern") else 0,
+            1 if p.get("sdr_flag") else 0,
+            {"STRONG": 3, "MODERATE": 2, "WEAK": 1}.get(p.get("strength"), 0),
+            p.get("omega025") or -99,
+            p.get("count") or 0,
+        )
+    pairs_sorted = sorted(pairs, key=_rank, reverse=True)
+    findings = []
+    for p in pairs_sorted[:12]:
+        pl = p.get("plausibility") or {}
+        pattern = (pl.get("known_pattern") or {}).get("note")
+        why = pattern or (
+            "Mechanistic plausibility for at least one drug."
+            if pl.get("plausible")
+            else "Co-mentioned on AE posts — review clinically; not yet mechanism-gated."
+        )
+        findings.append({
+            **p,
+            "headline": f"{p['drug_a'].title()} + {p['drug_b'].title()} → {p['event']}",
+            "why_it_matters": why,
+            "what_to_do": (
+                "Prioritise for clinical review (known DDI pattern / plausible)."
+                if pl.get("plausible")
+                else "Park for review after loading more polypharmacy ICSRs (FAERS bulk)."
+            ),
+        })
+    out["pairs"] = pairs_sorted
+    out["findings"] = findings
+    out["needs_demo_seed"] = len([f for f in findings if (f.get("plausibility") or {}).get("plausible")]) < 2
+    out["headline"] = (
+        f"{len(findings)} interaction finding(s) to review — "
+        f"{sum(1 for f in findings if (f.get('plausibility') or {}).get('plausible'))} plausibility-gated."
+        if findings
+        else "No co-mention pairs yet — load the PV demo pack for polypharmacy fixtures."
     )
+    out["verdict"] = out["headline"]
     return out
 
 
@@ -1567,13 +1611,97 @@ def signal_ddi(signal_id: int, db: Session = Depends(get_db)):
 
 @router.get("/pregnancy")
 def pregnancy_cohort(db: Session = Depends(get_db)):
-    """Pregnancy / teratogen cohort mode with stratified DMA."""
+    """Pregnancy / teratogen cohort mode with stratified DMA + actionable findings."""
     from ..analytics.corpus import build_ae_reports
-    from ..analytics.pregnancy import stratified_pregnancy_dma
+    from ..analytics.disproportionality import compute_signals
+    from ..analytics.pregnancy import (
+        is_congenital_event,
+        pregnancy_demo_posts,
+        stratified_pregnancy_dma,
+    )
+    from ..models import Signal
     from ..projects.scope import current_project_id
 
-    corpus = build_ae_reports(db, project_id=current_project_id())
-    return stratified_pregnancy_dma(corpus["posts"])
+    pid = current_project_id()
+    corpus = build_ae_reports(db, project_id=pid)
+    out = stratified_pregnancy_dma(corpus["posts"])
+
+    # If congenital stratum is empty, blend offline teratogen fixture pairs so the
+    # lens is never a blank numbers page (clearly labeled as demo fixtures).
+    congenital = list(out.get("congenital_signals") or [])
+    fixture_used = False
+    if len(congenital) < 2:
+        fixture_reports = []
+        for post in pregnancy_demo_posts():
+            # title format: "Pregnancy cohort: {drug} → {reaction}"
+            title = post.get("title") or ""
+            body = post.get("body") or ""
+            drug = (post.get("title") or "").split(":")[-1].split("→")[0].strip() if "→" in title else None
+            reaction = title.split("→")[-1].strip() if "→" in title else None
+            if not drug:
+                # fallback parse from body first token patterns
+                for dname in ("isotretinoin", "valproate", "topiramate", "warfarin",
+                              "methotrexate", "carbamazepine", "lithium"):
+                    if dname in body.lower():
+                        drug = dname
+                        break
+            if not reaction:
+                for r in ("birth defect", "neural tube defect", "cleft palate",
+                          "teratogenicity", "miscarriage", "cardiac malformation"):
+                    if r in body.lower():
+                        reaction = r
+                        break
+            if drug and reaction:
+                fixture_reports.append((drug.lower(), reaction.lower()))
+                fixture_reports.append((drug.lower(), reaction.lower()))  # n>=2
+        if fixture_reports:
+            fixture_used = True
+            for s in compute_signals(fixture_reports):
+                if is_congenital_event(s["symptom"]):
+                    congenital.append({**s, "fixture": True, "pregnancy_cohort": True,
+                                       "congenital_stratum": True})
+
+    # Attach signal_id + finding narrative where possible
+    findings = []
+    for s in congenital[:15]:
+        sig = None
+        q = db.query(Signal).filter(Signal.drug.ilike(s["drug"]))
+        if pid is not None:
+            q = q.filter(Signal.project_id == pid)
+        for cand in q.limit(30).all():
+            ev = (s["symptom"] or "").lower()
+            if (cand.symptom or "").lower() == ev or (cand.meddra_pt or "").lower() == ev:
+                sig = cand
+                break
+        findings.append({
+            **s,
+            "signal_id": sig.id if sig else None,
+            "headline": f"{s['drug'].title()} → {s['symptom']} (pregnancy / congenital stratum)",
+            "why_it_matters": (
+                "Classic teratogen / congenital-anomaly surveillance case — "
+                "stratify pregnancy exposures separately from general adult DMA."
+            ),
+            "what_to_do": (
+                "Open the signal for SAR / lifecycle triage, or corroborate with label boxed warnings."
+                if sig
+                else "Load PV demo pack + recompute to persist as a full signal row, then triage."
+            ),
+        })
+
+    out["congenital_signals"] = congenital
+    out["findings"] = findings
+    out["fixture_blended"] = fixture_used
+    out["needs_demo_seed"] = len(findings) < 2
+    out["headline"] = (
+        f"{len(findings)} congenital / teratogen finding(s) in the pregnancy cohort"
+        + (" (includes offline demo fixtures until live pregnancy ICSRs accumulate)." if fixture_used else ".")
+    )
+    out["verdict"] = out["headline"]
+    out["how_to_use"] = (
+        "Review congenital findings first → open a signal → export SAR / advance lifecycle. "
+        "This is stratified DMA on pregnancy-context text, not a pregnancy registry."
+    )
+    return out
 
 
 @router.post("/signals/{signal_id}/narrative")

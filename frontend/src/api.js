@@ -176,9 +176,9 @@ export const api = {
     const q = new URLSearchParams();
     (excludeDrugs || []).forEach((d) => q.append('exclude_drugs', d));
     const qs = q.toString();
-    // GET — remine is read-only sensitivity analysis (no analyst write role required)
     return req(`/api/signals/${id}/unmask${qs ? `?${qs}` : ''}`);
   },
+  remineLab: (limit = 8) => req(`/api/remine/lab?limit=${limit}`),
   signalCasefile: (id) => req(`/api/signals/${id}/casefile`),
   signalDdi: (id) => req(`/api/signals/${id}/ddi`),
   signalSar: (id) => req(`/api/signals/${id}/sar`),

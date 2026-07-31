@@ -1,23 +1,43 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
 import { Badge, Button, Card, Spinner } from '../components/ui';
 
-/** Drug–drug interaction co-mention mining (Ω + plausibility gate). */
+/** Drug–drug interaction findings — actionable cards, not a number dump. */
 export default function Ddi({ embedded = false }) {
   const { tick, bump } = useRefresh();
   const [data, setData] = useState(null);
-  const [plausibleOnly, setPlausibleOnly] = useState(false);
+  const [plausibleOnly, setPlausibleOnly] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [autoTried, setAutoTried] = useState(false);
 
   const load = () => {
     api.ddi({ plausible_only: plausibleOnly || undefined, min_count: 1 })
       .then(setData)
-      .catch(() => setData({ pairs: [], n_posts: 0, needs_demo_seed: true }));
+      .catch(() => setData({ findings: [], pairs: [], needs_demo_seed: true, headline: 'Could not load DDI.' }));
   };
 
   useEffect(() => { load(); }, [tick, plausibleOnly]);
+
+  useEffect(() => {
+    if (!data || autoTried || busy) return;
+    if (data.needs_demo_seed) {
+      setAutoTried(true);
+      (async () => {
+        setBusy(true);
+        try {
+          await api.ingestPvDemo({ recompute: true });
+          bump?.();
+          load();
+        } catch (e) {
+          setErr(e?.message || String(e));
+        }
+        setBusy(false);
+      })();
+    }
+  }, [data, autoTried, busy]);
 
   const loadDemo = async () => {
     setBusy(true);
@@ -33,69 +53,59 @@ export default function Ddi({ embedded = false }) {
   };
 
   if (!data) return <Spinner label="Mining DDI co-mentions…" />;
-  const pairs = data.pairs || [];
+  const findings = data.findings || data.pairs || [];
 
   return (
     <div className="space-y-5">
       {!embedded && (
         <div>
-          <h2 className="text-xl font-bold text-slate-100">Drug–drug interaction signals</h2>
+          <h2 className="text-xl font-bold text-slate-100">Drug–drug interaction findings</h2>
           <p className="text-sm text-slate-400 mt-1">
-            Co-mention disproportionality (Ω) on multi-product AE posts, gated by mechanistic
-            plausibility. Use this to spot polypharmacy hypotheses (e.g. anticoagulant + NSAID → bleed).
+            Co-mentioned products on the same AE report — ranked by plausibility / known DDI patterns.
+            This is a hypothesis list for clinical review, not an interaction checker.
           </p>
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-slate-400">
-          {data.n_multi_drug ?? 0} multi-drug posts · {pairs.length} pair–event rows
-        </span>
+        <p className="text-slate-200 flex-1">{data.headline || data.verdict}</p>
         <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={plausibleOnly}
-            onChange={(e) => setPlausibleOnly(e.target.checked)}
-          />
-          Plausible only
+          <input type="checkbox" checked={plausibleOnly} onChange={(e) => setPlausibleOnly(e.target.checked)} />
+          Plausible / patterned first
         </label>
         <Button variant="primary" disabled={busy} onClick={loadDemo}>
-          {busy ? 'Loading…' : 'Load PV demo pack'}
+          {busy ? 'Loading demo…' : 'Refresh demo pack'}
         </Button>
       </div>
-
-      {data.verdict && <p className="text-sm text-slate-200">{data.verdict}</p>}
       {err && <p className="text-sm text-rose-300">{err}</p>}
 
-      {pairs.length === 0 ? (
+      {findings.length === 0 ? (
         <Card className="p-4 text-sm text-slate-400">
-          No co-mention DDI candidates yet. Click <span className="text-slate-200">Load PV demo pack</span> to
-          ingest FAERS polypharmacy fixtures (warfarin+ibuprofen, sertraline+tramadol, etc.).
+          {busy ? 'Seeding polypharmacy fixtures…' : 'No findings yet — click Refresh demo pack.'}
         </Card>
       ) : (
-        <div className="space-y-2">
-          {pairs.map((p) => (
-            <Card key={`${p.drug_a}|${p.drug_b}|${p.event}`} className="p-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <div className="text-sm text-slate-100 font-medium capitalize">
-                    {p.drug_a} + {p.drug_b}
-                    <span className="text-slate-500 font-normal"> → </span>
-                    {p.event}
+        <div className="space-y-3">
+          {findings.slice(0, 15).map((p) => (
+            <Card key={`${p.drug_a}|${p.drug_b}|${p.event}`} className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-slate-100">
+                    {p.headline || `${p.drug_a} + ${p.drug_b} → ${p.event}`}
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    n={p.count} · E≈{p.expected} · Ω={p.omega} (Ω025={p.omega025})
+                  <p className="mt-1.5 text-sm text-slate-300 leading-relaxed">
+                    {p.why_it_matters || p.plausibility?.known_pattern?.note || 'Co-mention interaction candidate.'}
+                  </p>
+                  <p className="mt-1 text-[12px] text-amber-200/90">
+                    Next: {p.what_to_do || 'Review on Signal Detail after opening either product.'}
+                  </p>
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    n={p.count} · Ω={p.omega} (Ω025={p.omega025})
                     {p.interaction_ror != null ? ` · interaction-ROR≈${p.interaction_ror}` : ''}
                   </div>
-                  {p.plausibility?.known_pattern && (
-                    <div className="mt-1 text-[11px] text-amber-300/90">
-                      {p.plausibility.known_pattern.note}
-                    </div>
-                  )}
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-col gap-1.5 items-end">
                   <Badge
-                    value={p.strength}
+                    value={p.strength || 'WEAK'}
                     className={
                       p.strength === 'STRONG'
                         ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
@@ -104,17 +114,20 @@ export default function Ddi({ embedded = false }) {
                           : 'bg-slate-600/20 text-slate-400 border-slate-600/30'
                     }
                   />
-                  {p.sdr_flag && (
-                    <Badge value="Ω SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" />
-                  )}
                   <Badge
-                    value={p.plausibility?.plausible ? 'plausible' : 'review'}
+                    value={(p.plausibility || {}).plausible ? 'plausible' : 'review'}
                     className={
-                      p.plausibility?.plausible
+                      (p.plausibility || {}).plausible
                         ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                         : 'bg-slate-600/20 text-slate-400 border-slate-600/30'
                     }
                   />
+                  <Link
+                    to={`/signals?q=${encodeURIComponent(p.drug_a)}`}
+                    className="text-xs text-sky-300 hover:underline capitalize"
+                  >
+                    Find {p.drug_a} signals →
+                  </Link>
                 </div>
               </div>
             </Card>
@@ -122,9 +135,7 @@ export default function Ddi({ embedded = false }) {
         </div>
       )}
 
-      {data.disclaimer && (
-        <p className="text-[10px] text-slate-500 leading-relaxed">{data.disclaimer}</p>
-      )}
+      {data.disclaimer && <p className="text-[10px] text-slate-500 leading-relaxed">{data.disclaimer}</p>}
     </div>
   );
 }
