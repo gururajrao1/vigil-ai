@@ -178,7 +178,19 @@ export const api = {
     const qs = q.toString();
     return req(`/api/signals/${id}/unmask${qs ? `?${qs}` : ''}`);
   },
-  remineLab: (limit = 8) => req(`/api/remine/lab?limit=${limit}`),
+  remineLab: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries({ limit: 24, offset: 0, only: 'all', sort: 'impact', ...params })
+        .filter(([, v]) => v != null && v !== ''),
+    ).toString();
+    return req(`/api/remine/lab?${qs}`);
+  },
+  // GET so read-only viewers can run the sensitivity analysis too
+  remineRunPair: (drug, event, excludeDrugs = []) => {
+    const q = new URLSearchParams({ drug, event });
+    excludeDrugs.forEach((d) => q.append('exclude_drugs', d));
+    return req(`/api/remine/run?${q.toString()}`);
+  },
   signalCasefile: (id) => req(`/api/signals/${id}/casefile`),
   signalDdi: (id) => req(`/api/signals/${id}/ddi`),
   signalSar: (id) => req(`/api/signals/${id}/sar`),

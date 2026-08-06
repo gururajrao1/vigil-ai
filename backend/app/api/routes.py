@@ -1531,12 +1531,66 @@ def signal_casefile(signal_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/remine/lab")
-def remine_lab(limit: int = 8, db: Session = Depends(get_db)):
-    """Always-on competition-bias remine cards (before/after PRR) for the active project."""
+def remine_lab(
+    limit: int = 24,
+    offset: int = 0,
+    q: str | None = None,
+    only: str = "all",
+    sort: str = "impact",
+    db: Session = Depends(get_db),
+):
+    """Corpus-wide competition-bias remine cards (before/after PRR + IC025).
+
+    Screens every remine-eligible (product, event) pair — a pair qualifies when
+    two or more distinct products report the same event. Supports search (``q``),
+    filtering (``only``: all|actionable|unmasked|co_reported|vanished|attenuated|
+    amplified|stable|evaluable|devices|high|moderate), sorting (``sort``:
+    impact|coreporting|masking|delta|prr|count|risk) and paging.
+    """
     from ..analytics.remine_lab import build_remine_lab
     from ..projects.scope import current_project_id
 
-    return build_remine_lab(db, project_id=current_project_id(), limit=limit)
+    return build_remine_lab(
+        db,
+        project_id=current_project_id(),
+        limit=limit,
+        offset=offset,
+        q=q,
+        only=only,
+        sort=sort,
+    )
+
+
+@router.get("/remine/run")
+@router.post("/remine/run")
+def remine_run_pair(
+    drug: str,
+    event: str,
+    db: Session = Depends(get_db),
+    exclude_drugs: list[str] | None = Query(None),
+):
+    """Remine any (product, event) pair directly — no persisted Signal row needed.
+
+    Read-only sensitivity analysis, so Remine lab cards stay actionable even when
+    a pair has not been materialised into the signals table yet.
+    """
+    from ..analytics.corpus import build_ae_reports
+    from ..analytics.masking import analyze_masking, remine_unmasked
+    from ..analytics.remine_lab import effective_project_id
+    from ..projects.scope import current_project_id
+
+    # Same scope the lab screened in, so both surfaces agree on the same pair
+    pid = effective_project_id(db, current_project_id())
+    corpus = build_ae_reports(db, project_id=pid)
+    exclude = list(exclude_drugs or [])
+    if not exclude:
+        report = analyze_masking(corpus["reports"], drug, event)
+        exclude = list(report.get("suggested_exclude") or [])
+        if not exclude and report.get("maskers"):
+            exclude = [report["maskers"][0]["drug"]]
+    return remine_unmasked(
+        corpus["posts"], drug, event, exclude, full_reports=corpus["reports"]
+    )
 
 
 @router.get("/ddi")

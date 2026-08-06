@@ -12,7 +12,27 @@ from __future__ import annotations
 from collections import Counter
 from typing import List, Optional, Set, Tuple
 
+from .corpus import reports_from_posts_excluding_maskers
 from .disproportionality import compute_signals
+
+# A competitor needs at least this many reports of the event to be a credible
+# masker — one report cannot suppress another product's disproportionality.
+MIN_MASKER_COUNT = 2
+
+
+def _rates(
+    reports: List[Tuple[str, str]], drug: str, event: str
+) -> Tuple[Optional[float], Optional[float]]:
+    """Return (a/(a+b), c/(c+d)) — the target and comparator event rates."""
+    d_l = (drug or "").lower()
+    n_total = len(reports)
+    n_drug = sum(1 for d, _ in reports if d.lower() == d_l)
+    n_event = sum(1 for _, e in reports if e == event)
+    a = sum(1 for d, e in reports if d.lower() == d_l and e == event)
+    target = (a / n_drug) if n_drug else None
+    denom = n_total - n_drug
+    comparator = ((n_event - a) / denom) if denom > 0 else None
+    return target, comparator
 
 
 def _pair_metrics(
@@ -88,8 +108,9 @@ def analyze_masking(
             continue
         share = cnt / total_event
         pressure = cnt / max(target_count, 1)
-        # Selectable whenever another drug reports the same event
-        likely = share >= 0.10 or pressure >= 1.0 or cnt >= target_count
+        # Selectable whenever another drug reports the same event, but a single
+        # report cannot suppress anything — require real mass before suggesting it.
+        likely = cnt >= MIN_MASKER_COUNT and (share >= 0.10 or cnt > target_count)
         maskers.append({
             "drug": other,
             "count": int(cnt),
@@ -186,10 +207,16 @@ def remine_unmasked(
     if not excl and baseline.get("suggested_exclude"):
         excl = {d.lower() for d in baseline["suggested_exclude"]}
 
-    # Competition-bias remine: drop EVERY report row whose drug is a masker
-    unmasked_reports = [
-        (d, e) for d, e in baseline_reports if d.lower() not in excl
-    ]
+    # Competition-bias remine at CASE level: drop whole reports mentioning a
+    # masker. Row-level exclusion leaves the target's own a/(a+b) untouched, so
+    # the resulting PRR shift is pure comparator arithmetic and carries no
+    # pair-specific evidence.
+    if posts:
+        unmasked_reports = reports_from_posts_excluding_maskers(posts, excl)
+    else:
+        unmasked_reports = [
+            (d, e) for d, e in baseline_reports if d.lower() not in excl
+        ]
     remine = _pair_metrics(unmasked_reports, drug, event)
 
     b = baseline.get("baseline") or {}
@@ -202,36 +229,77 @@ def remine_unmasked(
             "count_delta": int(remine.get("post_count") or 0) - int(b.get("post_count") or 0),
         }
 
+    # Decompose MR = PRR_after/PRR_before into the comparator term (the classical
+    # masking effect, shared by every product on this event) and the co-reporting
+    # term (pair-specific, moves only when the target's cases overlap the masker's).
+    t_before, c_before = _rates(baseline_reports, drug, event)
+    t_after, c_after = _rates(unmasked_reports, drug, event)
+    coreport = (t_after / t_before) if (t_before and t_after) else None
+    comparator = (c_before / c_after) if (c_before and c_after) else None
+    mr = None
+    if remine and b.get("prr"):
+        mr = round((remine.get("prr") or 0) / b["prr"], 3)
+
     revealed = False
     attenuated = False
-    if remine:
-        was_sdr = bool(b.get("sdr_flag"))
-        now_sdr = bool(remine.get("sdr_flag"))
-        prr_up = (remine.get("prr") or 0) > (b.get("prr") or 0) * 1.15
-        prr_down = (remine.get("prr") or 0) < (b.get("prr") or 0) * 0.85
-        revealed = (now_sdr and not was_sdr) or prr_up
-        attenuated = (was_sdr and not now_sdr) or prr_down
+    names = ", ".join(sorted(excl))
 
     if not excl:
+        outcome = "stable"
         interpretation = "No maskers selected — metrics unchanged."
     elif remine is None:
+        outcome = "vanished"
         interpretation = (
-            "After removing maskers, this pair vanished from the residual corpus "
-            "(no remaining reports). Competition bias cannot be assessed this way."
+            f"Every {drug} report of this event is co-reported with {names}, so the "
+            "pair vanishes from the residual corpus. The association is carried "
+            "entirely by shared cases — review for confounding rather than masking."
         )
-    elif revealed:
+    elif remine.get("sdr_flag") and not b.get("sdr_flag"):
+        outcome, revealed = "unmasked", True
         interpretation = (
-            f"Signal strengthened after removing {', '.join(sorted(excl))}. "
-            "Competition bias may have been suppressing this pair — escalate for review."
+            f"Crosses the signalling threshold once {names} is removed — this pair "
+            f"was genuinely masked. {drug} sat below the signalling cut-off only "
+            "because a competitor inflated the background rate for this event. "
+            "Escalate for review."
         )
-    elif attenuated:
+    elif b.get("sdr_flag") and not remine.get("sdr_flag"):
+        outcome, attenuated = "attenuated", True
         interpretation = (
-            f"Signal weakened after removing {', '.join(sorted(excl))}. "
-            "The association may have been inflated by shared reporting patterns."
+            f"Drops below the signalling threshold once {names} is removed — the "
+            "disproportionality was sustained by shared reporting patterns rather "
+            "than by this pair on its own."
+        )
+    elif coreport is not None and not (0.85 <= coreport <= 1.15):
+        outcome, revealed = "co_reported", coreport > 1
+        attenuated = coreport < 1
+        direction = "rises" if coreport > 1 else "falls"
+        interpretation = (
+            f"{drug}'s own reporting rate for this event {direction} {coreport:.2f}x "
+            f"once {names} cases are removed, so its cases overlap the competitor's. "
+            "That points at confounding or co-reporting rather than pure masking — "
+            "review the shared cases."
+        )
+    elif mr is not None and mr <= 0.85:
+        outcome, attenuated = "attenuated", True
+        interpretation = (
+            f"Signal weakened after removing {names}. The association may have been "
+            "inflated by shared reporting patterns."
+        )
+    elif mr is not None and mr >= 1.15:
+        outcome = "amplified"
+        shared = (
+            f"the same {comparator:.2f}x comparator factor"
+            if comparator else "the same comparator factor"
+        )
+        interpretation = (
+            f"PRR rises {mr:.2f}x after removing {names}, but every product reporting "
+            f"this event gains {shared} and this pair still does not cross the "
+            "signalling threshold. Expected masking arithmetic — monitor, no action yet."
         )
     else:
+        outcome = "stable"
         interpretation = (
-            f"Metrics stable after removing {', '.join(sorted(excl))}. "
+            f"Metrics stable after removing {names}. "
             "Competition bias does not appear to drive this signal."
         )
 
@@ -246,6 +314,10 @@ def remine_unmasked(
         "delta": delta,
         "signal_strengthened": revealed,
         "signal_attenuated": attenuated,
+        "outcome": outcome,
+        "masking_ratio": mr,
+        "coreporting_ratio": round(coreport, 3) if coreport else None,
+        "comparator_ratio": round(comparator, 3) if comparator else None,
         "interpretation": interpretation,
         "masking_risk": baseline.get("masking_risk"),
         "maskers": baseline.get("maskers"),

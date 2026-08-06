@@ -62,7 +62,7 @@ Ingest → scrub → extract → 4-gate AE → PRR/ROR/EBGM/BCPNN → remine / D
 | **AE validation** | Explainable **4-gate** engine (drug · symptom · negative sentiment · non-negated) |
 | **Signal detection** | PRR, ROR, Yates χ², EBGM/EB05, BCPNN IC025, SDR, spikes, MaxSPRT |
 | **Analytic lenses** | Remine lab, DDI findings, pregnancy cohort, SMQ, class effects, vaccine AESI, geo, vs FAERS |
-| **Competition-bias remine** | Mask competitor products → recompute PRR/ROR/χ² (read-only sensitivity; does **not** overwrite stored SDR) |
+| **Competition-bias remine** | Case-level unmasking of competitor products → recompute PRR/ROR/χ², split into pair-specific vs shared-comparator effect (read-only sensitivity; does **not** overwrite stored SDR) |
 | **Evidence** | Knowledge graph, story mode, term glossary, casefile trajectory, SAR (GVP Module IX-shaped) |
 | **Ops** | Priority score, GVP-style lifecycle, alert inbox, KPIs / SPC |
 | **Export** | ICH E2B R2/R3 (demo), CIOMS I (demo), SAR PDF/Markdown |
@@ -282,7 +282,7 @@ Legacy URLs (`/lifecycle`, `/alerts`, `/smq`, …) **redirect** into the hubs ab
 
 | Lens | Question it answers |
 |------|---------------------|
-| **Remine lab** | If we hide competitor products for this event, does PRR/χ² strengthen or collapse? (always runnable; pick a signal card) |
+| **Remine lab** | If we hide competitor products for this event, does the pair cross the signalling threshold? Screens **every** eligible (product, event) pair in the corpus — searchable, filterable by outcome, paged |
 | **DDI findings** | Which drug pairs co-mention the same AE more than chance — and which look clinically risky? |
 | **Pregnancy** | Exposure + congenital / pregnancy-context events; fixture blend when the live cohort is thin |
 | **SMQ** | Do member PTs pool into a syndrome signal? |
@@ -292,6 +292,23 @@ Legacy URLs (`/lifecycle`, `/alerts`, `/smq`, …) **redirect** into the hubs ab
 | **vs FAERS** | Social signal vs openFDA FAERS pattern? |
 
 Lenses are **overlays / sensitivity analyses** — they do **not** replace or overwrite stored PRR/SDR on the Detect table. Remine shows before→after in the lab / masking panel only.
+
+**Reading a remine card.** Unmasking is applied at **case level** (whole reports mentioning a masker are dropped, as a spontaneous reporting system would), then the masking ratio is decomposed exactly:
+
+```
+MR = PRR_after / PRR_before = coreporting_term × comparator_term
+```
+
+The **comparator term** is the classical masking effect and is *shared by every product reporting that event*, so a raw PRR rise ranks nothing — it happens to almost every pair once the comparator arm shrinks. The **co-reporting term** is pair-specific and moves only when the target's own cases overlap the masker's. The actionable outcome is a **threshold crossing** (`unmasked`). Cards are tiered by evidence: `evaluable` (≥3 cases, Evans criterion), `provisional` (2), `exploratory` (1).
+
+| Outcome | Meaning |
+|---------|---------|
+| `unmasked` | Crosses the signalling threshold after unmasking — escalate |
+| `co_reported` | Target's own cases overlap the masker's — review for confounding |
+| `vanished` | Pair disappears; association carried entirely by shared cases |
+| `attenuated` | Drops below threshold / weakens |
+| `amplified` | PRR up by the shared comparator factor only — no action |
+| `stable` | Competition bias does not drive this pair |
 
 **Demo seed:** Data Sources → **Load PV demo pack** (`POST /api/ingest/pv-demo`) loads VAERS + FAERS bulk samples so Remine / DDI / Pregnancy have peers and co-mentions.
 
