@@ -304,11 +304,17 @@ def source_to_dict(source: SuggestedSource) -> dict:
     if source.access_status == "login_required":
         emoji = "🟡"
         label = "Requires Login"
-        reason = (
-            "Auth/paywall friction detected: " + ", ".join(flags[:5])
-            if flags
-            else "Login wall markers found in DOM (wp-login / sign-in / 登录 / 注册)."
-        )
+        if "known_paywall" in flags:
+            reason = (
+                "Known HCP/subscription paywall — auto-skipped. "
+                "Use Data Sources → PubMed / Europe PMC / FAERS instead of cracking logins."
+            )
+        else:
+            reason = (
+                "Auth/paywall friction detected: " + ", ".join(flags[:5])
+                if flags
+                else "Login wall markers found in DOM (wp-login / sign-in / 登录 / 注册)."
+            )
     else:
         emoji = "🟢"
         label = "Public"

@@ -34,21 +34,39 @@ _AUTH_FRICTION_MARKERS = (
     "登录", "註冊", "注册", "会員登録", "ログイン", "サインイン",
 )
 
-# Offline fallback: curated patient-community seeds by therapeutic area.
+# Domains that are known subscription / HCP-login walls — we never crack them.
+# Prefer open literature + patient forums instead (PubMed, Europe PMC, Reddit, Drugs.com…).
+_KNOWN_PAYWALL_DOMAINS = frozenset({
+    "medscape.com", "medpagetoday.com", "healio.com", "statnews.com",
+    "nature.com", "sciencedirect.com", "elsevier.com", "wiley.com",
+    "springer.com", "nejm.org", "jamanetwork.com", "thelancet.com",
+    "uptodate.com", "clinicalkey.com", "oxfordacademic.com",
+    "tandfonline.com", "sagepub.com", "acm.org", "ieee.org",
+})
+
+# Offline fallback: curated *open* patient-community / PV seeds by therapeutic area.
 _OFFLINE_SEEDS: dict[str, list[dict[str, str]]] = {
     "oncology": [
         {"url": "https://www.cancer.org/treatment", "title": "ACS Treatment Communities"},
         {"url": "https://www.cancercare.org/", "title": "CancerCare Support"},
         {"url": "https://www.inspire.com/groups/advanced-breast-cancer/", "title": "Inspire Advanced BC"},
+        {"url": "https://www.reddit.com/r/cancer/", "title": "r/cancer"},
     ],
     "vaccine": [
         {"url": "https://www.immunize.org/", "title": "Immunize.org"},
         {"url": "https://www.vaccinesafety.edu/", "title": "Vaccine Safety Education"},
+        {"url": "https://www.reddit.com/r/Vaccine/", "title": "r/Vaccine"},
+    ],
+    "device": [
+        {"url": "https://www.fda.gov/medical-devices", "title": "FDA Medical Devices"},
+        {"url": "https://www.reddit.com/r/diabetes/", "title": "r/diabetes (devices / CGM)"},
     ],
     "general": [
         {"url": "https://www.patientslikeme.com/", "title": "PatientsLikeMe"},
         {"url": "https://www.drugs.com/answers/", "title": "Drugs.com Q&A"},
         {"url": "https://www.reddit.com/r/AskDocs/", "title": "r/AskDocs"},
+        {"url": "https://www.reddit.com/r/pharmacology/", "title": "r/pharmacology"},
+        {"url": "https://patient.info/forums", "title": "Patient.info forums"},
     ],
 }
 
@@ -60,9 +78,20 @@ def _domain(url: str) -> str:
         return ""
 
 
-def scan_auth_friction(html: str) -> tuple[str, list[str]]:
-    """Inspect raw HTML for authentication / paywall friction tags."""
+def _is_known_paywall(url: str) -> bool:
+    d = _domain(url)
+    if not d:
+        return False
+    return any(d == blocked or d.endswith("." + blocked) for blocked in _KNOWN_PAYWALL_DOMAINS)
+
+
+def scan_auth_friction(html: str, url: str = "") -> tuple[str, list[str]]:
+    """Inspect raw HTML (and known domain list) for authentication / paywall friction."""
     flags: list[str] = []
+    if url and _is_known_paywall(url):
+        flags.append("known_paywall")
+        return "login_required", flags
+
     lower = (html or "").lower()
     soup = BeautifulSoup(html or "", "html.parser")
 
@@ -243,9 +272,11 @@ def _offline_discover(project: Project, keywords: list[str]) -> list[dict[str, s
 async def run_pathfinder(db: Session, project: Project) -> PathfinderRun:
     """Execute intent-driven discovery and enqueue suggested sources."""
     keywords = project_keywords(project)
+    # Bias toward open patient forums / literature — not HCP paywalls (Medscape etc.)
     intent = (
-        f"patient forums and communities discussing "
+        f"patient forums reddit drugs.com discussing "
         f"{' '.join(keywords[:5]) or project.therapeutic_area or 'drug adverse events'} "
+        f"open access -medscape -healio -uptodate "
         f"including regional boards China Japan niche specialty sites"
     )
 
@@ -295,12 +326,49 @@ async def run_pathfinder(db: Session, project: Project) -> PathfinderRun:
         provider = "offline"
 
     discovered: list[dict[str, Any]] = []
+    # Prefer open pages: process public-leaning hits first, skip enqueueing known paywalls
+    # into the actionable queue unless the analyst explicitly wants them (still listed as skipped).
+    skipped_paywall = 0
+    ordered_hits: list[dict[str, str]] = []
+    deferred_paywall: list[dict[str, str]] = []
     for hit in hits:
+        url = (hit.get("url") or "").strip()
+        if _is_known_paywall(url):
+            deferred_paywall.append(hit)
+        else:
+            ordered_hits.append(hit)
+    # Keep a short paywall tail for transparency, but do not auto-onboard them
+    ordered_hits.extend(deferred_paywall[:3])
+
+    for hit in ordered_hits:
         url = hit.get("url", "").strip()
         if not url or not url.startswith("http"):
             continue
+        if _is_known_paywall(url):
+            # Record as login_required + auto-reject so Approve is not the default path
+            access_status, flags = "login_required", ["known_paywall"]
+            skipped_paywall += 1
+            row = SuggestedSource(
+                project_id=project.id,
+                url=url[:1024],
+                domain=_domain(url),
+                title=(hit.get("title") or url)[:512],
+                access_status=access_status,
+                access_flags_json=json.dumps(flags),
+                approval_status="rejected",
+                discovery_run_id=run.id,
+            )
+            db.add(row)
+            discovered.append({
+                "url": url,
+                "title": hit.get("title"),
+                "access_status": access_status,
+                "flags": flags,
+                "auto_skipped": True,
+            })
+            continue
         html = _fetch_html(url)
-        access_status, flags = scan_auth_friction(html)
+        access_status, flags = scan_auth_friction(html, url=url)
         row = SuggestedSource(
             project_id=project.id,
             url=url[:1024],
@@ -320,10 +388,17 @@ async def run_pathfinder(db: Session, project: Project) -> PathfinderRun:
         })
 
     run.status = "completed"
+    run.finished_at = datetime.utcnow()
     run.provider = provider
     run.urls_discovered = len(discovered)
-    run.result_json = json.dumps(discovered)
-    run.finished_at = datetime.utcnow()
+    run.result_json = json.dumps({
+        "discovered": discovered,
+        "skipped_paywall": skipped_paywall,
+        "note": (
+            "Known HCP/paywall domains (e.g. Medscape) are auto-skipped — "
+            "use Data Sources → PubMed / Europe PMC / FAERS instead of cracking logins."
+        ),
+    })
     db.commit()
     db.refresh(run)
     return run
