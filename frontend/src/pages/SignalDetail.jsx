@@ -7,6 +7,7 @@ import { api } from '../api';
 import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 import SourceTraceability from '../components/ui/SourceTraceability';
 import SeverityAuditPopover from '../components/SeverityAuditPopover';
+import SignalBriefing from '../components/SignalBriefing';
 
 // vigiGrade-style completeness dimensions (labels mirror app/analytics/completeness.py).
 const COMPLETENESS_DIMS = [
@@ -261,7 +262,7 @@ function LifecyclePanel({ sig, onUpdated }) {
   };
 
   return (
-    <Card className="p-4 border-teal-700/40 bg-teal-500/[0.03]">
+    <Card id="signal-workflow" className="p-4 border-teal-700/40 bg-teal-500/[0.03]">
       <CardHeader title="Workflow status" subtitle="Same stages as the Workflow board · priority · owner · audit trail" />
 
       <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -468,6 +469,24 @@ export default function SignalDetail() {
 
   if (!sig) return <Spinner label="Loading signal…" />;
 
+  const briefing = sig.briefing || null;
+
+  const scrollToId = (elId) => {
+    const el = document.getElementById(elId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const onBriefingAction = (action) => {
+    if (action === 'scroll_posts') scrollToId('signal-supporting-posts');
+    else if (action === 'scroll_workflow') scrollToId('signal-workflow');
+    else if (action === 'scroll_remine') scrollToId('signal-remine');
+    else if (action === 'export_sar') {
+      api.downloadSar(sig.id, sig.drug, sig.symptom, 'pdf').catch(() => {
+        window.open(api.sarPdfUrl(sig.id), '_blank');
+      });
+    }
+  };
+
   const fda = sig.fda_evidence || {};
   const label = sig.label_evidence || {};
   const recall = sig.recall || {};
@@ -527,6 +546,10 @@ export default function SignalDetail() {
   return (
     <div className="space-y-6">
       <Link to="/signals" className="text-sm text-sky-400 hover:underline">← Back to signals</Link>
+
+      {briefing && (
+        <SignalBriefing briefing={briefing} onAction={onBriefingAction} />
+      )}
 
       <div className="flex items-start justify-between">
         <div>
@@ -697,7 +720,7 @@ export default function SignalDetail() {
       </Card>
 
       {/* Competition-bias masking / unmask remine */}
-      <Card className="p-4 border-orange-700/40 bg-orange-500/[0.03]">
+      <Card id="signal-remine" className="p-4 border-orange-700/40 bg-orange-500/[0.03]">
         <CardHeader
           title="Competition-bias masking"
           subtitle="See which other products dominate this event, then remine without them — does this signal strengthen?"
@@ -1853,7 +1876,7 @@ export default function SignalDetail() {
       )}
 
       {/* supporting posts with explainability */}
-      <Card className="p-4">
+      <Card id="signal-supporting-posts" className="p-4">
         <CardHeader title="Source traceability" subtitle={`${sig.supporting_posts?.length || 0} supporting posts with per-gate reasoning`} />
         <div className="mt-4 space-y-4">
           {(sig.supporting_posts || []).map((p) => (

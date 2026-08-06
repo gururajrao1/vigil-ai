@@ -32,7 +32,14 @@ export default function RiskPopulations({ embedded = false }) {
       .finally(() => setBusy(false));
   };
 
-  useEffect(() => { load(); }, [tick]);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const pid = sp.get('product_id') || '';
+    const ae = sp.get('target_ae_pt') || '';
+    if (pid) setProductId(pid);
+    if (ae) setTargetAe(ae);
+    load(pid || undefined, ae || undefined);
+  }, [tick]);
 
   const runPredict = () => {
     if (!productId.trim() || !targetAe.trim()) {

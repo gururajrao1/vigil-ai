@@ -1283,7 +1283,15 @@ def get_signal(
         "thread_score": score_thread(thread_posts, drug=sig.drug or "",
                                      symptom=sig.symptom or ""),
         "evidence_pending": evidence_pending,
+        "briefing": _attach_briefing(sig),
     }
+
+
+def _attach_briefing(sig: Signal) -> dict:
+    from ..analytics.signal_briefing import build_signal_briefing
+
+    return build_signal_briefing(signal_to_dict(sig))
+
 
 
 @router.get("/signals/{signal_id}/e2b")
