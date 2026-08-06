@@ -5,7 +5,7 @@ import json
 import threading
 from collections import Counter
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -316,7 +316,8 @@ def ingest_pv_demo(recompute: bool = True, db: Session = Depends(get_db)):
     """Load offline packs that make DDI, pregnancy, and masking remine demo-ready.
 
     Pulls FAERS-bulk fixtures (polypharmacy), VAERS fixtures, and pregnancy/teratogen
-    demo ICSRs. Recomputes signals by default so lenses update immediately.
+    demo ICSRs that pass 4-gate AE NLP so they land in Safety Signals Detect.
+    Recomputes signals by default so lenses update immediately.
     """
     from ..analytics.pregnancy import pregnancy_demo_posts
     from ..ingestion.srs_bulk import crawl_faers_bulk, crawl_vaers
@@ -335,7 +336,9 @@ def ingest_pv_demo(recompute: bool = True, db: Session = Depends(get_db)):
         "packs": ["faers_bulk_fixture", "vaers_fixture", "pregnancy_demo"],
         "note": (
             "Demo pack for DDI co-mentions, pregnancy/teratogen cohort, and "
-            "competition-bias remine. Prototype data — not for clinical use."
+            "competition-bias remine. Pregnancy ICSRs use v2 ids and congenital "
+            "lexicon terms so they become AE-flagged Detect rows. "
+            "Prototype data — not for clinical use."
         ),
         **stats,
     }
@@ -1220,40 +1223,44 @@ def get_label_gap(db: Session = Depends(get_db)):
 
 
 @router.get("/signals/{signal_id}")
-def get_signal(signal_id: int, db: Session = Depends(get_db)):
+def get_signal(
+    signal_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Return signal + supporting posts immediately.
+
+    Multi-source evidence (PubMed / DailyMed / recalls / device class / EUDAMED)
+    is scheduled in the background on first view so free-tier network latency
+    never blocks the Signal Detail page (was hanging on coronary stent, etc.).
+    """
+    from ..evidence.enrich import (
+        enrich_signal_background,
+        mark_enrich_pending,
+        needs_network_enrichment,
+    )
+
     sig = db.get(Signal, signal_id)
     if not sig:
         raise HTTPException(404, "signal not found")
 
-    # Lazy, cached multi-source evidence enrichment. Runs once per signal on
-    # first view, then persisted. Device signals also get EUDAMED lookup.
-    if sig.literature_json in (None, "", "{}"):
-        try:
-            from ..evidence.enrich import enrich_one
-            ev = enrich_one(sig.product_type or "drug", sig.drug, sig.symptom)
-            sig.label_evidence_json = json.dumps(ev.get("label_evidence") or {})
-            sig.recall_json = json.dumps(ev.get("recall") or {})
-            sig.literature_json = json.dumps(ev.get("literature") or {})
-            sig.device_class_json = json.dumps(ev.get("device_classification") or {})
-            # EUDAMED enrichment for device signals
-            if (sig.product_type or "drug") == "device" and sig.drug:
-                from ..ingestion.sources import query_eudamed
-                eudamed = query_eudamed(sig.drug, timeout=6.0)
-                if eudamed.get("available"):
-                    existing = json.loads(sig.device_class_json or "{}")
-                    existing["eudamed"] = eudamed
-                    sig.device_class_json = json.dumps(existing)
-            db.commit()
-        except Exception:
-            db.rollback()
+    evidence_pending = False
+    if needs_network_enrichment(sig.literature_json):
+        # Claim the slot so concurrent clicks don't all hit external APIs
+        sig.literature_json = mark_enrich_pending()
+        db.commit()
+        background_tasks.add_task(enrich_signal_background, signal_id)
+        evidence_pending = True
 
     ids = json.loads(sig.supporting_post_ids or "[]")
+    # Cap payload size — huge supporting sets were slowing serialization on devices
+    ids = ids[:80]
     rows = (
         db.query(ProcessedPost, RawPost)
         .join(RawPost, ProcessedPost.raw_id == RawPost.id)
         .filter(ProcessedPost.id.in_(ids))
         .all()
-    )
+    ) if ids else []
     supporting = [post_to_dict(p, r) for p, r in rows]
     from ..analytics.thread_score import score_thread
     thread_posts = []
@@ -1275,6 +1282,7 @@ def get_signal(signal_id: int, db: Session = Depends(get_db)):
         "supporting_posts": supporting,
         "thread_score": score_thread(thread_posts, drug=sig.drug or "",
                                      symptom=sig.symptom or ""),
+        "evidence_pending": evidence_pending,
     }
 
 
@@ -1557,6 +1565,25 @@ def ddi_signals(
             p.get("count") or 0,
         )
     pairs_sorted = sorted(pairs, key=_rank, reverse=True)
+    from ..models import Signal
+
+    pid = current_project_id()
+
+    def _resolve(drug: str, event: str):
+        if not drug:
+            return None
+        q = db.query(Signal).filter(Signal.drug.ilike(drug))
+        if pid is not None:
+            q = q.filter(Signal.project_id == pid)
+        ev = (event or "").lower().strip()
+        soft = []
+        for cand in q.limit(60).all():
+            for f in ((cand.symptom or "").lower(), (cand.meddra_pt or "").lower()):
+                if f and (f == ev or (ev and (ev in f or f in ev))):
+                    return cand
+            soft.append(cand)
+        return soft[0] if soft else None
+
     findings = []
     for p in pairs_sorted[:12]:
         pl = p.get("plausibility") or {}
@@ -1566,14 +1593,19 @@ def ddi_signals(
             if pl.get("plausible")
             else "Co-mentioned on AE posts — review clinically; not yet mechanism-gated."
         )
+        sig_a = _resolve(p.get("drug_a"), p.get("event"))
+        sig_b = _resolve(p.get("drug_b"), p.get("event"))
         findings.append({
             **p,
+            "signal_id": (sig_a.id if sig_a else None) or (sig_b.id if sig_b else None),
+            "signal_id_a": sig_a.id if sig_a else None,
+            "signal_id_b": sig_b.id if sig_b else None,
             "headline": f"{p['drug_a'].title()} + {p['drug_b'].title()} → {p['event']}",
             "why_it_matters": why,
             "what_to_do": (
-                "Prioritise for clinical review (known DDI pattern / plausible)."
-                if pl.get("plausible")
-                else "Park for review after loading more polypharmacy ICSRs (FAERS bulk)."
+                "Open either product’s Safety Signal for triage / SAR."
+                if (sig_a or sig_b)
+                else "Prioritise for clinical review after confirming the pair appears in Detect."
             ),
         })
     out["pairs"] = pairs_sorted
@@ -1611,14 +1643,13 @@ def signal_ddi(signal_id: int, db: Session = Depends(get_db)):
 
 @router.get("/pregnancy")
 def pregnancy_cohort(db: Session = Depends(get_db)):
-    """Pregnancy / teratogen cohort mode with stratified DMA + actionable findings."""
+    """Pregnancy / teratogen cohort mode with stratified DMA + actionable findings.
+
+    Findings are built only from AE-flagged corpus posts (same pool as Safety Signals).
+    Phantom fixture DMA is not shown — load PV demo pack to persist real rows.
+    """
     from ..analytics.corpus import build_ae_reports
-    from ..analytics.disproportionality import compute_signals
-    from ..analytics.pregnancy import (
-        is_congenital_event,
-        pregnancy_demo_posts,
-        stratified_pregnancy_dma,
-    )
+    from ..analytics.pregnancy import stratified_pregnancy_dma
     from ..models import Signal
     from ..projects.scope import current_project_id
 
@@ -1626,55 +1657,34 @@ def pregnancy_cohort(db: Session = Depends(get_db)):
     corpus = build_ae_reports(db, project_id=pid)
     out = stratified_pregnancy_dma(corpus["posts"])
 
-    # If congenital stratum is empty, blend offline teratogen fixture pairs so the
-    # lens is never a blank numbers page (clearly labeled as demo fixtures).
-    congenital = list(out.get("congenital_signals") or [])
-    fixture_used = False
-    if len(congenital) < 2:
-        fixture_reports = []
-        for post in pregnancy_demo_posts():
-            # title format: "Pregnancy cohort: {drug} → {reaction}"
-            title = post.get("title") or ""
-            body = post.get("body") or ""
-            drug = (post.get("title") or "").split(":")[-1].split("→")[0].strip() if "→" in title else None
-            reaction = title.split("→")[-1].strip() if "→" in title else None
-            if not drug:
-                # fallback parse from body first token patterns
-                for dname in ("isotretinoin", "valproate", "topiramate", "warfarin",
-                              "methotrexate", "carbamazepine", "lithium"):
-                    if dname in body.lower():
-                        drug = dname
-                        break
-            if not reaction:
-                for r in ("birth defect", "neural tube defect", "cleft palate",
-                          "teratogenicity", "miscarriage", "cardiac malformation"):
-                    if r in body.lower():
-                        reaction = r
-                        break
-            if drug and reaction:
-                fixture_reports.append((drug.lower(), reaction.lower()))
-                fixture_reports.append((drug.lower(), reaction.lower()))  # n>=2
-        if fixture_reports:
-            fixture_used = True
-            for s in compute_signals(fixture_reports):
-                if is_congenital_event(s["symptom"]):
-                    congenital.append({**s, "fixture": True, "pregnancy_cohort": True,
-                                       "congenital_stratum": True})
-
-    # Attach signal_id + finding narrative where possible
-    findings = []
-    for s in congenital[:15]:
-        sig = None
-        q = db.query(Signal).filter(Signal.drug.ilike(s["drug"]))
+    def _resolve_signal(drug: str, event: str):
+        if not drug:
+            return None
+        q = db.query(Signal).filter(Signal.drug.ilike(drug))
         if pid is not None:
             q = q.filter(Signal.project_id == pid)
-        for cand in q.limit(30).all():
-            ev = (s["symptom"] or "").lower()
-            if (cand.symptom or "").lower() == ev or (cand.meddra_pt or "").lower() == ev:
-                sig = cand
-                break
+        ev = (event or "").lower().strip()
+        soft = []
+        for cand in q.limit(80).all():
+            fields = [
+                (cand.symptom or "").lower(),
+                (cand.meddra_pt or "").lower(),
+            ]
+            for f in fields:
+                if not f:
+                    continue
+                if f == ev or (ev and (ev in f or f in ev)):
+                    return cand
+            soft.append(cand)
+        # Drug-only fallback when event labels diverge after MedDRA mapping
+        return soft[0] if soft and not ev else None
+
+    findings = []
+    for s in (out.get("congenital_signals") or [])[:15]:
+        sig = _resolve_signal(s.get("drug"), s.get("symptom"))
         findings.append({
             **s,
+            "fixture": False,
             "signal_id": sig.id if sig else None,
             "headline": f"{s['drug'].title()} → {s['symptom']} (pregnancy / congenital stratum)",
             "why_it_matters": (
@@ -1684,24 +1694,109 @@ def pregnancy_cohort(db: Session = Depends(get_db)):
             "what_to_do": (
                 "Open the signal for SAR / lifecycle triage, or corroborate with label boxed warnings."
                 if sig
-                else "Load PV demo pack + recompute to persist as a full signal row, then triage."
+                else (
+                    "Pair not yet in Detect — load PV demo pack (or recompute) so this "
+                    "pregnancy ICSR becomes an AE-flagged signal row."
+                )
             ),
         })
 
-    out["congenital_signals"] = congenital
+    other = []
+    for s in (out.get("other_pregnancy_signals") or [])[:12]:
+        sig = _resolve_signal(s.get("drug"), s.get("symptom"))
+        other.append({**s, "signal_id": sig.id if sig else None})
+
+    out["congenital_signals"] = out.get("congenital_signals") or []
+    out["other_pregnancy_signals"] = other
     out["findings"] = findings
-    out["fixture_blended"] = fixture_used
+    out["fixture_blended"] = False
     out["needs_demo_seed"] = len(findings) < 2
     out["headline"] = (
-        f"{len(findings)} congenital / teratogen finding(s) in the pregnancy cohort"
-        + (" (includes offline demo fixtures until live pregnancy ICSRs accumulate)." if fixture_used else ".")
+        f"{len(findings)} congenital / teratogen finding(s) in the pregnancy cohort "
+        f"({out.get('n_pregnancy_posts', 0)} pregnancy-context AE posts)."
+        if findings
+        else "No congenital findings in AE corpus yet — load the pregnancy demo pack to seed ICSRs."
     )
     out["verdict"] = out["headline"]
     out["how_to_use"] = (
-        "Review congenital findings first → open a signal → export SAR / advance lifecycle. "
-        "This is stratified DMA on pregnancy-context text, not a pregnancy registry."
+        "Review congenital findings first → open the linked Safety Signal → export SAR / "
+        "advance lifecycle. Findings map into the same Detect table as core DMA."
     )
     return out
+
+
+@router.get("/risk-strata")
+def risk_strata(
+    product_id: str | None = None,
+    target_ae_pt: str | None = None,
+    min_confidence: float = 0.55,
+    limit: int = 8,
+    db: Session = Depends(get_db),
+):
+    """Proactive risk stratification — high-risk demographic/comorbidity segments.
+
+    When product_id / target_ae_pt omitted, returns candidate pairs from the corpus
+    plus a default stratification on the densest pair (demo-friendly).
+    """
+    from ..analytics.risk_strata import list_candidate_pairs, predict_high_risk_populations
+    from ..projects.scope import current_project_id
+
+    pid = current_project_id()
+    candidates = list_candidate_pairs(db, project_id=pid, limit=12)
+    pairs = candidates.get("pairs") or []
+
+    if not product_id or not target_ae_pt:
+        if not pairs:
+            return {
+                "product_id": product_id or "",
+                "target_ae_pt": target_ae_pt or "",
+                "model": "none",
+                "segments": [],
+                "findings": [],
+                "candidate_pairs": [],
+                "needs_demo_seed": True,
+                "headline": "No AE corpus density for stratification — load PV demo pack or Fetch sources.",
+                "verdict": "No AE corpus density for stratification — load PV demo pack or Fetch sources.",
+                "how_to_use": (
+                    "Pass product_id + target_ae_pt, or load corpus then reopen this lens."
+                ),
+                "disclaimer": candidates.get("disclaimer"),
+                "ontology_stack": [],
+                "evidence_sources": [],
+            }
+        product_id = product_id or pairs[0]["product_id"]
+        target_ae_pt = target_ae_pt or pairs[0]["target_ae_pt"]
+
+    out = predict_high_risk_populations(
+        db,
+        product_id=product_id,
+        target_ae_pt=target_ae_pt,
+        min_confidence=min_confidence,
+        project_id=pid,
+        limit=limit,
+    )
+    out["candidate_pairs"] = pairs
+    return out
+
+
+@router.post("/risk-strata/predict")
+def risk_strata_predict(
+    product_id: str = Query(..., min_length=1),
+    target_ae_pt: str = Query(..., min_length=1),
+    min_confidence: float = 0.55,
+    db: Session = Depends(get_db),
+):
+    """Explicit predict endpoint (mirrors FastMCP ``predict_high_risk_populations``)."""
+    from ..analytics.risk_strata import predict_high_risk_populations
+    from ..projects.scope import current_project_id
+
+    return predict_high_risk_populations(
+        db,
+        product_id=product_id,
+        target_ae_pt=target_ae_pt,
+        min_confidence=min_confidence,
+        project_id=current_project_id(),
+    )
 
 
 @router.post("/signals/{signal_id}/narrative")
@@ -1732,18 +1827,23 @@ def draft_copilot_assessment(signal_id: int, db: Session = Depends(get_db)):
     if not sig:
         raise HTTPException(404, "signal not found")
 
-    # Ensure evidence is enriched before drafting (mirrors GET /signals/{id} logic)
+    # Ensure evidence is enriched before drafting (non-blocking claim + sync enrich with short timeout)
     if sig.literature_json in (None, "", "{}"):
         try:
             from ..evidence.enrich import enrich_one
-            ev = enrich_one(sig.product_type or "drug", sig.drug, sig.symptom)
+            ev = enrich_one(sig.product_type or "drug", sig.drug, sig.symptom, timeout=2.0)
             sig.label_evidence_json = json.dumps(ev.get("label_evidence") or {})
             sig.recall_json = json.dumps(ev.get("recall") or {})
-            sig.literature_json = json.dumps(ev.get("literature") or {})
+            sig.literature_json = json.dumps(ev.get("literature") or {"available": False, "source": "pubmed_offline"})
             sig.device_class_json = json.dumps(ev.get("device_classification") or {})
             db.commit()
         except Exception:
             db.rollback()
+            try:
+                sig.literature_json = json.dumps({"available": False, "source": "pubmed_offline"})
+                db.commit()
+            except Exception:
+                db.rollback()
 
     assessment = generate_assessment(signal_to_dict(sig))
     sig.copilot_json = json.dumps(assessment)

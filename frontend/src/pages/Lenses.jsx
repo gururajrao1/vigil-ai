@@ -7,9 +7,11 @@ import Divergence from './Divergence';
 import Ddi from './Ddi';
 import Pregnancy from './Pregnancy';
 import RemineLab from './RemineLab';
+import RiskPopulations from './RiskPopulations';
 
 const TABS = [
   { id: 'remine', label: 'Remine lab' },
+  { id: 'risk', label: 'Risk populations' },
   { id: 'ddi', label: 'DDI findings' },
   { id: 'pregnancy', label: 'Pregnancy' },
   { id: 'smq', label: 'SMQ syndromes' },
@@ -24,12 +26,13 @@ export default function Lenses() {
   return (
     <HubShell
       title="Analytic Lenses"
-      subtitle="Remine competition bias, DDI findings, pregnancy/teratogen cohort, SMQ, class effects, vaccine AESI, geo scan, and vs FAERS."
+      subtitle="Remine, proactive risk populations, DDI, pregnancy, SMQ, class effects, vaccine AESI, geo, and vs FAERS."
       tabDefs={TABS}
       defaultTab="remine"
     >
       {(tab) => {
         if (tab === 'remine') return <RemineLab embedded />;
+        if (tab === 'risk') return <RiskPopulations embedded />;
         if (tab === 'ddi') return <Ddi embedded />;
         if (tab === 'pregnancy') return <Pregnancy embedded />;
         if (tab === 'class') return <ClassEffects embedded />;

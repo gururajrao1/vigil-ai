@@ -39,6 +39,7 @@ const CMD_ITEMS = [
   { label: 'Lenses · SMQ', icon: '◈', path: '/lenses?tab=smq' },
   { label: 'Lenses · class effects', icon: '⚗', path: '/lenses?tab=class' },
   { label: 'Lenses · Remine lab', icon: '◎', path: '/lenses?tab=remine' },
+  { label: 'Lenses · risk populations', icon: '⌖', path: '/lenses?tab=risk' },
   { label: 'Lenses · DDI findings', icon: '⚗', path: '/lenses?tab=ddi' },
   { label: 'Lenses · pregnancy', icon: '🤰', path: '/lenses?tab=pregnancy' },
   { label: 'Lenses · vaccine', icon: '💉', path: '/lenses?tab=vaccine' },

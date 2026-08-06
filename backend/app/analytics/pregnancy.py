@@ -26,6 +26,8 @@ CONGENITAL_EVENTS: Set[str] = {
     "intrauterine growth restriction", "stillbirth", "miscarriage",
     "spontaneous abortion", "neonatal death", "fetal death", "embryotoxicity",
     "developmental delay", "patent ductus arteriosus", "congenital malformation",
+    "foetal damage", "congenital cardiac disorder", "neonatal renal impairment",
+    "neonatal renal failure", "abortion spontaneous",
 }
 
 
@@ -46,6 +48,7 @@ def is_congenital_event(event: str) -> bool:
     return any(tok in e for tok in (
         "congenital", "teratogen", "cleft", "neural tube", "spina",
         "malformation", "birth defect", "stillbirth", "miscarriage",
+        "foetal", "fetal", "abortion", "neonatal renal", "embryotox",
     ))
 
 
@@ -60,29 +63,43 @@ def filter_pregnancy_posts(posts: List[dict]) -> List[dict]:
 
 
 def pregnancy_demo_posts() -> List[dict]:
-    """Offline pregnancy/teratogen demo ICSRs for an empty cohort."""
+    """Offline pregnancy/teratogen demo ICSRs designed to pass 4-gate AE NLP.
+
+    Bodies intentionally include lexicon drug + congenital/pregnancy event surfaces
+    plus negative sentiment cues so ingest → ProcessedPost.ae_flag → Signal rows.
+    """
     from datetime import datetime, timedelta
 
     base = datetime.utcnow() - timedelta(days=40)
     rows = [
-        ("isotretinoin", "birth defect", "Pregnancy exposure to isotretinoin despite iPLEDGE; congenital birth defect reported."),
-        ("isotretinoin", "teratogenicity", "Pregnant patient on isotretinoin — teratogenicity and fetal harm concern."),
-        ("valproate", "neural tube defect", "Maternal valproate exposure in first trimester; neural tube defect / spina bifida."),
-        ("valproate", "birth defect", "Pregnancy exposure to sodium valproate with congenital anomaly / birth defect."),
-        ("topiramate", "cleft palate", "Antenatal topiramate exposure; infant cleft palate reported."),
-        ("warfarin", "birth defect", "Fetal warfarin syndrome concern after pregnancy exposure; birth defect."),
-        ("methotrexate", "miscarriage", "Methotrexate taken around conception; miscarriage / spontaneous abortion."),
-        ("ace inhibitor", "renal impairment", "Pregnancy trimester exposure to ACE inhibitor; neonatal renal impairment."),
-        ("carbamazepine", "neural tube defect", "Prenatal carbamazepine; neural tube defect under investigation."),
-        ("lithium", "cardiac malformation", "Pregnancy exposure to lithium; cardiac malformation (Ebstein anomaly concern)."),
+        ("isotretinoin", "birth defect",
+         "Horrible pregnancy exposure to isotretinoin despite iPLEDGE; congenital birth defect reported — terrified of fetal harm."),
+        ("isotretinoin", "teratogenicity",
+         "Pregnant patient wrongly stayed on isotretinoin — severe teratogenicity and fetal harm concern, devastated."),
+        ("valproate", "neural tube defect",
+         "Maternal valproate exposure in first trimester; tragic neural tube defect / spina bifida diagnosis."),
+        ("valproate", "birth defect",
+         "Pregnancy exposure to sodium valproate with serious congenital anomaly / birth defect — awful outcome."),
+        ("topiramate", "cleft palate",
+         "Antenatal topiramate exposure; infant born with cleft palate, family is devastated."),
+        ("warfarin", "birth defect",
+         "Fetal warfarin syndrome concern after pregnancy exposure; painful birth defect reported."),
+        ("methotrexate", "miscarriage",
+         "Methotrexate taken around conception; suffered miscarriage / spontaneous abortion — heartbreaking."),
+        ("lisinopril", "neonatal renal impairment",
+         "Pregnancy trimester exposure to lisinopril ACE inhibitor; neonatal renal impairment — critically ill newborn."),
+        ("carbamazepine", "neural tube defect",
+         "Prenatal carbamazepine exposure; neural tube defect under investigation — frightening pregnancy outcome."),
+        ("lithium", "cardiac malformation",
+         "Pregnancy exposure to lithium; serious cardiac malformation (Ebstein anomaly concern) — catastrophic fetal harm."),
     ]
     posts = []
     for i, (drug, reaction, body) in enumerate(rows):
         posts.append({
-            "external_id": f"preg_demo:{i+1}",
+            "external_id": f"preg_demo:v2:{i+1}",
             "platform": "pregnancy_demo",
-            "author": f"preg_demo:{i+1}",
-            "title": f"Pregnancy cohort: {drug} → {reaction}",
+            "author": f"preg_demo:v2:{i+1}",
+            "title": f"Pregnancy cohort: {drug} -> {reaction}",
             "body": body,
             "url": "",
             "posted_at": base + timedelta(days=i * 3),

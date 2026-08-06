@@ -189,6 +189,19 @@ export const api = {
     return req(`/api/ddi${q ? `?${q}` : ''}`);
   },
   pregnancy: () => req('/api/pregnancy'),
+  riskStrata: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    ).toString();
+    return req(`/api/risk-strata${q ? `?${q}` : ''}`);
+  },
+  riskStrataPredict: (productId, targetAe, minConfidence = 0.55) =>
+    req(
+      `/api/risk-strata/predict?product_id=${encodeURIComponent(productId)}`
+      + `&target_ae_pt=${encodeURIComponent(targetAe)}`
+      + `&min_confidence=${minConfidence}`,
+      { method: 'POST' },
+    ),
   ingestPvDemo: ({ recompute = true } = {}) =>
     req(`/api/ingest/pv-demo?recompute=${recompute}`, { method: 'POST' }),
 

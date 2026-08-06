@@ -375,6 +375,7 @@ function AuditButton({ signalId }) {
 export default function SignalDetail() {
   const { id } = useParams();
   const [sig, setSig] = useState(null);
+  const [loadErr, setLoadErr] = useState(null);
   const [regen, setRegen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [assessment, setAssessment] = useState(null);
@@ -392,7 +393,9 @@ export default function SignalDetail() {
   const [pvDemoBusy, setPvDemoBusy] = useState(false);
 
   useEffect(() => {
-    api.signal(id).then(setSig).catch(() => setSig(null));
+    let cancelled = false;
+    setSig(null);
+    setLoadErr(null);
     setAssessment(null);
     setUnmask(null);
     setUnmaskErr(null);
@@ -401,7 +404,28 @@ export default function SignalDetail() {
     setDdi(null);
     setSarPreview(null);
     setSelectedMaskers([]);
+
+    api.signal(id)
+      .then((s) => {
+        if (cancelled) return;
+        setSig(s);
+        // Evidence is filled in the background — soft-refresh once so PubMed/MAUDE show up
+        if (s?.evidence_pending || s?.literature?.source === 'enrich_pending') {
+          setTimeout(() => {
+            if (cancelled) return;
+            api.signal(id).then((fresh) => { if (!cancelled) setSig(fresh); }).catch(() => {});
+          }, 3500);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setSig(null);
+          setLoadErr(e?.message || 'Failed to load signal');
+        }
+      });
+
     api.signalMasking(id).then((m) => {
+      if (cancelled) return;
       setMasking(m);
       setSelectedMaskers(m.suggested_exclude || (m.maskers || []).filter((x) => x.likely_masker).map((x) => x.drug));
       // Auto-run remine when competitors exist so the user sees before/after immediately
@@ -410,16 +434,37 @@ export default function SignalDetail() {
         if (picks?.length) {
           setUnmasking(true);
           api.signalUnmask(id, picks)
-            .then(setUnmask)
-            .catch((e) => setUnmaskErr(e?.message || String(e)))
-            .finally(() => setUnmasking(false));
+            .then((r) => { if (!cancelled) setUnmask(r); })
+            .catch((e) => { if (!cancelled) setUnmaskErr(e?.message || String(e)); })
+            .finally(() => { if (!cancelled) setUnmasking(false); });
         }
       }
-    }).catch(() => setMasking(null));
-    api.signalCasefile(id).then(setCasefile).catch(() => setCasefile(null));
-    api.signalDdi(id).then(setDdi).catch(() => setDdi(null));
-    api.signalSar(id).then(setSarPreview).catch(() => setSarPreview(null));
+    }).catch(() => { if (!cancelled) setMasking(null); });
+    api.signalCasefile(id).then((c) => { if (!cancelled) setCasefile(c); }).catch(() => {});
+    api.signalDdi(id).then((d) => { if (!cancelled) setDdi(d); }).catch(() => {});
+    api.signalSar(id).then((s) => { if (!cancelled) setSarPreview(s); }).catch(() => {});
+
+    return () => { cancelled = true; };
   }, [id]);
+
+  if (loadErr) {
+    return (
+      <div className="space-y-4">
+        <Link to="/signals" className="text-sm text-sky-400 hover:underline">← Back to signals</Link>
+        <Card className="p-5 border-rose-700/30">
+          <div className="text-rose-300 font-medium">Couldn’t load this signal</div>
+          <p className="text-sm text-slate-400 mt-2">{loadErr}</p>
+          <p className="text-[11px] text-slate-500 mt-3">
+            If the API was cold-starting, wait a few seconds and retry. Evidence enrichment
+            no longer blocks the page — a hard refresh usually recovers.
+          </p>
+          <Button className="mt-4" variant="primary" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (!sig) return <Spinner label="Loading signal…" />;
 
@@ -1678,6 +1723,11 @@ export default function SignalDetail() {
         <Card className="p-4">
           <CardHeader title="External evidence"
                       subtitle="Cross-corroboration across keyless regulatory + literature sources" />
+          {(sig.evidence_pending || lit?.source === 'enrich_pending') && (
+            <p className="mt-2 text-[11px] text-amber-200/80">
+              Fetching PubMed / openFDA / device registries in the background — page loaded from the DB first.
+            </p>
+          )}
           <div className="mt-3 space-y-3 text-sm">
             {/* openFDA FAERS / MAUDE */}
             <div className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">

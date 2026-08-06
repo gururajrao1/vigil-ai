@@ -67,9 +67,9 @@ export default function Pregnancy({ embedded = false }) {
           {busy ? 'Loading…' : 'Refresh pregnancy demo pack'}
         </Button>
       </div>
-      {data.fixture_blended && (
+      {data.needs_demo_seed && !busy && (
         <p className="text-[11px] text-amber-200/80">
-          Showing offline teratogen fixtures blended into this view until live pregnancy ICSRs accumulate.
+          Few congenital AE rows in Detect yet — click Refresh to ingest pregnancy ICSRs into the signal table.
         </p>
       )}
       {err && <p className="text-sm text-rose-300">{err}</p>}
@@ -132,10 +132,10 @@ export default function Pregnancy({ embedded = false }) {
                     </Link>
                   ) : (
                     <Link
-                      to={`/signals?q=${encodeURIComponent(s.drug)}`}
+                      to={`/signals?drug=${encodeURIComponent(s.drug)}&symptom=${encodeURIComponent(s.symptom || '')}`}
                       className="text-xs text-sky-300 hover:underline capitalize"
                     >
-                      Search {s.drug} →
+                      Find in Detect →
                     </Link>
                   )}
                 </div>
@@ -151,7 +151,15 @@ export default function Pregnancy({ embedded = false }) {
           <div className="space-y-1.5">
             {data.other_pregnancy_signals.slice(0, 8).map((s) => (
               <div key={`${s.drug}|${s.symptom}`} className="text-sm text-slate-400 flex flex-wrap justify-between gap-2">
-                <span className="capitalize text-slate-300">{s.drug} → {s.symptom}</span>
+                <span className="capitalize text-slate-300">
+                  {s.signal_id ? (
+                    <Link to={`/signals/${s.signal_id}`} className="text-sky-300 hover:underline">
+                      {s.drug} → {s.symptom}
+                    </Link>
+                  ) : (
+                    <>{s.drug} → {s.symptom}</>
+                  )}
+                </span>
                 <span className="text-[11px]">n={s.post_count} · PRR={s.prr}</span>
               </div>
             ))}

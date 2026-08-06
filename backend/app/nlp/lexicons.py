@@ -245,6 +245,15 @@ SYMPTOMS = {
     "hyponatremia", "hypokalemia", "hypoglycemia", "hyperglycemia",
     "qt prolongation", "torsades de pointes", "ventricular arrhythmia",
     "interstitial lung disease", "pulmonary fibrosis", "pneumonitis",
+    # pregnancy / teratogen / congenital anomaly stratum (special-population PV)
+    "birth defect", "birth defects", "congenital anomaly", "congenital anomalies",
+    "congenital malformation", "teratogenicity", "teratogen",
+    "neural tube defect", "spina bifida", "cleft palate", "cleft lip",
+    "cardiac malformation", "heart defect", "limb reduction", "hypospadias",
+    "microcephaly", "fetal growth restriction", "intrauterine growth restriction",
+    "stillbirth", "miscarriage", "spontaneous abortion", "neonatal death",
+    "fetal death", "embryotoxicity", "developmental delay",
+    "patent ductus arteriosus", "renal impairment", "neonatal renal impairment",
 }
 
 # --------------------------------------------------------------------------- #

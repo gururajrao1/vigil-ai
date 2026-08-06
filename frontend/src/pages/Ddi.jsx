@@ -122,12 +122,18 @@ export default function Ddi({ embedded = false }) {
                         : 'bg-slate-600/20 text-slate-400 border-slate-600/30'
                     }
                   />
-                  <Link
-                    to={`/signals?q=${encodeURIComponent(p.drug_a)}`}
-                    className="text-xs text-sky-300 hover:underline capitalize"
-                  >
-                    Find {p.drug_a} signals →
-                  </Link>
+                  {p.signal_id ? (
+                    <Link to={`/signals/${p.signal_id}`} className="text-xs text-sky-300 hover:underline">
+                      Open signal →
+                    </Link>
+                  ) : (
+                    <Link
+                      to={`/signals?drug=${encodeURIComponent(p.drug_a)}&symptom=${encodeURIComponent(p.event || '')}`}
+                      className="text-xs text-sky-300 hover:underline capitalize"
+                    >
+                      Find {p.drug_a} in Detect →
+                    </Link>
+                  )}
                 </div>
               </div>
             </Card>

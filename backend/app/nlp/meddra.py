@@ -37,6 +37,8 @@ SOC = {
     "REPRO": "Reproductive system and breast disorders",
     "ENDO": "Endocrine disorders",
     "INFECT": "Infections and infestations",
+    "CONG": "Congenital, familial and genetic disorders",
+    "PREG": "Pregnancy, puerperium and perinatal conditions",
 }
 
 # symptom surface (lowercase) -> (Preferred Term, SOC key)
@@ -217,6 +219,35 @@ _PT_MAP: Dict[str, tuple[str, str]] = {
     "thrombocytopenia": ("Thrombocytopenia", "BLOOD"),
     "encephalitis": ("Encephalitis", "NERV"),
     "acute disseminated encephalomyelitis": ("Acute disseminated encephalomyelitis", "NERV"),
+    # Pregnancy / teratogen / congenital stratum
+    "birth defect": ("Congenital anomaly", "CONG"),
+    "birth defects": ("Congenital anomaly", "CONG"),
+    "congenital anomaly": ("Congenital anomaly", "CONG"),
+    "congenital anomalies": ("Congenital anomaly", "CONG"),
+    "congenital malformation": ("Congenital anomaly", "CONG"),
+    "teratogenicity": ("Foetal damage", "PREG"),
+    "teratogen": ("Foetal damage", "PREG"),
+    "neural tube defect": ("Neural tube defect", "CONG"),
+    "spina bifida": ("Spina bifida", "CONG"),
+    "cleft palate": ("Cleft palate", "CONG"),
+    "cleft lip": ("Cleft lip", "CONG"),
+    "cardiac malformation": ("Congenital cardiac disorder", "CONG"),
+    "heart defect": ("Congenital cardiac disorder", "CONG"),
+    "limb reduction": ("Limb reduction defect", "CONG"),
+    "hypospadias": ("Hypospadias", "CONG"),
+    "microcephaly": ("Microcephaly", "CONG"),
+    "fetal growth restriction": ("Foetal growth restriction", "PREG"),
+    "intrauterine growth restriction": ("Foetal growth restriction", "PREG"),
+    "stillbirth": ("Stillbirth", "PREG"),
+    "miscarriage": ("Abortion spontaneous", "PREG"),
+    "spontaneous abortion": ("Abortion spontaneous", "PREG"),
+    "neonatal death": ("Neonatal death", "PREG"),
+    "fetal death": ("Foetal death", "PREG"),
+    "embryotoxicity": ("Embryotoxicity", "PREG"),
+    "developmental delay": ("Developmental delay", "CONG"),
+    "patent ductus arteriosus": ("Patent ductus arteriosus", "CONG"),
+    "renal impairment": ("Renal impairment", "RENAL"),
+    "neonatal renal impairment": ("Neonatal renal failure", "PREG"),
 }
 
 

@@ -32,6 +32,11 @@ export default function Signals({ embedded = false }) {
   const [drugQ, setDrugQ] = useState(searchParams.get('drug') || '');
   const [symptomQ, setSymptomQ] = useState(searchParams.get('symptom') || '');
   const [socQ, setSocQ] = useState(searchParams.get('soc') || '');
+  // Free-text jump box (drug / vaccine / device / event) — debounced into `q`
+  const initialQ = searchParams.get('q') || searchParams.get('drug') || '';
+  const [searchDraft, setSearchDraft] = useState(initialQ);
+  const [textQ, setTextQ] = useState(initialQ);
+  const [eventDraft, setEventDraft] = useState(searchParams.get('symptom') || '');
   const [spikingOnly, setSpikingOnly] = useState(false);
   const [sdrOnly, setSdrOnly] = useState(false);
   const [pgxOnly, setPgxOnly] = useState(false);
@@ -55,6 +60,7 @@ export default function Signals({ embedded = false }) {
   // Sync deep-link tokens from Dashboard / SMQ / chart clicks
   useEffect(() => {
     const d = searchParams.get('drug');
+    const qParam = searchParams.get('q');
     const pin = searchParams.get('pin');
     const searchEvent = searchParams.get('searchEvent');
     const s = searchParams.get('symptom') || searchEvent;
@@ -63,9 +69,22 @@ export default function Signals({ embedded = false }) {
     const soc = searchParams.get('soc');
     const smqParam = searchParams.get('smq');
     const classEffect = searchParams.get('class_effect');
-    if (d != null) setDrugQ(d);
+    if (d != null) {
+      setDrugQ(d);
+      if (!qParam) {
+        setSearchDraft(d);
+        setTextQ(d);
+      }
+    }
+    if (qParam != null) {
+      setSearchDraft(qParam);
+      setTextQ(qParam);
+    }
     if (pin != null) setPinDrug(pin);
-    if (s != null) setSymptomQ(s);
+    if (s != null) {
+      setSymptomQ(s);
+      setEventDraft(s);
+    }
     if (st) setFilter(st);
     if (r) setRegion(r);
     if (soc != null) setSocQ(soc);
@@ -73,13 +92,29 @@ export default function Signals({ embedded = false }) {
     if (classEffect === '1' || classEffect === 'true') setClassEffectOnly(true);
   }, [searchParams]);
 
+  // Debounce free-text jump box → API `q` (and clear dedicated drug filter when using q)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = searchDraft.trim();
+      setTextQ(next);
+      if (next) setDrugQ(''); // prefer unified q search when typing in the jump box
+    }, 280);
+    return () => clearTimeout(t);
+  }, [searchDraft]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSymptomQ(eventDraft.trim()), 280);
+    return () => clearTimeout(t);
+  }, [eventDraft]);
+
   useEffect(() => {
     const params = {};
     if (filter !== 'ALL') params.strength = filter;
     if (region !== 'Global') params.region = region;
     if (spikingOnly) params.spiking = true;
     if (noveltyFilter !== 'ALL') params.label_novelty = noveltyFilter;
-    if (drugQ) params.drug = drugQ;
+    if (textQ) params.q = textQ;
+    else if (drugQ) params.drug = drugQ;
     if (symptomQ) params.symptom = symptomQ;
     if (socQ) params.soc = socQ;
     setSignals(null);
@@ -105,7 +140,7 @@ export default function Signals({ embedded = false }) {
     };
     load();
     return () => { cancelled = true; };
-  }, [tick, project?.id, filter, region, spikingOnly, noveltyFilter, drugQ, symptomQ, socQ]);
+  }, [tick, project?.id, filter, region, spikingOnly, noveltyFilter, drugQ, symptomQ, socQ, textQ]);
 
   const clearStoryContext = () => {
     setDrugQ('');
@@ -116,6 +151,9 @@ export default function Signals({ embedded = false }) {
     setClassEffectOnly(false);
     setFilter('ALL');
     setRegion('Global');
+    setSearchDraft('');
+    setTextQ('');
+    setEventDraft('');
     setSearchParams({}, { replace: true });
   };
 
@@ -170,16 +208,17 @@ export default function Signals({ embedded = false }) {
 
   return (
     <div className="space-y-4">
-      {(drugQ || symptomQ || socQ || (smq !== 'ALL') || pinDrug) && (
+      {(drugQ || textQ || symptomQ || socQ || (smq !== 'ALL') || pinDrug) && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 text-xs text-teal-100">
-          <span className="font-medium">Filtered deep-link</span>
+          <span className="font-medium">Filtered</span>
           {smq !== 'ALL' && (
             <span className="rounded bg-cyan-500/20 px-2 py-0.5">SMQ: {smqLabel || smq}</span>
           )}
           {pinDrug && (
             <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-100">pinned: {pinDrug}</span>
           )}
-          {drugQ && <span className="rounded bg-sky-500/20 px-2 py-0.5">drug: {drugQ}</span>}
+          {textQ && <span className="rounded bg-sky-500/20 px-2 py-0.5">search: {textQ}</span>}
+          {!textQ && drugQ && <span className="rounded bg-sky-500/20 px-2 py-0.5">drug: {drugQ}</span>}
           {symptomQ && <span className="rounded bg-rose-500/20 px-2 py-0.5">AE: {symptomQ}</span>}
           {socQ && <span className="rounded bg-violet-500/20 px-2 py-0.5">SOC: {socQ}</span>}
           <button type="button" onClick={clearStoryContext} className="ml-auto text-teal-300 hover:underline">
@@ -187,6 +226,50 @@ export default function Signals({ embedded = false }) {
           </button>
         </div>
       )}
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <input
+            type="search"
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                setTextQ(searchDraft.trim());
+                if (searchDraft.trim()) setDrugQ('');
+              }
+            }}
+            placeholder="Jump to drug, vaccine, or device… e.g. catheter, lithium, MMR"
+            className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500/60"
+            aria-label="Search products"
+          />
+          {searchDraft && (
+            <button
+              type="button"
+              onClick={() => { setSearchDraft(''); setTextQ(''); setDrugQ(''); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200 px-1.5 py-0.5"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <input
+          type="search"
+          value={eventDraft}
+          onChange={(e) => setEventDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              setSymptomQ(eventDraft.trim());
+            }
+          }}
+          placeholder="Optional: filter by event / AE…"
+          className="sm:w-56 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500/60"
+          aria-label="Search adverse events"
+        />
+      </div>
+
       <div className="app-filter-bar justify-between">
         <div className="flex gap-2 flex-wrap">
           {FILTERS.map((f) => (
