@@ -214,6 +214,13 @@ export const api = {
       + `&min_confidence=${minConfidence}`,
       { method: 'POST' },
     ),
+  riskStrataRank: (productId, targetAe, topN = 5, includeExploratory = false) =>
+    req(
+      `/api/risk-strata/rank?product_id=${encodeURIComponent(productId)}`
+      + `&target_ae_pt=${encodeURIComponent(targetAe)}`
+      + `&top_n=${topN}`
+      + `&include_exploratory=${includeExploratory}`,
+    ),
   ingestPvDemo: ({ recompute = true } = {}) =>
     req(`/api/ingest/pv-demo?recompute=${recompute}`, { method: 'POST' }),
 

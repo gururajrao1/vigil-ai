@@ -36,6 +36,28 @@ def predict_high_risk_populations_impl(
         db.close()
 
 
+def rank_high_risk_populations_impl(
+    product_id: str,
+    target_ae_pt: str,
+    top_n: int = 5,
+    project_id: Optional[int] = None,
+) -> dict:
+    from ..analytics.risk_ranking import rank_high_risk_populations
+    from ..database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return rank_high_risk_populations(
+            db,
+            product_id=product_id,
+            target_ae_pt=target_ae_pt,
+            top_n=top_n,
+            project_id=project_id,
+        )
+    finally:
+        db.close()
+
+
 def _build_mcp():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -51,10 +73,10 @@ def _build_mcp():
     mcp = FastMCP(
         "vigilai-risk-strata",
         instructions=(
-            "VigilAI proactive risk stratification. Call "
-            "predict_high_risk_populations to identify demographic and "
-            "comorbidity segments with elevated predicted risk for a "
-            "product–AE pair. Offline-first; not for clinical decisions."
+            "VigilAI proactive risk stratification & ranking. Use "
+            "predict_high_risk_populations for logistic segment scores, or "
+            "rank_high_risk_populations for Risk Elevation Multiplier ranking "
+            "with mitigation rules. Offline-first; not for clinical decisions."
         ),
     )
 
@@ -80,6 +102,31 @@ def _build_mcp():
             product_id=product_id,
             target_ae_pt=target_ae_pt,
             min_confidence=min_confidence,
+        )
+        return json.dumps(out, ensure_ascii=False)
+
+    @mcp.tool()
+    async def rank_high_risk_populations(
+        product_id: str,
+        target_ae_pt: str,
+        top_n: int = 5,
+    ) -> str:
+        """Ranks subpopulations by relative risk elevation for a given product-AE pair,
+        identifying demographic and comorbidity drivers alongside mitigation rules.
+
+        Args:
+            product_id: Drug, vaccine, or device name.
+            target_ae_pt: MedDRA-style Preferred Term / event.
+            top_n: Maximum ranked strata to return (default 5).
+
+        Returns:
+            JSON with Risk Elevation Multiplier ranking, Yates χ² gates,
+            feature attribution %, and domain mitigation (labeling vs device RCA).
+        """
+        out = rank_high_risk_populations_impl(
+            product_id=product_id,
+            target_ae_pt=target_ae_pt,
+            top_n=top_n,
         )
         return json.dumps(out, ensure_ascii=False)
 

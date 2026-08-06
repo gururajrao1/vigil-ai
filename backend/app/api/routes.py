@@ -1861,6 +1861,37 @@ def risk_strata_predict(
     )
 
 
+@router.get("/risk-strata/rank")
+@router.post("/risk-strata/rank")
+def risk_strata_rank(
+    product_id: str = Query(..., min_length=1),
+    target_ae_pt: str = Query(..., min_length=1),
+    top_n: int = 5,
+    include_exploratory: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Rank subpopulations by Risk Elevation Multiplier (REM).
+
+    REM = P(AE|Drug∩Subpop) / P(AE|Drug∩General). Keeps strata with REM≥1.5 and
+    Yates χ²≥4 by default. Mirrors FastMCP ``rank_high_risk_populations``.
+    """
+    from ..analytics.risk_ranking import rank_high_risk_populations
+    from ..analytics.risk_strata import list_candidate_pairs
+    from ..projects.scope import current_project_id
+
+    pid = current_project_id()
+    out = rank_high_risk_populations(
+        db,
+        product_id=product_id,
+        target_ae_pt=target_ae_pt,
+        top_n=top_n,
+        project_id=pid,
+        include_exploratory=include_exploratory,
+    )
+    out["candidate_pairs"] = (list_candidate_pairs(db, project_id=pid, limit=12).get("pairs") or [])
+    return out
+
+
 @router.post("/signals/{signal_id}/narrative")
 def regenerate_narrative(signal_id: int, db: Session = Depends(get_db)):
     from ..analytics.narrative import build_narrative
