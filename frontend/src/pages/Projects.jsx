@@ -12,6 +12,60 @@ const OWNER_BY_SLUG = {
   device: 'Gururaja',
 };
 
+/** Curated packs → Pathfinder / literature intent (see docs/VIGILAI_APPLICATION_HANDBOOK.md §11). */
+const KEYWORD_PACKS = [
+  {
+    id: 'general',
+    label: 'General PV',
+    keywords: 'adverse reaction, side effect, drug safety, pharmacovigilance, patient forum, MedWatch',
+  },
+  {
+    id: 'anticoagulant',
+    label: 'Anticoagulants',
+    keywords: 'warfarin, rivaroxaban, apixaban, haemorrhage, bleeding, anticoagulant, INR',
+  },
+  {
+    id: 'psych',
+    label: 'Psychiatry',
+    keywords: 'paroxetine, sertraline, lithium, suicidal ideation, akathisia, SSRI, bipolar forum',
+  },
+  {
+    id: 'glp1',
+    label: 'GLP-1 / metabolic',
+    keywords: 'semaglutide, Ozempic, Wegovy, pancreatitis, gastroparesis, nausea, weight loss drug',
+  },
+  {
+    id: 'oncology',
+    label: 'Oncology / ICI',
+    keywords: 'pembrolizumab, nivolumab, checkpoint inhibitor, immune-related AE, colitis, pneumonitis, oncology forum',
+  },
+  {
+    id: 'pregnancy',
+    label: 'Pregnancy',
+    keywords: 'pregnancy, congenital anomaly, birth defect, teratogen, lithium pregnancy, valproate, neural tube defect',
+  },
+  {
+    id: 'vaccine',
+    label: 'Vaccine / AESI',
+    keywords: 'myocarditis, vaccine side effects, reactogenicity, MMR, COVID-19 vaccine, VAERS, immunization',
+  },
+  {
+    id: 'device-cardiac',
+    label: 'Devices · cardiac',
+    keywords: 'pacemaker, coronary stent, defibrillator, lead fracture, device malfunction, MAUDE, implant forum',
+  },
+  {
+    id: 'device-diabetes',
+    label: 'Devices · diabetes',
+    keywords: 'insulin pump, continuous glucose monitor, CGM, overinfusion, sensor error, infusion set, diabetes device',
+  },
+  {
+    id: 'ddi',
+    label: 'DDI / polypharmacy',
+    keywords: 'polypharmacy, drug interaction, warfarin amiodarone, serotonin syndrome, concomitant medication',
+  },
+];
+
 function ownerFor(p) {
   return OWNER_BY_SLUG[p.slug] || OWNER_BY_SLUG[p.therapeutic_area] || 'VigilAI Ops';
 }
@@ -160,8 +214,41 @@ export default function Projects() {
             <option value="vaccine">vaccine</option>
             <option value="device">device</option>
           </select>
-          <input className="app-input sm:col-span-2" placeholder="keywords, comma-separated"
-            value={form.keywords} onChange={(e) => setForm({ ...form, keywords: e.target.value })} />
+          <div className="sm:col-span-2 space-y-2">
+            <input
+              className="app-input w-full"
+              placeholder="keywords, comma-separated — drive Pathfinder + literature retrieval"
+              value={form.keywords}
+              onChange={(e) => setForm({ ...form, keywords: e.target.value })}
+              aria-label="Project keywords"
+            />
+            <p className="text-[11px] text-[var(--app-text-muted)] leading-relaxed">
+              Keywords are the workspace intent vocabulary (3–8 terms). Pathfinder searches
+              patient forums with them; literature crawls narrow the same way. Pick a pack
+              below or type your own — then Run Pathfinder from Source Discovery.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {KEYWORD_PACKS.map((pack) => (
+                <button
+                  key={pack.id}
+                  type="button"
+                  onClick={() => setForm((f) => ({
+                    ...f,
+                    keywords: pack.keywords,
+                    therapeutic_area:
+                      pack.id.startsWith('device') ? 'device'
+                        : pack.id === 'oncology' ? 'oncology'
+                          : pack.id === 'vaccine' ? 'vaccine'
+                            : f.therapeutic_area,
+                  }))}
+                  className="rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] text-[var(--app-text-secondary)] hover:border-[var(--app-accent-sky)] hover:text-[var(--app-accent-sky)] transition"
+                  title={pack.keywords}
+                >
+                  {pack.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="mt-4 flex items-center gap-3">
           <Button onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create project'}</Button>

@@ -1,9 +1,11 @@
 # VigilAI — Complete Guide (Merged)
 
-> **Single ordered reference** merged from `README.md`, `ARCHITECTURE.md`, `FEATURES_BY_SOURCE.md`, `VIGILAI_ORIGINAL_FEATURES.md`, `FEATURE_USAGE_GUIDE.md`, `DEMO_SCRIPT.md`, and `PRESENTER_GUIDE.md`.  
-> Use this as the primary handout; the separate docs remain for deep detail.  
+> **Prefer the new handbook:** [`VIGILAI_APPLICATION_HANDBOOK.md`](VIGILAI_APPLICATION_HANDBOOK.md)  
+> (full where/how/what/why, mermaid architecture diagrams, Remine/Risk/DDI/Pregnancy, and **keyword packs** for Pathfinder).  
+> Word handout: [`VigilAI_Application_Handbook.docx`](VigilAI_Application_Handbook.docx).
 >
-> **UI:** http://localhost:5173 · **API:** http://127.0.0.1:8001 · **Login:** `admin@vigilai.dev` / `admin123`
+> This file remains as a historical merge of older guides.  
+> **UI:** https://vigil-ai-eight.vercel.app · **API:** https://vigil-ai-api.onrender.com · **Login:** `admin@vigilai.dev` / `admin123`
 
 ---
 

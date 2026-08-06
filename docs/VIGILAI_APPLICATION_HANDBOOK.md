@@ -1,0 +1,650 @@
+# VigilAI — Application Handbook
+
+> **Who this is for:** anyone joining a demo, onboarding, investor walkthrough, or clinical-ops review who needs the *where / how / what / why* of VigilAI in one place.  
+> **Live app:** https://vigil-ai-eight.vercel.app · **API:** https://vigil-ai-api.onrender.com  
+> **Default login:** `admin@vigilai.dev` / `admin123` (also `analyst@…` / `viewer@…` — see §3)  
+> **Companion docs:** `README.md` (slide map) · `ARCHITECTURE.md` · `DEMO_SCRIPT.md` · `DEPLOY_FREE.md`
+
+---
+
+## Quick keyword index (find anything fast)
+
+Use these terms in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the **Projects → keywords** field.
+
+| You want… | Search / say | Go to |
+|-----------|--------------|-------|
+| Main signal table | `Detect`, `SDR`, `PRR` | `/signals` |
+| Plain-English “what’s going on” | `briefing`, `Signal Detail` | Click any signal row |
+| Competition bias / remine | `Remine`, `masking`, `unmask` | `/lenses?tab=remine` |
+| High-risk patient segments | `risk populations`, `comorbidity` | `/lenses?tab=risk` |
+| Drug–drug interactions | `DDI`, `polypharmacy` | `/lenses?tab=ddi` |
+| Pregnancy / teratogen | `pregnancy`, `congenital` | `/lenses?tab=pregnancy` |
+| Syndrome pools | `SMQ` | `/lenses?tab=smq` |
+| ATC class read-across | `class effects` | `/lenses?tab=class` |
+| Vaccine AESI | `vaccine`, `Brighton`, `AESI` | `/lenses?tab=vaccine` |
+| Geography | `geo`, `spatial` | `/lenses?tab=spatial` |
+| Social vs FDA | `FAERS`, `divergence` | `/lenses?tab=divergence` |
+| Knowledge graph | `graph`, `story` | `/graph` |
+| Load demo data | `PV demo pack`, `FAERS bulk`, `VAERS` | `/sources` |
+| Narrow what Pathfinder finds | `keywords`, `project` | `/projects` |
+| Synthetic stress data | `Forge` | `/forge` |
+| Export ICSR | `E2B`, `CIOMS`, `SAR` | Signal Detail |
+
+**Demo jump products** (type into Signals search): `warfarin`, `rivaroxaban`, `semaglutide`, `paroxetine`, `lithium`, `coronary stent`, `catheter`, `pacemaker`, `MMR`, `covid-19 mrna vaccine`.
+
+---
+
+## Table of contents
+
+1. [What VigilAI is (and is not)](#1-what-vigilai-is-and-is-not)
+2. [Why it exists](#2-why-it-exists)
+3. [Who can use it (roles)](#3-who-can-use-it-roles)
+4. [Architecture (diagrams)](#4-architecture-diagrams)
+5. [End-to-end data journey](#5-end-to-end-data-journey)
+6. [How to use the app (by hub)](#6-how-to-use-the-app-by-hub)
+7. [Feature catalog (what / why / where)](#7-feature-catalog-what--why--where)
+8. [Signal science (how numbers work)](#8-signal-science-how-numbers-work)
+9. [NLP & 4-gate AE engine](#9-nlp--4-gate-ae-engine)
+10. [Project keywords for swift retrieval](#10-project-keywords-for-swift-retrieval)
+11. [Compiled keyword packs (copy/paste)](#11-compiled-keyword-packs-copypaste)
+12. [Data sources & network honesty](#12-data-sources--network-honesty)
+13. [Exports & compliance surfaces](#13-exports--compliance-surfaces)
+14. [How to run & deploy](#14-how-to-run--deploy)
+15. [Repo map (for engineers)](#15-repo-map-for-engineers)
+16. [Disclaimers](#16-disclaimers)
+17. [Glossary](#17-glossary)
+
+---
+
+## 1. What VigilAI is (and is not)
+
+**VigilAI** is an **offline-first pharmacovigilance (PV) and device-vigilance platform**. It listens to unstructured patient and regulatory chatter (forums, news, FAERS/VAERS-style reports, labels, device alerts), extracts clinical entities, validates adverse-event candidates with an **explainable 4-gate engine**, computes **disproportionality** (PRR / ROR / χ² / EBGM / BCPNN), overlays analytic lenses (remine, DDI, pregnancy, risk populations…), and pushes signals through a **GVP-shaped workflow** with demo **E2B / CIOMS / SAR** exports.
+
+| It is | It is not |
+|-------|-----------|
+| A working prototype for demos, KT, and architecture review | A validated regulatory submission system |
+| Drugs **and** vaccines **and** medical devices | US-only or drug-only |
+| Offline-capable (every network path has a fallback) | Dependent on paid LLM / API keys |
+| Transparent about surrogates (VigiBase, Sentinel…) | A live feed from licensed WHO VigiBase bulk |
+
+**Product types:** drug · vaccine · device / combination product.
+
+**Design rule:** no feature may hard-require an API key. Optional keys unlock richer crawl / LLM; the core path stays deterministic.
+
+---
+
+## 2. Why it exists
+
+Pre-market trials are **small and short**. Rare and late harms often appear first in **conversation** (Reddit, forums, news, device complaint narratives) before structured ICSRs catch up. VigilAI exists to:
+
+1. **Hear** that chatter worldwide (with PII scrubbing).  
+2. **Turn it into clinical concepts** (MedDRA-style PT/SOC, ATC, GMDN/IMDRF).  
+3. **Decide “is this an AE?”** with gates you can audit.  
+4. **Rank associations** with regulator-shaped stats, not vibes.  
+5. **Stress-test** signals (remine, DDI, pregnancy, risk strata).  
+6. **Hand off** to review workflow and demo exports.
+
+Grounding literature / policy intent (design, not claims of certification): Trontell 2004 (prepared mind for rare ADRs); Hauben 2007 (DMA + clinical validation on sparse data); FDAAA / Cures Act (active multi-center surveillance, RWE); Downing et al. (post-market safety events for novel therapeutics → risk-weight biologics, accelerated approvals, psychotropics, Class III devices).
+
+---
+
+## 3. Who can use it (roles)
+
+| Role | Default account | Can do |
+|------|-----------------|--------|
+| **Admin** | `admin@vigilai.dev` / `admin123` | Everything — users, ingest, reset, deploy ops |
+| **Analyst** | `analyst@vigilai.dev` / `analyst123` | Analytics, review, lifecycle, Forge, Projects, Pathfinder |
+| **Viewer** | `viewer@vigilai.dev` / `viewer123` | Read signals / lenses / exports; remine sensitivity is read-only |
+
+JWT + RBAC on API and UI. Public surfaces: homepage `/`, login `/login`.
+
+---
+
+## 4. Architecture (diagrams)
+
+### 4.1 System context
+
+```mermaid
+flowchart LR
+  subgraph Users
+    PV[PV / Device safety scientist]
+    Eng[Engineer / KT]
+    Lead[Leadership / demo]
+  end
+
+  subgraph Frontend
+    UI[React + Vite · Hubs · ⌘K]
+  end
+
+  subgraph Backend
+    API[FastAPI + JWT]
+    NLP[NLP + 4-gate AE]
+    DMA[Disproportionality + lenses]
+    WF[Lifecycle + alerts]
+  end
+
+  subgraph Data
+    DB[(SQLite / Neon Postgres)]
+    Ext[openFDA · PubMed · DailyMed · MAUDE · optional crawl keys]
+  end
+
+  PV --> UI
+  Eng --> UI
+  Lead --> UI
+  UI -->|REST /api/*| API
+  API --> NLP --> DMA --> WF
+  API --> DB
+  API -.->|optional, degrades offline| Ext
+```
+
+### 4.2 Layered architecture
+
+```mermaid
+flowchart TB
+  subgraph Presentation
+    A[Homepage · Login]
+    B[Dashboard · Signals · Lenses · Graph]
+    C[Projects · Sources · Forge · Users]
+  end
+
+  subgraph Application
+    R[API routes]
+    P[Pipeline: ingest → process → recompute_signals]
+    S[Scheduler / stream worker]
+    M[FastMCP risk tool]
+  end
+
+  subgraph Domain
+    N[Lexicons · MedDRA-style · ATC · GMDN/IMDRF]
+    D[PRR/ROR/χ² · EBGM · IC025 · MaxSPRT]
+    L[Remine · DDI · Pregnancy · Risk · SMQ · Class · Vaccine · Geo]
+    E[Evidence enrich · SAR · Casefile · E2B/CIOMS]
+  end
+
+  subgraph Infrastructure
+    DB[(SQLAlchemy ORM)]
+    Cache[Remine lab corpus fingerprint cache]
+    Files[Fixtures · VAERS/FAERS samples]
+  end
+
+  Presentation --> Application --> Domain --> Infrastructure
+```
+
+### 4.3 Signal pipeline (happy path)
+
+```mermaid
+sequenceDiagram
+  participant Src as Data source / Forge
+  participant Ingest as Ingestion
+  participant Scrub as PII scrub
+  participant NLP as NLP + 4-gate
+  participant DMA as Disproportionality
+  participant UI as Signal Detail / Lenses
+
+  Src->>Ingest: Raw posts / ICSRs
+  Ingest->>Scrub: Deduplicate + language
+  Scrub->>NLP: Clean text
+  NLP->>NLP: Entities · sentiment · negation
+  NLP->>DMA: AE-flagged (product, event) pairs
+  DMA->>DMA: PRR/ROR/χ²/EBGM/IC · SDR · spike
+  DMA->>UI: Signal rows + briefing + remine/DDI overlays
+  Note over UI: Evidence enrichment runs in background<br/>so Detail never hangs on PubMed/MAUDE
+```
+
+### 4.4 Remine (competition-bias) — conceptual 2×2
+
+```
+Before unmasking (full corpus):
+
+                 Event X     Other events
+  Product A         a             b
+  Others            c             d
+
+  PRR = (a/(a+b)) / (c/(c+d))
+
+After case-level unmasking (drop whole reports that mention masker M):
+
+  Same table rebuilt on residual cases.
+  MR = PRR_after / PRR_before
+     = coreporting_term × comparator_term
+
+  • comparator_term — classical masking (shared by every product on event X)
+  • coreporting_term — pair-specific (target's cases overlapped M)
+  • Actionable outcome — pair crosses signalling threshold after unmask
+```
+
+### 4.5 Deploy topology (current free-tier)
+
+```mermaid
+flowchart LR
+  Browser --> Vercel[Vercel · vigil-ai-eight.vercel.app]
+  Vercel -->|/api proxy| Render[Render · vigil-ai-api]
+  Render --> Neon[(Neon Postgres)]
+  Render -.->|optional| ExtAPIs[openFDA / NCBI / …]
+```
+
+Cold start on free Render: wake `/api/health` once (~30–60s) before a demo.
+
+---
+
+## 5. End-to-end data journey
+
+| Step | What happens | Why |
+|------|--------------|-----|
+| 1. Ingest | Crawl catalog, live stream, Pathfinder-approved sources, Forge, or **Load PV demo pack** | Get real / realistic text into the workspace |
+| 2. Scrub | Regex (+ optional Presidio) removes PII before DB | Privacy; never echo identity strings |
+| 3. NLP | Drugs→generic/ATC; symptoms→MedDRA-style PT/SOC; devices→GMDN/IMDRF | Comparable coding for stats |
+| 4. 4-gate AE | Product · symptom · negative sentiment · non-negated | Explainable “is this an AE?” |
+| 5. Recompute | Aggregate pairs → PRR/ROR/χ²/EBGM/IC · strength · SDR · spikes | Regulator-shaped ranking |
+| 6. Lenses | Remine, DDI, pregnancy, risk, SMQ… | Sensitivity / special populations — **do not overwrite** stored SDR |
+| 7. Evidence | PubMed / DailyMed / recalls / MAUDE (background) | Corroborate, don’t block UI |
+| 8. Workflow | Inbox → looking into it → … → done / not a concern | Ops ownership |
+| 9. Export | SAR PDF/MD · E2B R2/R3 · CIOMS I (demo templates) | Hand-off story |
+
+---
+
+## 6. How to use the app (by hub)
+
+### 6.1 First 5 minutes (recommended path)
+
+1. Open https://vigil-ai-eight.vercel.app → **Login**.  
+2. Header: confirm project (**General Pharmacovigilance** is the default).  
+3. **Data Sources** → **Load PV demo pack** (if Remine/DDI/Pregnancy look empty).  
+4. **Safety Signals → Detect** → type `warfarin` or `semaglutide` in the jump box → open a row.  
+5. Read the **plain-English briefing** at the top, then scroll to gates / DMA / remine.  
+6. **Lenses → Remine lab** → filter **Needs review** → Run remine on warfarin / haemorrhage.  
+7. Optional: **Evidence Explorer** graph → pick the same product–event.
+
+### 6.2 Navigation map
+
+| Hub | Route | Tabs | Use it when… |
+|-----|-------|------|----------------|
+| Homepage | `/` | — | Marketing / wake API before login |
+| Dashboard | `/dashboard` | Corpus · Ops KPIs | Volume, AE rate, triage quality |
+| Safety Signals | `/signals` | Detect · Workflow · Alerts | Find → manage → escalate |
+| Analytic Lenses | `/lenses` | Remine · Risk · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS | Stress-test or special-population views |
+| Evidence Explorer | `/graph` | Graph · Story · Glossary | Relationships & patient-slang → PT |
+| Projects | `/projects` | — | Create workspaces + **keywords** for Pathfinder |
+| Source Discovery | `/source-queue` | Pathfinder · Manual URL | Find / approve communities |
+| Data Sources | `/sources` | Catalog · Live · Networks · Agent | Crawl & demo pack |
+| Data Forge | `/forge` | — | Synthetic posts (analyst+) |
+| Users | `/users` | — | Admin only |
+
+**Shortcuts:** `⌘K` / `Ctrl+K` · header project switcher · **Sources → Fetch** (analyst+) · **Reset** (admin — avoid mid-demo).
+
+Legacy URLs (`/lifecycle`, `/alerts`, `/smq`, …) redirect into the hubs above.
+
+### 6.3 Signal Detail — what non-technical readers should look at first
+
+1. **Briefing card** — worry level, why bullets, glossary, next-step buttons.  
+2. **Supporting posts** — gate checkmarks (why it counted as an AE).  
+3. **Disproportionality strip** — PRR / IC025 / EB05 / strength / SDR.  
+4. **Competition-bias remine** — only when peers share the event.  
+5. **SAR / E2B / workflow** — “what would we do next.”
+
+Evidence (PubMed etc.) may say “pending” briefly — enrichment is backgrounded so device signals (e.g. coronary stent) no longer hang forever.
+
+---
+
+## 7. Feature catalog (what / why / where)
+
+### Core detection
+
+| Feature | What | Why | Where |
+|---------|------|-----|-------|
+| Detect table | Ranked product→event with PRR, EB05, IC025, SDR, filters, search | Hero triage list | `/signals` |
+| Jump search | Type drug / vaccine / device / event | Avoid scrolling 300+ rows | Detect search boxes |
+| Signal briefing | Deterministic plain-English summary | Non-technical stakeholders | Top of Signal Detail |
+| 4-gate AE | Explainable gates + confidence | Auditability | Supporting posts |
+| Disproportionality | PRR/ROR/χ² + Bayesian EBGM/IC | Regulator-shaped ranking | Detail + Detect |
+| Spike / MaxSPRT | Time + sequential boundaries | Emerging / repeated-look control | Detail / alerts |
+| WHO-UMC cues | Temporal, de/rechallenge… | Causality language | Detail |
+| Workflow + alerts | Kanban + inbox actions | Ops ownership | `/signals?tab=…` |
+
+### Analytic lenses (overlays — do **not** overwrite stored SDR)
+
+| Lens | What | Why | Where |
+|------|------|-----|-------|
+| **Remine lab** | Screens **every** remine-eligible pair; case-level unmask; MR split into co-reporting × comparator; outcomes: unmasked / co_reported / vanished / attenuated / amplified / stable | Competition bias (Pariente / Maignen / ENCePP Ch.11) | `/lenses?tab=remine` |
+| **Risk populations** | Logistic (NumPy IRLS; optional sklearn/LGBM) segments by age/sex/comorbidity | Proactive risk mitigation before severe harm | `/lenses?tab=risk` |
+| **DDI** | Co-mention pairs vs chance + clinical risk flags | Polypharmacy AE patterns | `/lenses?tab=ddi` |
+| **Pregnancy** | Exposure + congenital / perinatal events | Special-population PV | `/lenses?tab=pregnancy` |
+| **SMQ** | Pool PTs into syndrome signals | Catch fragmented reporting | `/lenses?tab=smq` |
+| **Class effects** | Same event across ATC class | Class vs product signal | `/lenses?tab=class` |
+| **Vaccine** | AESI / Brighton-style focus | Vaccine safety lens | `/lenses?tab=vaccine` |
+| **Geo** | Spatial concentration vs expected | Cluster detection | `/lenses?tab=spatial` |
+| **vs FAERS** | Social signal vs openFDA pattern | Divergence / corroboration | `/lenses?tab=divergence` |
+
+### Evidence & export
+
+| Feature | What | Where |
+|---------|------|-------|
+| Knowledge graph | Drug ↔ AE force graph + inspector | `/graph` |
+| Story mode | Guided A-vs-B narrative | `/graph?tab=story` |
+| Glossary | Patient slang → PT | `/graph` glossary tab |
+| Casefile trajectory | Snapshots over time | Signal Detail |
+| SAR | GVP Module IX–shaped PDF/MD | Signal Detail |
+| E2B R2/R3 · CIOMS I | Demo XML / form templates | Signal Detail |
+
+### Workspace ops
+
+| Feature | What | Why |
+|---------|------|-----|
+| Projects + keywords | Therapeutic workspaces; keywords drive Pathfinder & literature narrowing | Swift, scoped retrieval |
+| Pathfinder | Suggest forums/communities from keywords | Source discovery without manual URL hunting |
+| PV demo pack | VAERS + FAERS bulk samples + pregnancy/DDI-friendly ICSRs | Instant remine / DDI / pregnancy demos |
+| Data Forge | Synthetic narratives + quality loop | Zero-PHI stress testing |
+| Network registry | Live connectors vs licensed **surrogates** | Honest architecture |
+
+---
+
+## 8. Signal science (how numbers work)
+
+### 8.1 2×2 disproportionality
+
+| Cell | Meaning |
+|------|---------|
+| **a** | Target product + target event |
+| **b** | Target product + other events |
+| **c** | Other products + target event |
+| **d** | Rest |
+
+- **PRR** = (a/(a+b)) / (c/(c+d))  
+- **ROR** = (a·d) / (b·c)  
+- Continuity: **Haldane–Anscombe +0.5** on all cells  
+- **χ² (Yates)** for independence  
+- **EBGM / EB05** — MGPS-style Bayesian shrinkage (FDA-flavored)  
+- **IC / IC025** — BCPNN (UMC-flavored)  
+- **SDR** — composite “signal of disproportionate reporting” when any regulator-style criterion fires  
+
+**Strength tiers**
+
+| Tier | Rule |
+|------|------|
+| STRONG | PRR ≥ 2, χ² ≥ 4, count ≥ 3 |
+| MODERATE | PRR ≥ 1.5, count ≥ 2 |
+| WEAK | else |
+
+### 8.2 Remine outcomes (read carefully)
+
+| Outcome | Meaning | Demo language |
+|---------|---------|---------------|
+| `unmasked` | Crosses signalling threshold after removing maskers | “This was genuinely masked — escalate.” |
+| `co_reported` | Target’s own rate moves because cases overlapped the masker | “Confounding / shared cases — review.” |
+| `vanished` | Pair disappears when masker cases are removed | “Association lived only in shared reports.” |
+| `attenuated` | Weakens / drops below threshold | “May have been inflated.” |
+| `amplified` | PRR rises only by the **shared** comparator factor | “Expected arithmetic — not pair-specific.” |
+| `stable` | No meaningful competition-bias effect | “No remine action.” |
+
+Evidence tiers: **evaluable** (≥3 cases, Evans), **provisional** (2), **exploratory** (1).
+
+Remine is **read-only sensitivity** — Detect table baselines are not overwritten.
+
+### 8.3 Risk populations (proactive strata)
+
+Input: product + target AE PT.  
+Features: age bracket, sex, comorbidity vector (lexicon→UMLS/ICD-style cues), severity ordinal.  
+Output: predicted risk, relative elevation vs baseline, top contributing factors.  
+Also exposed as FastMCP tool `predict_high_risk_populations`.
+
+---
+
+## 9. NLP & 4-gate AE engine
+
+All four gates must pass for `ae_flag = true`:
+
+| Gate | Requirement |
+|------|-------------|
+| 1 | Product entity present (drug / vaccine / device) |
+| 2 | Symptom or malfunction entity present |
+| 3 | **Negative** sentiment |
+| 4 | Symptom **not** negated |
+
+`ae_confidence ≈ min(0.99, |sentiment| × 0.9 + 0.1)` with full gate traces on supporting posts.
+
+Normalization stack (open surrogates — **not** licensed MedDRA/UMLS):
+
+- Drugs → generic + WHO **ATC** (RxNorm when online)  
+- Symptoms → MedDRA-style **PT/SOC** (+ hybrid RapidFuzz / embedding match)  
+- Devices → **GMDN** / FDA product-code style; failures → **IMDRF**  
+- Missingness is kept as a feature (no silent imputation)
+
+---
+
+## 10. Project keywords for swift retrieval
+
+### What they are
+
+On **Projects → Create workspace**, the field **keywords, comma-separated** stores a JSON list on the project (`keywords_json`). They are **not** a free-text search of the whole internet by themselves — they are the **intent vocabulary** VigilAI uses to retrieve the right sources and literature **fast** for that workspace.
+
+### Where they are consumed
+
+| Consumer | How keywords help |
+|----------|-------------------|
+| **Pathfinder** (`Source Discovery`) | Builds the search intent: *“patient forums discussing {keywords}…”* → SearXNG / Exa / Tavily / offline seeds |
+| **Literature crawls** | Narrows PubMed / Europe PMC–style queries with project product keywords |
+| **Workspace identity** | Shown as chips on the project card so teammates know the surveillance focus |
+| **Language hint** | Pathfinder infers CJK / regional second passes from keywords + therapeutic area |
+
+### How to write good keywords
+
+1. **3–8 terms** (Pathfinder uses roughly the first 5 in the intent string).  
+2. Mix **product / class**, **event / symptom**, and **community language** (*side effect*, *forum*, *adverse reaction*).  
+3. Prefer phrases people actually type: `checkpoint inhibitor`, not only `ICI`.  
+4. For devices: include both **device class** and **failure mode** (*infusion pump*, *overinfusion*).  
+5. Avoid PII, brand-only spam, or single stop-words (`the`, `drug`).  
+6. After saving: set the project active in the header → **Source Discovery → Run Pathfinder** → Approve sources → Fetch / Fill workspace.
+
+### Default seeded workspaces
+
+| Project | Keywords |
+|---------|----------|
+| General Pharmacovigilance | `adverse reaction`, `side effect`, `drug safety`, `pharmacovigilance` |
+| Oncology Surveillance | `immunotherapy`, `checkpoint inhibitor`, `chemotherapy side effects`, `oncology forum` |
+| Vaccine Monitoring | `vaccine side effects`, `reactogenicity`, `post vaccination`, `immunization` |
+
+---
+
+## 11. Compiled keyword packs (copy/paste)
+
+Paste into **Projects → keywords** (comma-separated). Pick one pack or mix 4–6 terms.
+
+### General PV / social listening
+```
+adverse reaction, side effect, drug safety, pharmacovigilance, patient forum, MedWatch
+```
+
+### Anticoagulants / haemorrhage
+```
+warfarin, rivaroxaban, apixaban, haemorrhage, bleeding, anticoagulant, INR
+```
+
+### Psychiatry / suicidality
+```
+paroxetine, sertraline, lithium, suicidal ideation, akathisia, SSRI, bipolar forum
+```
+
+### Metabolic / GLP-1
+```
+semaglutide, Ozempic, Wegovy, pancreatitis, gastroparesis, nausea, weight loss drug
+```
+
+### Oncology / immunotherapy
+```
+pembrolizumab, nivolumab, checkpoint inhibitor, immune-related AE, colitis, pneumonitis, oncology forum
+```
+
+### Pregnancy / teratogen
+```
+pregnancy, congenital anomaly, birth defect, teratogen, lithium pregnancy, valproate, neural tube defect
+```
+
+### Vaccine / AESI
+```
+myocarditis, vaccine side effects, reactogenicity, MMR, COVID-19 vaccine, VAERS, immunization
+```
+
+### Devices — cardiac / implant
+```
+pacemaker, coronary stent, defibrillator, lead fracture, device malfunction, MAUDE, implant forum
+```
+
+### Devices — diabetes / infusion
+```
+insulin pump, continuous glucose monitor, CGM, overinfusion, sensor error, infusion set, diabetes device
+```
+
+### Devices — respiratory / other
+```
+CPAP, ventilator, mask leak, endoscope, reprocessing, field safety notice, MHRA
+```
+
+### Dermatologic / isotretinoin
+```
+isotretinoin, Accutane, depression, IBD, dermatology forum, dry skin severe
+```
+
+### DDI / polypharmacy demos
+```
+polypharmacy, drug interaction, warfarin amiodarone, serotonin syndrome, concomitant medication
+```
+
+### How to verify a pack worked
+
+1. Create / edit project with the pack → **Create project**.  
+2. Select it in the header.  
+3. **Source Discovery → Run Pathfinder** — suggested URLs should reflect the pack.  
+4. **Fill workspace** or crawl from **Data Sources**.  
+5. **Detect** search for a product from the pack (e.g. `warfarin`).
+
+### In-app jump keywords (Signals Detect search)
+
+These are **corpus lookup** strings, not Pathfinder keywords — type them to jump without scrolling:
+
+| Domain | Try these |
+|--------|-----------|
+| Drugs | `warfarin`, `rivaroxaban`, `semaglutide`, `paroxetine`, `sertraline`, `lithium`, `ibuprofen`, `prednisone` |
+| Vaccines | `covid-19 mrna vaccine`, `MMR` |
+| Devices | `coronary stent`, `catheter`, `pacemaker`, `insulin pump`, `continuous glucose monitor` |
+| Events | `Haemorrhage`, `Fatigue`, `Anxiety`, `Device malfunction`, `Nausea` |
+
+---
+
+## 12. Data sources & network honesty
+
+### One-click catalog (examples)
+
+Fast / demo-friendly: Google News, life-science news, FDA RSS, FAERS live/bulk, VAERS, PubMed, Europe PMC, DailyMed, MHRA devices, MAUDE, device recalls, **Load PV demo pack**.
+
+Slower / key-gated: YouTube, X/Twitter, Reddit direct / Pullpush.
+
+### Live vs surrogate
+
+| Kind | Examples | Reality in VigilAI |
+|------|----------|--------------------|
+| **Live / free** | openFDA FAERS & MAUDE, PubMed, DailyMed, MHRA FSNs | Real network calls when online; fixtures offline |
+| **Surrogate / registry slot** | WHO VigiBase/VigiLyze, FDA Sentinel, NESTcc | Documented as architecture honesty — exploration over *our* corpus, not licensed bulk ingest |
+
+---
+
+## 13. Exports & compliance surfaces
+
+| Export | Shape | Status |
+|--------|-------|--------|
+| SAR PDF / Markdown | GVP Module IX–inspired signal assessment | Demo template |
+| ICH E2B R2 / R3 XML | ICSR electronic exchange | Demo — not a validated gateway |
+| CIOMS I | Classic form-style | Demo |
+| Audit trail | Role actions logged | Prototype integrity |
+
+Always show the disclaimer (§16) in customer-facing demos.
+
+---
+
+## 14. How to run & deploy
+
+### Live
+
+| Surface | URL |
+|---------|-----|
+| App | https://vigil-ai-eight.vercel.app |
+| API health | https://vigil-ai-api.onrender.com/api/health |
+| Proxied health | https://vigil-ai-eight.vercel.app/api/health |
+
+### Local (summary)
+
+```powershell
+# Backend
+cd backend
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+
+# Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. Prefer an existing DB for presentations — do **not** Reset mid-demo.
+
+Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgres. See `docs/DEPLOY_FREE.md`.
+
+---
+
+## 15. Repo map (for engineers)
+
+| Area | Path | Role |
+|------|------|------|
+| API | `backend/app/api/routes.py` | HTTP surface |
+| Models | `backend/app/models.py` | ORM |
+| Pipeline | `backend/app/pipeline.py` | Process + recompute |
+| NLP | `backend/app/nlp/*` | Entities, gates, MedDRA-style |
+| Analytics | `backend/app/analytics/*` | DMA, remine, DDI, pregnancy, risk, SAR… |
+| Ingestion | `backend/app/ingestion/*` | Crawls, fixtures, bulk SRS |
+| Evidence | `backend/app/evidence/*` | Enrichment, registry |
+| Projects | `backend/app/projects/*` | Scope, Pathfinder, keywords |
+| MCP | `backend/app/mcp/*` | `predict_high_risk_populations` |
+| UI pages | `frontend/src/pages/*` | Hubs |
+| API client | `frontend/src/api.js` | REST wrappers |
+
+---
+
+## 16. Disclaimers
+
+- Prototype for demonstration and architecture review.  
+- Synthetic / demo data is **fictional**.  
+- openFDA coverage is **US FAERS / MAUDE** (plus other open feeds as wired).  
+- MedDRA coding is an **open surrogate**, not a licensed MedDRA distribution.  
+- E2B / CIOMS / SAR are **demo templates**, not validated submission artifacts.  
+- **Not for clinical use** and not a substitute for a validated PV system.
+
+---
+
+## 17. Glossary
+
+| Term | Plain meaning |
+|------|----------------|
+| **AE** | Adverse event |
+| **AESI** | Adverse event of special interest (often vaccines) |
+| **ATC** | WHO Anatomical Therapeutic Chemical drug class |
+| **BCPNN / IC025** | Bayesian confidence propagation; IC lower bound |
+| **DMA** | Disproportionality analysis methods |
+| **EBGM / EB05** | Empirical Bayes geometric mean; 5% lower bound |
+| **GMDN** | Global Medical Device Nomenclature |
+| **GVP** | Good Pharmacovigilance Practices (EU) |
+| **ICSR** | Individual Case Safety Report |
+| **IMDRF** | International Medical Device Regulators Forum terms |
+| **MAUDE** | FDA device adverse event database |
+| **MedDRA PT/SOC** | Preferred Term / System Organ Class |
+| **PRR / ROR** | Proportional Reporting Ratio / Reporting Odds Ratio |
+| **Remine** | Recompute DMA after removing competitor (masker) cases |
+| **SDR** | Signal of Disproportionate Reporting |
+| **SMQ** | Standardised MedDRA Query (syndrome pool) |
+| **VAERS** | US vaccine adverse event reporting system |
+| **WHO-UMC** | Uppsala Monitoring Centre causality categories |
+
+---
+
+*Document version aligned with Remine corpus-wide screening, Signal briefing, Risk populations, and project keyword packs. For slide-ready bullets see `README.md`; for deploy steps see `DEPLOY_FREE.md`.*
