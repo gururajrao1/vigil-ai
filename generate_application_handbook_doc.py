@@ -243,8 +243,26 @@ def build():
         ],
     )
 
-    # --- 7 ---
-    _h(doc, "7. Feature catalog (highlights)")
+    # --- how to use each feature ---
+    _h(doc, "7. How to use each feature (step by step)")
+    _p(
+        doc,
+        "Full click-by-click recipes for every hub live in the markdown handbook §7 "
+        "(Dashboard, Detect, Signal Detail, Workflow, Alerts, Remine, Risk, DDI, Pregnancy, "
+        "SMQ, Class, Vaccine, Geo, vs FAERS, Graph, Projects/keywords, Pathfinder, Sources, "
+        "Forge, Users, plus a 10-minute hero script). Summary of the operating pattern:",
+    )
+    for line in [
+        "Detect: search product → open row → read briefing first.",
+        "Remine lab: filter Needs review → Run remine → judge threshold crossing, not raw PRR rise.",
+        "Lenses (DDI/Pregnancy/SMQ/…): open tab → follow Open signal / Find in Detect.",
+        "Projects: pick a keyword pack → Create → header switcher → Pathfinder → Fill/Fetch.",
+        "Sources: Load PV demo pack once when Remine/DDI/Pregnancy look empty.",
+        "Exports: SAR / E2B / CIOMS from Signal Detail — demo templates only.",
+    ]:
+        _p(doc, "• " + line, space_after=2)
+
+    _h(doc, "8. Feature catalog (highlights)")
     _table(
         doc,
         ["Feature", "What / Why"],
@@ -262,7 +280,7 @@ def build():
     )
 
     # --- 8 ---
-    _h(doc, "8. Signal science (cheat sheet)")
+    _h(doc, "9. Signal science (cheat sheet)")
     _table(
         doc,
         ["Metric", "Meaning"],
@@ -277,7 +295,7 @@ def build():
     )
 
     # --- 9 ---
-    _h(doc, "9. Project keywords — why they matter")
+    _h(doc, "10. Project keywords — why they matter")
     _p(
         doc,
         "On Projects → Create workspace, comma-separated keywords are stored on the project. "
@@ -288,7 +306,7 @@ def build():
     )
 
     # --- 10 ---
-    _h(doc, "10. Compiled keyword packs (copy/paste)")
+    _h(doc, "11. Compiled keyword packs (copy/paste)")
     packs = [
         ("General PV", "adverse reaction, side effect, drug safety, pharmacovigilance, patient forum, MedWatch"),
         ("Anticoagulants", "warfarin, rivaroxaban, apixaban, haemorrhage, bleeding, anticoagulant, INR"),

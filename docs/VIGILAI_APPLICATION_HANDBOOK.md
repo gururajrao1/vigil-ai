@@ -1,9 +1,10 @@
 # VigilAI — Application Handbook
 
 > **Who this is for:** anyone joining a demo, onboarding, investor walkthrough, or clinical-ops review who needs the *where / how / what / why* of VigilAI in one place.  
+> **How to use:** §6 (hubs) + **§7 step-by-step for every major feature** + §12 keyword packs.  
 > **Live app:** https://vigil-ai-eight.vercel.app · **API:** https://vigil-ai-api.onrender.com  
 > **Default login:** `admin@vigilai.dev` / `admin123` (also `analyst@…` / `viewer@…` — see §3)  
-> **Companion docs:** `README.md` (slide map) · `ARCHITECTURE.md` · `DEMO_SCRIPT.md` · `DEPLOY_FREE.md`
+> **Companion docs:** `README.md` (slide map) · `ARCHITECTURE.md` · `DEMO_SCRIPT.md` · `DEPLOY_FREE.md` · deeper panel lore in `FEATURE_USAGE_GUIDE.md`
 
 ---
 
@@ -42,17 +43,18 @@ Use these terms in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the **Pr
 4. [Architecture (diagrams)](#4-architecture-diagrams)
 5. [End-to-end data journey](#5-end-to-end-data-journey)
 6. [How to use the app (by hub)](#6-how-to-use-the-app-by-hub)
-7. [Feature catalog (what / why / where)](#7-feature-catalog-what--why--where)
-8. [Signal science (how numbers work)](#8-signal-science-how-numbers-work)
-9. [NLP & 4-gate AE engine](#9-nlp--4-gate-ae-engine)
-10. [Project keywords for swift retrieval](#10-project-keywords-for-swift-retrieval)
-11. [Compiled keyword packs (copy/paste)](#11-compiled-keyword-packs-copypaste)
-12. [Data sources & network honesty](#12-data-sources--network-honesty)
-13. [Exports & compliance surfaces](#13-exports--compliance-surfaces)
-14. [How to run & deploy](#14-how-to-run--deploy)
-15. [Repo map (for engineers)](#15-repo-map-for-engineers)
-16. [Disclaimers](#16-disclaimers)
-17. [Glossary](#17-glossary)
+7. [How to use each feature (step by step)](#7-how-to-use-each-feature-step-by-step)
+8. [Feature catalog (what / why / where)](#8-feature-catalog-what--why--where)
+9. [Signal science (how numbers work)](#9-signal-science-how-numbers-work)
+10. [NLP & 4-gate AE engine](#10-nlp--4-gate-ae-engine)
+11. [Project keywords for swift retrieval](#11-project-keywords-for-swift-retrieval)
+12. [Compiled keyword packs (copy/paste)](#12-compiled-keyword-packs-copypaste)
+13. [Data sources & network honesty](#13-data-sources--network-honesty)
+14. [Exports & compliance surfaces](#14-exports--compliance-surfaces)
+15. [How to run & deploy](#15-how-to-run--deploy)
+16. [Repo map (for engineers)](#16-repo-map-for-engineers)
+17. [Disclaimers](#17-disclaimers)
+18. [Glossary](#18-glossary)
 
 ---
 
@@ -286,7 +288,226 @@ Evidence (PubMed etc.) may say “pending” briefly — enrichment is backgroun
 
 ---
 
-## 7. Feature catalog (what / why / where)
+## 7. How to use each feature (step by step)
+
+Each recipe: **where → clicks → what you should see → what to say / watch for**.
+
+### 7.1 Dashboard — Corpus metrics
+
+1. Open **Dashboard** (`/dashboard`).  
+2. Stay on **Corpus metrics**.  
+3. Read totals: posts, AE rate, platforms, top drugs/events, charts.  
+4. Click an AE / product bar if linked — it deep-links into **Detect** with a filter.  
+
+**Say:** “This is volume and yield — not yet a regulatory decision.”
+
+### 7.2 Dashboard — Ops KPIs
+
+1. Switch to **Ops KPIs & SPC**.  
+2. Look at review backlog, time-to-decision, completeness, alert-frequency SPC.  
+
+**Say:** “Ops quality of the safety team, not just science.”
+
+### 7.3 Safety Signals — Detect
+
+1. Open **Safety Signals → Detect**.  
+2. In the **jump box**, type a product (`warfarin`, `semaglutide`, `coronary stent`) and press Enter (optional second box for event).  
+3. Use strength / product-type / region / SDR / spike filters as needed.  
+4. Sort by **PRR**, **EB05**, or **IC025** depending on the story.  
+5. Click a **row** → Signal Detail.  
+
+**Clear filters** with the Clear control on the search box when done.  
+**Gotcha:** empty table after a weird filter combo — clear search + set strength to ALL.
+
+### 7.4 Signal Detail (full walk)
+
+1. From Detect, open any row.  
+2. **Briefing card (top)** — worry level, why bullets, glossary, next-step buttons (scroll to posts / remine / workflow, or export SAR).  
+3. **Header** — product → event; spike dot if rising.  
+4. **Badge strip** — strength, SDR, WHO-UMC, severity, device/drug badges.  
+5. **Disproportionality** — PRR / ROR / χ² / EB05 / IC025 / expected vs observed.  
+6. **Supporting posts** — expand a post; check gate ✓/✕ (product, symptom, sentiment, negation).  
+7. **Competition-bias remine** (if peers share the event) — select maskers → **Remine** → read before/after PRR and interpretation.  
+8. **Casefile / trajectory** — how the signal moved over time (when present).  
+9. **Evidence** — PubMed / labels / recalls (may load a few seconds later).  
+10. **Exports** — SAR PDF/MD, E2B R2/R3, CIOMS.  
+11. **Workflow panel** — assign state (Inbox → Looking into it → …).  
+
+**Say for non-tech:** start at the briefing; only open stats if asked.  
+**Gotcha:** first open of a heavy device signal may show evidence “pending” — wait or soft-refresh; page should not spin forever.
+
+### 7.5 Safety Signals — Workflow
+
+1. Open **Safety Signals → Workflow**.  
+2. Drag or move cards across kanban columns (Inbox → Looking into it → … → Done / Not a concern).  
+3. Open a card to jump back to Signal Detail.  
+
+**Say:** “Same lifecycle states as on the detail page — team ownership.”
+
+### 7.6 Safety Signals — Alert inbox
+
+1. Open **Safety Signals → Alert inbox**.  
+2. Scan spike / strong / high-severity pings.  
+3. Actions: **Escalate** / **Investigate** / **False alarm** (as available).  
+
+**Gotcha:** Escalate ≠ the same as only changing workflow column — show both if asked about ops.
+
+### 7.7 Remine lab
+
+1. **Lenses → Remine lab** (`/lenses?tab=remine`).  
+2. Optional: click **What is this?** for dataset / method.  
+3. Search (`warfarin`, `haemorrhage`) or filter chips: **Needs review**, **Crosses threshold**, **≥3 cases**, **Devices**.  
+4. Sort by Impact / Co-reporting / Count.  
+5. On a card, click **Run remine now** — read interpretation + PRR / IC025 before→after.  
+6. **Open signal →** for SAR / lifecycle.  
+7. If almost empty: **Load PV demo pack**.  
+
+**Say:** “Read-only sensitivity — Detect baselines are not overwritten. Judge threshold crossing, not raw PRR rise.”  
+**Outcomes:** see §9.2 (`unmasked`, `co_reported`, `amplified`, …).
+
+### 7.8 Risk populations
+
+1. **Lenses → Risk populations**.  
+2. Enter a **product** and **target AE** (e.g. product from Detect, AE PT).  
+3. Click **Predict segments** (adjust min confidence if shown).  
+4. Read high-risk segments: predicted risk, relative elevation, contributing factors (age / sex / comorbidity).  
+
+**Say:** “Proactive strata — who might be hurt *before* the next severe case piles up.”  
+**Gotcha:** thin corpus → few segments; load demo pack or Forge then recompute.
+
+### 7.9 DDI findings
+
+1. **Lenses → DDI findings**.  
+2. Scan co-mentioned drug pairs + shared event + risk flag.  
+3. Click **Open signal** or **Find in Detect** to land on a real pair.  
+
+**Say:** “Polypharmacy co-mention vs chance — not a full PBPK interaction engine.”  
+**If empty:** Load PV demo pack (FAERS bulk includes polypharmacy-style ICSRs).
+
+### 7.10 Pregnancy
+
+1. **Lenses → Pregnancy**.  
+2. Review exposure + congenital / perinatal findings.  
+3. Follow **Open signal** / **Find in Detect** (`lithium` + congenital terms work well after demo pack).  
+
+**Say:** “Special-population lens — teratogen / perinatal stratum.”
+
+### 7.11 SMQ syndromes
+
+1. **Lenses → SMQ**.  
+2. Pick a syndrome (or leave all).  
+3. See member PTs pooled — does the *syndrome* light up when single PTs look weak?  
+4. Jump to Detect / Detail from a member row when linked.  
+
+**Say:** “Fragmented reporting of one clinical concept across many PTs.”
+
+### 7.12 Class effects
+
+1. **Lenses → Class effects**.  
+2. Pick an ATC class / event view.  
+3. Ask: same event across the class, or one product standing out?  
+
+**Say:** “Class vs product — labeling / REMS implications differ.”
+
+### 7.13 Vaccine
+
+1. **Lenses → Vaccine**.  
+2. Filter AESI / Brighton-style focus if offered.  
+3. Open a vaccine→event into Detect (e.g. myocarditis after COVID mRNA in demo data).  
+
+**Say:** “Vaccine safety lens on top of the same DMA core.”
+
+### 7.14 Geo clusters
+
+1. **Lenses → Geo clusters**.  
+2. Look for regions with concentration beyond expected share.  
+3. Drill into the product–event if linked.  
+
+**Say:** “Spatial clustering — hypothesis for quality / batch / reporting artifact.”
+
+### 7.15 vs FAERS (divergence)
+
+1. **Lenses → vs FAERS**.  
+2. Compare social / corpus signal pattern vs openFDA FAERS (or offline KB fallback).  
+3. Note agree / diverge — not automatic truth.
+
+### 7.16 Evidence Explorer — Graph
+
+1. Open **Evidence Explorer** (`/graph`).  
+2. Filter product / event.  
+3. Click a node/edge → inspector.  
+4. Use **Signal Story Mode** (isolate → contrast) when available.  
+
+**Say:** “Relationships at a glance — then validate on Signal Detail.”
+
+### 7.17 Evidence Explorer — Compare story & Glossary
+
+1. Tab **Compare story** — guided A-vs-B narrative for an event.  
+2. Tab **Glossary** — patient slang → MedDRA-style PT (show “what patients say”).
+
+### 7.18 Projects + keywords
+
+1. **Projects**.  
+2. Create workspace: name, slug, therapeutic area.  
+3. Click a **keyword pack** chip (or type 3–8 comma-separated terms).  
+4. **Create project** → select it in the **header** switcher.  
+5. **Fill workspace** if post count is 0.  
+6. Go to **Source Discovery → Run Pathfinder** (keywords drive the search intent).  
+
+**Verify:** Pathfinder suggestions and later Detect search reflect the pack (e.g. `warfarin` pack → haemorrhage pairs).
+
+### 7.19 Source Discovery
+
+1. **Source Discovery**.  
+2. Tab **Pathfinder**: **Run Pathfinder** → review suggested URLs → **Approve** / Reject.  
+3. Tab **Manual URL**: paste a forum URL → onboard / sample extract (selectors proposed).  
+
+**Gotcha:** JS-heavy forums may return low confidence — that honesty is correct.
+
+### 7.20 Data Sources — Catalog & PV demo pack
+
+1. **Data Sources → Catalog**.  
+2. Prefer **fast** tiles for demos (News, FAERS, VAERS, PubMed, MAUDE, MHRA…).  
+3. Click **Load PV demo pack** once per workspace when Remine/DDI/Pregnancy need peers.  
+4. Wait for ingest + recompute; then reopen Lenses / Detect.  
+
+**Avoid mid-demo:** slow Reddit/Twitter/YouTube unless the network story is the point.
+
+### 7.21 Data Sources — Live stream · Networks · Agent
+
+1. **Live stream** — start timed continuous ingest (server-side); watch counts rise.  
+2. **Networks** — live connectors vs **surrogate** slots (VigiBase/Sentinel…) — architecture honesty.  
+3. **Agent chat** — natural language → crawl dispatch (login required).
+
+### 7.22 Data Forge
+
+1. **Data Forge** (analyst+).  
+2. Set drug, condition, platform, region, record count → **Generate**.  
+3. Read quality scores; export JSONL/CSV if needed.  
+
+**Gotcha:** Forge output is **synthetic** and not always auto-merged into Detect — say so. Use it for pipeline stress / zero-PHI demos.
+
+### 7.23 Users (admin)
+
+1. **Users** — list / create accounts, change roles (admin / analyst / viewer).
+
+### 7.24 Hero demo scripts (10 minutes)
+
+| Minute | Path | Line to say |
+|--------|------|-------------|
+| 0–1 | Login + wake health if cold | “Offline-first PV + devices.” |
+| 1–2 | Dashboard corpus | “Listening volume.” |
+| 2–4 | Detect → search `warfarin` → Detail briefing | “Plain English first.” |
+| 4–6 | Gates + PRR/IC025 | “Explainable AE + regulator-shaped stats.” |
+| 6–8 | Remine lab → Needs review → Run | “Competition bias sensitivity — baselines untouched.” |
+| 8–9 | Optional DDI or Pregnancy | “Special population / polypharmacy overlays.” |
+| 9–10 | SAR or E2B download | “Hand-off story — demo template, not a validated gateway.” |
+
+**Device alternate:** Detect → `coronary stent` or `insulin pump` → GMDN/IMDRF + MAUDE evidence.
+
+---
+
+## 8. Feature catalog (what / why / where)
 
 ### Core detection
 
@@ -338,7 +559,7 @@ Evidence (PubMed etc.) may say “pending” briefly — enrichment is backgroun
 
 ---
 
-## 8. Signal science (how numbers work)
+## 9. Signal science (how numbers work)
 
 ### 8.1 2×2 disproportionality
 
@@ -365,7 +586,7 @@ Evidence (PubMed etc.) may say “pending” briefly — enrichment is backgroun
 | MODERATE | PRR ≥ 1.5, count ≥ 2 |
 | WEAK | else |
 
-### 8.2 Remine outcomes (read carefully)
+### 9.2 Remine outcomes (read carefully)
 
 | Outcome | Meaning | Demo language |
 |---------|---------|---------------|
@@ -380,7 +601,7 @@ Evidence tiers: **evaluable** (≥3 cases, Evans), **provisional** (2), **explor
 
 Remine is **read-only sensitivity** — Detect table baselines are not overwritten.
 
-### 8.3 Risk populations (proactive strata)
+### 9.3 Risk populations (proactive strata)
 
 Input: product + target AE PT.  
 Features: age bracket, sex, comorbidity vector (lexicon→UMLS/ICD-style cues), severity ordinal.  
@@ -389,7 +610,7 @@ Also exposed as FastMCP tool `predict_high_risk_populations`.
 
 ---
 
-## 9. NLP & 4-gate AE engine
+## 10. NLP & 4-gate AE engine
 
 All four gates must pass for `ae_flag = true`:
 
@@ -411,7 +632,7 @@ Normalization stack (open surrogates — **not** licensed MedDRA/UMLS):
 
 ---
 
-## 10. Project keywords for swift retrieval
+## 11. Project keywords for swift retrieval
 
 ### What they are
 
@@ -445,7 +666,7 @@ On **Projects → Create workspace**, the field **keywords, comma-separated** st
 
 ---
 
-## 11. Compiled keyword packs (copy/paste)
+## 12. Compiled keyword packs (copy/paste)
 
 Paste into **Projects → keywords** (comma-separated). Pick one pack or mix 4–6 terms.
 
@@ -530,7 +751,7 @@ These are **corpus lookup** strings, not Pathfinder keywords — type them to ju
 
 ---
 
-## 12. Data sources & network honesty
+## 13. Data sources & network honesty
 
 ### One-click catalog (examples)
 
@@ -547,7 +768,7 @@ Slower / key-gated: YouTube, X/Twitter, Reddit direct / Pullpush.
 
 ---
 
-## 13. Exports & compliance surfaces
+## 14. Exports & compliance surfaces
 
 | Export | Shape | Status |
 |--------|-------|--------|
@@ -560,7 +781,7 @@ Always show the disclaimer (§16) in customer-facing demos.
 
 ---
 
-## 14. How to run & deploy
+## 15. How to run & deploy
 
 ### Live
 
@@ -593,7 +814,7 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 
 ---
 
-## 15. Repo map (for engineers)
+## 16. Repo map (for engineers)
 
 | Area | Path | Role |
 |------|------|------|
@@ -611,7 +832,7 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 
 ---
 
-## 16. Disclaimers
+## 17. Disclaimers
 
 - Prototype for demonstration and architecture review.  
 - Synthetic / demo data is **fictional**.  
@@ -622,7 +843,7 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 
 ---
 
-## 17. Glossary
+## 18. Glossary
 
 | Term | Plain meaning |
 |------|----------------|
