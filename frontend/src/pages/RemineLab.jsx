@@ -137,6 +137,17 @@ export default function RemineLab({ embedded = false }) {
   const cards = data.cards || [];
   const facets = data.facets || {};
   const method = data.method || {};
+  const totalMatching = data.total_matching ?? cards.length;
+  const totalEligible = data.total_eligible ?? cards.length;
+  // An API predating corpus-wide screening returns no facets/method
+  const legacyApi = data.total_eligible == null;
+  const methodRows = [
+    ['Dataset', method.dataset],
+    ['Eligibility', method.eligibility],
+    ['Technique', method.technique],
+    ['Reading the numbers', method.metrics],
+    ['Evidence tiers', method.tiers],
+  ].filter(([, v]) => v);
 
   return (
     <div className="space-y-5">
@@ -159,11 +170,18 @@ export default function RemineLab({ embedded = false }) {
 
       {showMethod && (
         <Card className="p-4 space-y-2 text-sm text-slate-300 border-sky-700/30 bg-sky-500/[0.03]">
-          <div><span className="text-slate-500 uppercase text-[10px] tracking-wide">Dataset</span><p className="mt-0.5">{method.dataset}</p></div>
-          <div><span className="text-slate-500 uppercase text-[10px] tracking-wide">Eligibility</span><p className="mt-0.5">{method.eligibility}</p></div>
-          <div><span className="text-slate-500 uppercase text-[10px] tracking-wide">Technique</span><p className="mt-0.5">{method.technique}</p></div>
-          <div><span className="text-slate-500 uppercase text-[10px] tracking-wide">Reading the numbers</span><p className="mt-0.5">{method.metrics}</p></div>
-          <div><span className="text-slate-500 uppercase text-[10px] tracking-wide">Evidence tiers</span><p className="mt-0.5">{method.tiers}</p></div>
+          {methodRows.length ? methodRows.map(([label, text]) => (
+            <div key={label}>
+              <span className="text-slate-500 uppercase text-[10px] tracking-wide">{label}</span>
+              <p className="mt-0.5">{text}</p>
+            </div>
+          )) : (
+            <p className="text-slate-400">
+              This API build predates corpus-wide screening, so it returns only a
+              handful of pre-picked cards. Redeploy the backend to screen every
+              eligible product–event pair.
+            </p>
+          )}
         </Card>
       )}
 
@@ -205,7 +223,7 @@ export default function RemineLab({ embedded = false }) {
       </div>
 
       {/* Outcome filters */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className={`flex flex-wrap gap-1.5 ${legacyApi ? 'hidden' : ''}`}>
         {FILTERS.map((f) => {
           const n = f.id === 'all' ? facets.all : facets[f.id];
           const active = only === f.id;
@@ -227,7 +245,8 @@ export default function RemineLab({ embedded = false }) {
       </div>
 
       <p className="text-xs text-slate-500">
-        Showing {cards.length} of {data.total_matching} matching · {data.total_eligible} eligible pairs screened
+        Showing {cards.length} of {totalMatching} matching · {totalEligible} eligible pairs screened
+        {legacyApi && ' · API build predates corpus-wide screening'}
       </p>
 
       {cards.length === 0 ? (
@@ -248,7 +267,7 @@ export default function RemineLab({ embedded = false }) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-slate-100 capitalize flex items-center gap-2 flex-wrap">
                       {c.drug} <span className="text-slate-600">→</span> {c.event}
-                      <span className={`text-[10px] ${tier.tone}`}>{tier.label}</span>
+                      {c.evidence_tier && <span className={`text-[10px] ${tier.tone}`}>{tier.label}</span>}
                       {c.product_type === 'device' && (
                         <span className="text-[10px] text-slate-500 uppercase">device</span>
                       )}
@@ -269,13 +288,17 @@ export default function RemineLab({ embedded = false }) {
                     </div>
 
                     <div className="mt-2 text-[11px] text-slate-500">
-                      Exclude: {(c.maskers || []).join(', ') || '—'} · {c.target_count} of {c.event_total} reports of this event
-                      {!c.credible_masker && <span className="text-slate-600"> · no dominant competitor</span>}
+                      Exclude: {(c.maskers || []).join(', ') || '—'}
+                      {c.event_total != null && ` · ${c.target_count} of ${c.event_total} reports of this event`}
+                      {c.credible_masker === false && <span className="text-slate-600"> · no dominant competitor</span>}
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-2 items-end shrink-0">
-                    <Badge value={oc.label} className={oc.tone} />
+                    <Badge
+                      value={c.outcome ? oc.label : (c.masking_risk || 'ready')}
+                      className={oc.tone}
+                    />
                     <Button
                       variant="primary"
                       disabled={runningKey === key}
@@ -297,7 +320,7 @@ export default function RemineLab({ embedded = false }) {
           {data.has_more && (
             <div className="flex justify-center pt-1">
               <Button variant="ghost" disabled={loading} onClick={() => setOffset(offset + PAGE)}>
-                {loading ? 'Loading…' : `Show more (${data.total_matching - cards.length} left)`}
+                {loading ? 'Loading…' : `Show more (${totalMatching - cards.length} left)`}
               </Button>
             </div>
           )}
