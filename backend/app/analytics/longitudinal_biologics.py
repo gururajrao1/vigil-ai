@@ -28,10 +28,18 @@ _ATMP_CUES = re.compile(
 
 # Wider biologic cues. These are NOT advanced therapies, but they share the
 # delayed-onset / immunogenicity surveillance problem, so they justify a
-# longitudinal view (INN stems: -mab, -cept, -kinra; plus vaccines/biosimilars).
-_BIOLOGIC_CUES = re.compile(
-    r"\b(\w+(?:mab|cept|kinra|ase))\b|\b(biologic|biosimilar|monoclonal|"
-    r"immunoglobulin|vaccine|mrna)\b",
+# longitudinal view.
+# WHO INN stems are matched against the product name only — stems like -ase
+# collide with ordinary words ("disease", "increase") in free text.
+_BIOLOGIC_INN_STEMS = re.compile(
+    r"\b(?=\w{6,}\b)\w+(?:mab|cept|kinra|ase|tide)\b",
+    re.I,
+)
+
+# Explicit class words are safe to match anywhere.
+_BIOLOGIC_KEYWORDS = re.compile(
+    r"\b(biologic|biosimilar|monoclonal antibody|monoclonal|immunoglobulin|"
+    r"vaccine|mrna|fusion protein|recombinant)\b",
     re.I,
 )
 
@@ -97,8 +105,9 @@ def is_advanced_therapy(product: str, text: str = "") -> bool:
 
 def is_biologic(product: str, text: str = "") -> bool:
     """Broader biologic class (mAbs, fusion proteins, vaccines, biosimilars)."""
-    blob = f"{product or ''} {text or ''}"
-    return bool(_BIOLOGIC_CUES.search(blob))
+    if _BIOLOGIC_INN_STEMS.search(product or ""):
+        return True
+    return bool(_BIOLOGIC_KEYWORDS.search(f"{product or ''} {text or ''}"))
 
 
 def extract_onset_days(text: str) -> Optional[float]:
