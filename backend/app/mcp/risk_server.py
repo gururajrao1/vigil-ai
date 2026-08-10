@@ -81,6 +81,22 @@ def get_normalized_feature_matrix_impl(
         db.close()
 
 
+def evaluate_narrative_causality_impl(
+    text: str,
+    product: str = "",
+    event: str = "",
+    fda_known: bool = False,
+) -> dict:
+    from ..nlp.causality_engine import evaluate_narrative_causality
+
+    return evaluate_narrative_causality(
+        text,
+        product=product,
+        event=event,
+        fda_known=fda_known,
+    )
+
+
 def _build_mcp():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -96,13 +112,37 @@ def _build_mcp():
     mcp = FastMCP(
         "vigilai-risk-strata",
         instructions=(
-            "VigilAI proactive risk stratification, ranking, and feature store. "
-            "Use predict_high_risk_populations / rank_high_risk_populations for "
-            "strata, or get_normalized_feature_matrix for the Product-Event-Cohort "
-            "ML feature matrix X with 4-gate explainability. Offline-first; "
+            "VigilAI proactive risk stratification, ranking, feature store, and "
+            "narrative causality (WHO-UMC + Naranjo). Offline-first; "
             "not for clinical decisions."
         ),
     )
+
+    @mcp.tool()
+    async def evaluate_narrative_causality(
+        text: str,
+        product: str = "",
+        event: str = "",
+        fda_known: bool = False,
+    ) -> str:
+        """Run WHO-UMC + Naranjo causality assessment over a case narrative.
+
+        Args:
+            text: Case / social narrative.
+            product: Suspected product name.
+            event: MedDRA-style Preferred Term / symptom.
+            fda_known: Whether openFDA already lists the pair.
+
+        Returns:
+            JSON with who_umc, naranjo checklist, and de/rechallenge tags.
+        """
+        out = evaluate_narrative_causality_impl(
+            text=text,
+            product=product,
+            event=event,
+            fda_known=fda_known,
+        )
+        return json.dumps(out, ensure_ascii=False)
 
     @mcp.tool()
     async def predict_high_risk_populations(

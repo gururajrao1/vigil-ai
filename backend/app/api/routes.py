@@ -1260,6 +1260,50 @@ def get_label_gap(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/label-filter")
+def api_label_filter(
+    product: str,
+    event: str,
+    online: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Module 1 — in-label vs novel tag + Weber alert-gate adjustment."""
+    from ..analytics.label_filter import filter_product_event
+
+    return filter_product_event(
+        product, event, db=db, offline_only=not online,
+    )
+
+
+@router.post("/nlp/causality")
+def api_nlp_causality(payload: dict):
+    """Module 2 — WHO-UMC + Naranjo + de/rechallenge extraction."""
+    from ..nlp.causality_engine import evaluate_narrative_causality
+
+    text = payload.get("text") or ""
+    if not str(text).strip():
+        raise HTTPException(422, "text is required")
+    return evaluate_narrative_causality(
+        text,
+        product=payload.get("product") or payload.get("drug") or "",
+        event=payload.get("event") or payload.get("symptom") or "",
+        fda_known=bool(payload.get("fda_known")),
+        product_type=payload.get("product_type") or "drug",
+        use_optional_bionlp=bool(payload.get("use_optional_bionlp", False)),
+    )
+
+
+@router.get("/signals/{signal_id}/triangulation")
+def api_signal_triangulation(signal_id: int, db: Session = Depends(get_db)):
+    """Module 3 — Social + FAERS/MAUDE + RWD triangulation."""
+    from ..analytics.triangulation import triangulate_signal_row
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    return triangulate_signal_row(db, sig)
+
+
 @router.get("/signals/{signal_id}")
 def get_signal(
     signal_id: int,
@@ -1317,8 +1361,13 @@ def get_signal(
             "title": r.title or "",
             "platform": r.platform,
         })
-    return {
+    base = {
         **signal_to_dict(sig),
+        "supporting_posts": supporting,
+    }
+    enriched = _enrich_gvp_modules(db, sig, base)
+    return {
+        **enriched,
         "trend_series": signal_trend_series(db, sig),
         "supporting_posts": supporting,
         "evidence_mix": evidence_mix(supporting),
@@ -1327,6 +1376,44 @@ def get_signal(
         "evidence_pending": evidence_pending,
         "briefing": _attach_briefing(sig),
     }
+
+
+def _enrich_gvp_modules(db: Session, sig: Signal, payload: dict) -> dict:
+    """Attach label_filter + triangulation (+ light causality) on signal detail."""
+    try:
+        from ..analytics.label_filter import filter_product_event
+        from ..analytics.triangulation import triangulate_signal
+        from ..analytics.lifecycle import gvp_alias_for
+        from ..nlp.causality_engine import evaluate_narrative_causality
+
+        payload["label_filter"] = filter_product_event(
+            sig.drug or "",
+            sig.meddra_pt or sig.symptom or "",
+            pt=sig.meddra_pt,
+            soc=sig.meddra_soc,
+            db=db,
+            offline_only=True,
+        )
+        payload["triangulation"] = triangulate_signal(payload, db=db)
+        payload["gvp_lifecycle_alias"] = gvp_alias_for(sig.lifecycle_status)
+        # Causality on narrative / first supporting excerpt
+        blob = sig.narrative or ""
+        if not blob:
+            for p in (payload.get("supporting_posts") or [])[:3]:
+                blob += " " + (p.get("text") or "")
+        fda = payload.get("fda_evidence") or {}
+        payload["causality_assessment"] = evaluate_narrative_causality(
+            blob,
+            product=sig.drug or "",
+            event=sig.meddra_pt or sig.symptom or "",
+            fda_known=bool(fda.get("known")),
+            product_type=sig.product_type or "drug",
+        )
+    except Exception:
+        payload.setdefault("label_filter", None)
+        payload.setdefault("triangulation", None)
+        payload.setdefault("causality_assessment", None)
+    return payload
 
 
 def _attach_briefing(sig: Signal) -> dict:
@@ -2450,13 +2537,22 @@ def update_lifecycle(
     Body JSON: ``{status, owner?, notes?}``.
     Validates the state transition, updates the signal, and appends an audit log entry.
     """
+    from ..analytics.lifecycle import (
+        LIFECYCLE_TRANSITIONS,
+        compute_priority,
+        gvp_alias_for,
+        is_valid_transition,
+        normalize_lifecycle_status,
+        valid_next_states,
+    )
+
     sig = db.get(Signal, signal_id)
     if not sig:
         raise HTTPException(404, "signal not found")
 
-    new_status = (payload.get("status") or "").lower()
+    new_status = normalize_lifecycle_status(payload.get("status") or "")
     if new_status not in LIFECYCLE_TRANSITIONS:
-        raise HTTPException(422, f"Invalid lifecycle_status '{new_status}'. "
+        raise HTTPException(422, f"Invalid lifecycle_status '{payload.get('status')}'. "
                                  f"Valid states: {list(LIFECYCLE_TRANSITIONS)}")
     current = sig.lifecycle_status or "new"
     if not is_valid_transition(current, new_status):
@@ -2484,7 +2580,134 @@ def update_lifecycle(
     ))
     db.commit()
     db.refresh(sig)
-    return signal_to_dict(sig)
+    out = signal_to_dict(sig)
+    out["gvp_lifecycle_alias"] = gvp_alias_for(sig.lifecycle_status)
+    return out
+
+
+@router.get("/gvp/register")
+def gvp_register(db: Session = Depends(get_db), limit: int = 100):
+    """GVP Module IX Signal Tracking Register (table for Safety Signals hub)."""
+    from ..analytics.label_filter import filter_product_event
+    from ..analytics.lifecycle import gvp_alias_for, valid_next_states
+    from ..analytics.triangulation import triangulate_signal
+    from ..projects.scope import current_project_id
+
+    pid = current_project_id()
+    q = db.query(Signal)
+    if pid is not None:
+        from sqlalchemy import or_
+        q = q.filter(or_(Signal.project_id == pid, Signal.project_id.is_(None), Signal.project_id == 0))
+    signals = q.order_by(Signal.priority_score.desc()).limit(min(limit, 200)).all()
+    signals = sorted(signals, key=lambda s: s.priority_score or 0.0, reverse=True)
+    rows = []
+    for s in signals:
+        base = signal_to_dict(s, fda=True)
+        try:
+            lf = filter_product_event(
+                s.drug or "", s.meddra_pt or s.symptom or "",
+                pt=s.meddra_pt, soc=s.meddra_soc, db=db, offline_only=True,
+            )
+        except Exception:
+            lf = {"tag": "UNKNOWN"}
+        try:
+            tri = triangulate_signal(base, db=db)
+        except Exception:
+            tri = {"urgency_tier": "INSUFFICIENT", "triangulated_risk_score": 0}
+        status = s.lifecycle_status or "new"
+        rows.append({
+            "id": s.id,
+            "product": s.drug,
+            "event": s.meddra_pt or s.symptom,
+            "strength": s.strength,
+            "prr": s.prr,
+            "chi_square": s.chi_square,
+            "who_umc": s.who_umc,
+            "severity": s.severity,
+            "label_tag": (lf or {}).get("tag"),
+            "is_in_label": (lf or {}).get("is_in_label"),
+            "weber_adjusted": ((lf or {}).get("weber") or {}).get("weber_adjusted"),
+            "triangulation_tier": (tri or {}).get("urgency_tier"),
+            "triangulated_risk_score": (tri or {}).get("triangulated_risk_score"),
+            "lifecycle_status": status,
+            "gvp_alias": gvp_alias_for(status),
+            "next_states": valid_next_states(status),
+            "priority_score": s.priority_score or 0,
+            "owner": s.lifecycle_owner,
+            "updated_at": s.lifecycle_updated_at.isoformat() if s.lifecycle_updated_at else None,
+        })
+    return {
+        "rows": rows,
+        "n": len(rows),
+        "disclaimer": (
+            "GVP Module IX–shaped signal tracking register over VigilAI corpus. "
+            "Prototype; not a validated QMS record."
+        ),
+    }
+
+
+@router.get("/gvp/pbrer")
+@router.get("/gvp/pbrer.md")
+def gvp_pbrer_md(db: Session = Depends(get_db), signal_id: int | None = None):
+    """Aggregate PBRER/PSUR draft (markdown)."""
+    from fastapi.responses import PlainTextResponse
+    from ..reports.pbrer import build_pbrer_payload, render_pbrer_markdown
+    from ..projects.scope import current_project_id
+
+    payload = build_pbrer_payload(db, signal_id=signal_id, project_id=current_project_id())
+    return PlainTextResponse(render_pbrer_markdown(payload), media_type="text/markdown")
+
+
+@router.get("/gvp/pbrer.pdf")
+def gvp_pbrer_pdf(db: Session = Depends(get_db), signal_id: int | None = None):
+    from fastapi.responses import Response
+    from ..reports.pbrer import build_pbrer_payload, render_pbrer_pdf
+    from ..projects.scope import current_project_id
+
+    payload = build_pbrer_payload(db, signal_id=signal_id, project_id=current_project_id())
+    data = render_pbrer_pdf(payload)
+    return Response(data, media_type="application/pdf", headers={
+        "Content-Disposition": 'attachment; filename="vigilai_pbrer_draft.pdf"',
+    })
+
+
+@router.get("/gvp/pbrer.docx")
+def gvp_pbrer_docx(db: Session = Depends(get_db), signal_id: int | None = None):
+    from fastapi.responses import Response
+    from ..reports.docx_pdf_generator import render_docx_or_markdown
+    from ..reports.pbrer import build_pbrer_payload, render_pbrer_markdown
+    from ..projects.scope import current_project_id
+
+    payload = build_pbrer_payload(db, signal_id=signal_id, project_id=current_project_id())
+    md = render_pbrer_markdown(payload)
+    raw, media, ext = render_docx_or_markdown("PBRER / PSUR Draft", md, prefer_docx=True)
+    return Response(raw, media_type=media, headers={
+        "Content-Disposition": f'attachment; filename="vigilai_pbrer_draft.{ext}"',
+    })
+
+
+@router.get("/signals/{signal_id}/pbrer.md")
+def signal_pbrer_md(signal_id: int, db: Session = Depends(get_db)):
+    from fastapi.responses import PlainTextResponse
+    from ..reports.pbrer import build_pbrer_payload, render_pbrer_markdown
+
+    if not db.get(Signal, signal_id):
+        raise HTTPException(404, "signal not found")
+    payload = build_pbrer_payload(db, signal_id=signal_id)
+    return PlainTextResponse(render_pbrer_markdown(payload), media_type="text/markdown")
+
+
+@router.get("/signals/{signal_id}/pbrer.pdf")
+def signal_pbrer_pdf(signal_id: int, db: Session = Depends(get_db)):
+    from fastapi.responses import Response
+    from ..reports.pbrer import build_pbrer_payload, render_pbrer_pdf
+
+    if not db.get(Signal, signal_id):
+        raise HTTPException(404, "signal not found")
+    payload = build_pbrer_payload(db, signal_id=signal_id)
+    return Response(render_pbrer_pdf(payload), media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="signal_{signal_id}_pbrer.pdf"',
+    })
 
 
 @router.get("/lifecycle/summary")
@@ -2494,6 +2717,8 @@ def lifecycle_summary(db: Session = Depends(get_db)):
     Returns signal counts by lifecycle status and the top 10 signals ranked by
     priority_score (descending) with key fields for triage.
     """
+    from ..analytics.lifecycle import gvp_alias_for
+
     signals = db.query(Signal).all()
     counts: dict[str, int] = {s: 0 for s in LIFECYCLE_TRANSITIONS}
     for sig in signals:
@@ -2511,6 +2736,7 @@ def lifecycle_summary(db: Session = Depends(get_db)):
                 "event": s.meddra_pt or s.symptom,
                 "priority_score": s.priority_score or 0.0,
                 "lifecycle_status": s.lifecycle_status or "new",
+                "gvp_alias": gvp_alias_for(s.lifecycle_status),
                 "strength": s.strength,
                 "severity": s.severity,
                 "label_novelty": s.label_novelty or "unknown",

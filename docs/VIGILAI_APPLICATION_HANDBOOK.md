@@ -642,6 +642,17 @@ Normalization stack (open surrogates — **not** licensed MedDRA/UMLS):
 - Devices → **GMDN** / FDA product-code style; failures → **IMDRF**  
 - Missingness is kept as a feature (no silent imputation)
 
+### 10.1c GVP Signal Management OS (Modules 1–4)
+
+| Module | UI path | API |
+|--------|---------|-----|
+| Label filter + Weber gates | **Signal Detail** — label badge (`[IN-LABEL]` / `[OFF-LABEL: NOVEL]`) | `GET /api/label-filter` |
+| WHO-UMC + Naranjo causality | **Signal Detail** — Causality assessment panel | `POST /api/nlp/causality` · MCP `evaluate_narrative_causality` |
+| Triangulation matrix | **Signal Detail** — Multi-source triangulation card | `GET /api/signals/{id}/triangulation` |
+| GVP IX register + PBRER/SAR | **Safety Signals → Register** (`/signals?tab=register`) | `GET /api/gvp/register`, `/api/gvp/pbrer.pdf|.docx`, existing SAR routes |
+
+All generated SAR/PBRER documents carry an AI-assisted draft disclaimer requiring QPPV/Medical Reviewer validation.
+
 ### 10.1b Predictive intelligence (Phase 1–2)
 
 Long-term ClairLabs-aligned stack now has a working Phase 1–2 spine:

@@ -8,6 +8,9 @@ import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 import SourceTraceability from '../components/ui/SourceTraceability';
 import SeverityAuditPopover from '../components/SeverityAuditPopover';
 import SignalBriefing from '../components/SignalBriefing';
+import LabelComparisonBadge from '../components/LabelComparisonBadge';
+import CausalityAssessmentPanel from '../components/CausalityAssessmentPanel';
+import TriangulationMatrixCard from '../components/TriangulationMatrixCard';
 
 // vigiGrade-style completeness dimensions (labels mirror app/analytics/completeness.py).
 const COMPLETENESS_DIMS = [
@@ -640,6 +643,16 @@ export default function SignalDetail() {
         <SignalBriefing briefing={briefing} onAction={onBriefingAction} />
       )}
 
+      <div className="grid md:grid-cols-2 gap-4">
+        <TriangulationMatrixCard triangulation={sig.triangulation} />
+        <CausalityAssessmentPanel
+          causality={sig.causality_assessment}
+          whoUmc={sig.who_umc}
+          whoFactors={sig.who_umc_factors}
+          severity={sig.severity}
+        />
+      </div>
+
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-100 capitalize flex items-center gap-3">
@@ -653,6 +666,7 @@ export default function SignalDetail() {
             {sig.sdr_flag && <Badge value="SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" title="Signal of Disproportionate Reporting" />}
             <Badge kind="causality" value={`WHO-UMC: ${sig.who_umc}`} />
             <SeverityAuditPopover signalId={sig.id} severity={sig.severity} />
+            <LabelComparisonBadge labelFilter={sig.label_filter} novelty={sig.label_novelty} />
             {pgx && <Badge value={`🧬 PGx: ${pgx.gene}`} className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30" title={`${pgx.allele} · ${pgx.level}`} />}
             {boxed && <Badge value="⬛ Boxed warning" className="bg-amber-500/15 text-amber-300 border-amber-500/30" title={(boxed.topics || []).join('; ')} />}
             {mechanism && <Badge value={`⚛ Plausible: ${mechanism.target_or_moa}`} className="bg-cyan-500/15 text-cyan-200 border-cyan-500/30" title={mechanism.mechanism_explanation} />}

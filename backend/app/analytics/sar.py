@@ -82,7 +82,7 @@ def build_sar_payload(db: Session, sig: Signal) -> dict:
     else:
         action = "Routine surveillance; document if dismissed."
 
-    return {
+    payload = {
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "title": f"Signal Assessment Report — {sig.drug} / {sig.meddra_pt or sig.symptom}",
         "gvp_module": "EMA GVP Module IX (signal management) — documentation pack",
@@ -121,6 +121,9 @@ def build_sar_payload(db: Session, sig: Signal) -> dict:
             "factors": _safe_json(sig.who_umc_factors_json, []) or [],
             "severity": sig.severity,
         },
+        "label_filter": None,
+        "naranjo": None,
+        "triangulation": None,
         "lifecycle": {
             "status": sig.lifecycle_status or "new",
             "priority_score": sig.priority_score,
@@ -156,6 +159,38 @@ def build_sar_payload(db: Session, sig: Signal) -> dict:
         "recommended_action": action,
         "disclaimer": _DISCLAIMER,
     }
+
+    # Enrich with Modules 1–3 (offline-safe)
+    try:
+        from .label_filter import filter_product_event
+        from .triangulation import triangulate_signal
+        from ..api.helpers import signal_to_dict
+        from ..nlp.causality_engine import naranjo_score
+
+        base = signal_to_dict(sig, fda=True)
+        payload["label_filter"] = filter_product_event(
+            sig.drug or "",
+            sig.meddra_pt or sig.symptom or "",
+            pt=sig.meddra_pt,
+            soc=sig.meddra_soc,
+            db=db,
+            offline_only=True,
+        )
+        payload["triangulation"] = triangulate_signal(base, db=db)
+        # Naranjo over concatenated case excerpts
+        blob = " ".join(c.get("excerpt") or "" for c in payload.get("case_series") or [])
+        payload["naranjo"] = naranjo_score(
+            blob or (sig.narrative or ""),
+            product=sig.drug or "",
+            event=sig.meddra_pt or sig.symptom or "",
+            fda_known=bool((fda or {}).get("known")),
+        )
+        if payload.get("naranjo"):
+            payload["causality"]["naranjo"] = payload["naranjo"]
+    except Exception:
+        pass
+
+    return payload
 
 
 def render_sar_markdown(payload: dict) -> str:

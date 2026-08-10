@@ -474,6 +474,14 @@ export const api = {
 
   // labeling-gap detection (novel / in_label / boxed / unknown tier counts + novel list)
   labelGap: () => req('/api/label-gap'),
+  labelFilter: (product, event, { online = false } = {}) =>
+    req(`/api/label-filter?product=${encodeURIComponent(product)}&event=${encodeURIComponent(event)}&online=${online}`),
+  narrativeCausality: (body) =>
+    req('/api/nlp/causality', { method: 'POST', body: JSON.stringify(body) }),
+  triangulation: (id) => req(`/api/signals/${id}/triangulation`),
+  gvpRegister: (limit = 100) => req(`/api/gvp/register?limit=${limit}`),
+  exportPbrerPdfUrl: () => `${BASE}/api/gvp/pbrer.pdf`,
+  exportPbrerDocxUrl: () => `${BASE}/api/gvp/pbrer.docx`,
 
   // GVP Module IX signal lifecycle management
   updateLifecycle: (id, body) =>

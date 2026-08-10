@@ -33,6 +33,7 @@ const CMD_ITEMS = [
   { label: 'Dashboard · corpus metrics', icon: '📊', path: '/dashboard' },
   { label: 'Dashboard · ops KPIs', icon: '📈', path: '/dashboard?tab=ops' },
   { label: 'Safety Signals · detect', icon: '🚨', path: '/signals' },
+  { label: 'Safety Signals · Register', icon: '📋', path: '/signals?tab=register' },
   { label: 'Safety Signals · workflow', icon: '📋', path: '/signals?tab=lifecycle' },
   { label: 'Safety Signals · alert inbox', icon: '🔔', path: '/signals?tab=alerts' },
   { label: 'Analytic Lenses', icon: '◈', path: '/lenses' },

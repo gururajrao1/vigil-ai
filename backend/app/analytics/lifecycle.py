@@ -105,3 +105,41 @@ def valid_next_states(current: str) -> list[str]:
 def is_valid_transition(from_state: str, to_state: str) -> bool:
     """Return True when the from→to transition is allowed by GVP Module IX workflow."""
     return to_state in LIFECYCLE_TRANSITIONS.get(from_state, [])
+
+
+# Prompt / EMA-style aliases ↔ persisted snake_case states
+GVP_ALIAS_TO_STATE: dict[str, str] = {
+    "detection": "new",
+    "validation": "under_evaluation",
+    "prioritization": "prioritized",
+    "assessment": "assessed",
+    "regulatory_action": "assessed",  # action notes live on assessed→closed
+    "closed": "closed",
+    "rejected": "rejected",
+    # pass-through of native states
+    "new": "new",
+    "under_evaluation": "under_evaluation",
+    "validated": "validated",
+    "prioritized": "prioritized",
+    "assessed": "assessed",
+}
+
+STATE_TO_GVP_ALIAS: dict[str, str] = {
+    "new": "DETECTION",
+    "under_evaluation": "VALIDATION",
+    "validated": "VALIDATION",
+    "prioritized": "PRIORITIZATION",
+    "assessed": "ASSESSMENT",
+    "closed": "CLOSED",
+    "rejected": "REJECTED",
+}
+
+
+def normalize_lifecycle_status(raw: str | None) -> str:
+    """Map GVP alias or native status to persisted lifecycle_status."""
+    key = (raw or "new").strip().lower().replace(" ", "_")
+    return GVP_ALIAS_TO_STATE.get(key, key if key in LIFECYCLE_STATES else "new")
+
+
+def gvp_alias_for(status: str | None) -> str:
+    return STATE_TO_GVP_ALIAS.get((status or "new").lower(), "DETECTION")
