@@ -32,6 +32,7 @@ const CMD_ITEMS = [
   { label: 'Biotech homepage', icon: '◈', path: '/' },
   { label: 'Dashboard · corpus metrics', icon: '📊', path: '/dashboard' },
   { label: 'Dashboard · ops KPIs', icon: '📈', path: '/dashboard?tab=ops' },
+  { label: 'Dashboard · Inspection & COU', icon: '🛡', path: '/dashboard?tab=governance' },
   { label: 'Safety Signals · detect', icon: '🚨', path: '/signals' },
   { label: 'Safety Signals · Register', icon: '📋', path: '/signals?tab=register' },
   { label: 'Safety Signals · workflow', icon: '📋', path: '/signals?tab=lifecycle' },

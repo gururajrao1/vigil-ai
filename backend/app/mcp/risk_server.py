@@ -219,6 +219,38 @@ def _build_mcp():
         )
         return json.dumps(out, ensure_ascii=False)
 
+    @mcp.tool()
+    async def get_pgx_gene_associations(drug_name: str, event: str = "") -> str:
+        """Return PharmGKB/CPIC gene-variant warnings and metabolizer profiles.
+
+        Offline-first curated table with optional live API enrichment.
+        """
+        from ..analytics.pgx_engine import get_pgx_gene_associations as _fn
+
+        return json.dumps(_fn(drug_name, event=event, offline_only=True), ensure_ascii=False)
+
+    @mcp.tool()
+    async def evaluate_benefit_risk_ratio(drug_id: str, primary_ae_pt: str) -> str:
+        """Return PrOACT-URL balance metrics, efficacy benchmarks, and risk trade-offs."""
+        from ..analytics.benefit_risk import evaluate_benefit_risk_ratio as _fn
+
+        return json.dumps(
+            _fn(drug_id, primary_ae_pt, offline_only=True),
+            ensure_ascii=False,
+        )
+
+    @mcp.tool()
+    async def get_inspection_lead_time_metrics() -> str:
+        """Return SLA compliance metrics, pending reviews, and overdue escalation alerts."""
+        from ..database import SessionLocal
+        from ..reports.inspection_audit import inspection_portfolio
+
+        db = SessionLocal()
+        try:
+            return json.dumps(inspection_portfolio(db, limit=200), ensure_ascii=False)
+        finally:
+            db.close()
+
     return mcp
 
 

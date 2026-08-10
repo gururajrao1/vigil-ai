@@ -9,7 +9,7 @@ unavailable.
 Sections returned:
   signal_summary | statistical_evidence | causality_assessment | clinical_context |
   regulatory_context | benefit_risk | recommendation (monitor/escalate/close) |
-  recommendation_rationale | disclaimer
+  recommendation_rationale | disclaimer | feature_tour | plain_english_tour
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ import json
 import re
 
 from .. import llm
+from .copilot_tour import attach_feature_tour
 
 DISCLAIMER = (
     "PROTOTYPE — Synthetic data only. Evidence is derived from social-listening and "
@@ -467,7 +468,7 @@ def generate_assessment(signal_dict: dict, allow_llm: bool = True) -> dict:
     fallback = _deterministic_assessment(signal_dict)
 
     if not allow_llm:
-        return {**fallback, "source": "deterministic"}
+        return attach_feature_tour({**fallback, "source": "deterministic"}, signal_dict)
 
     context_brief = _build_context_brief(signal_dict)
     prompt = (
@@ -509,6 +510,6 @@ def generate_assessment(signal_dict: dict, allow_llm: bool = True) -> dict:
             if parsed.get("recommendation") not in ("monitor", "escalate", "close"):
                 parsed["recommendation"] = fallback["recommendation"]
             parsed["disclaimer"] = DISCLAIMER
-            return {**parsed, "source": "llm"}
+            return attach_feature_tour({**parsed, "source": "llm"}, signal_dict)
 
-    return {**fallback, "source": "deterministic"}
+    return attach_feature_tour({**fallback, "source": "deterministic"}, signal_dict)

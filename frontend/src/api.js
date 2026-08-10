@@ -119,6 +119,46 @@ export const api = {
   auditChain: () => req('/api/audit/chain'),
   regenerateNarrative: (id) => req(`/api/signals/${id}/narrative`, { method: 'POST' }),
   draftAssessment: (id) => req(`/api/signals/${id}/copilot`, { method: 'POST' }),
+  askCopilot: (id, question) =>
+    req(`/api/signals/${id}/copilot/ask`, {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    }),
+  inspectionPortfolio: (limit = 200) => req(`/api/inspection/portfolio?limit=${limit}`),
+  inspectionSignal: (id) => req(`/api/inspection/signals/${id}`),
+  downloadSjl: async (id) => {
+    const headers = {};
+    if (_token) headers.Authorization = `Bearer ${_token}`;
+    if (_projectId) headers['X-Project-Id'] = _projectId;
+    const res = await fetch(`${BASE}/api/inspection/signals/${id}/sjl?fmt=md`, { headers });
+    if (!res.ok) throw new Error(`SJL export failed (${res.status})`);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sjl_${id}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+  governanceCredibility: () => req('/api/governance/credibility'),
+  governanceCou: () => req('/api/governance/cou'),
+  pgxAssociations: (drug, event = '') =>
+    req(`/api/pgx/associations?drug=${encodeURIComponent(drug)}&event=${encodeURIComponent(event)}&offline=true`),
+  signalPgxProfile: (id) => req(`/api/signals/${id}/pgx-profile`),
+  signalLongitudinalBiologics: (id) => req(`/api/signals/${id}/longitudinal-biologics`),
+  signalLotClustering: (id) => req(`/api/signals/${id}/lot-clustering`),
+  benefitRiskProact: (drug, event, opts = {}) => {
+    const q = new URLSearchParams({
+      drug,
+      event,
+      strength: opts.strength || 'WEAK',
+      post_count: String(opts.post_count || 0),
+      offline: 'true',
+    });
+    return req(`/api/benefit-risk/proact?${q}`);
+  },
+  signalBenefitRiskProact: (id) => req(`/api/signals/${id}/benefit-risk-proact?offline=true`),
+  frontiersSummary: () => req('/api/frontiers/summary'),
   posts: (params = {}) => {
     const q = new URLSearchParams(params).toString();
     return req(`/api/posts${q ? `?${q}` : ''}`);

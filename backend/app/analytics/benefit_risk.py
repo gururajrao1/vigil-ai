@@ -607,3 +607,164 @@ def drug_table(rows: List[dict]) -> List[dict]:
     out = list(by_drug.values())
     out.sort(key=lambda r: (order.get(r.get("verdict"), 3), r.get("ratio_value") or 0))
     return out
+
+
+# --------------------------------------------------------------------------- #
+# PrOACT-URL / BRAT quantitative balance (ClinicalTrials.gov optional)
+# --------------------------------------------------------------------------- #
+_PROACT_DISCLAIMER = (
+    "Prototype PrOACT-URL / BRAT balance. Efficacy rates are ClinicalTrials.gov "
+    "or curated offline surrogates; SAE rates are social/DMA-derived — NOT a "
+    "CHMP/FDA benefit–risk determination."
+)
+
+# Offline efficacy response-rate cache (illustrative literature / label ranges)
+_EFFICACY_CACHE: Dict[str, dict] = {
+    "semaglutide": {"response_rate_pct": 62.0, "endpoint": "≥5% weight loss / HbA1c response", "source": "offline_label_surrogate"},
+    "atorvastatin": {"response_rate_pct": 55.0, "endpoint": "LDL-C goal attainment", "source": "offline_literature_surrogate"},
+    "sertraline": {"response_rate_pct": 50.0, "endpoint": "HAM-D response ≥50%", "source": "offline_literature_surrogate"},
+    "warfarin": {"response_rate_pct": 70.0, "endpoint": "stroke prevention efficacy (relative)", "source": "offline_literature_surrogate"},
+    "pembrolizumab": {"response_rate_pct": 40.0, "endpoint": "ORR (indication-dependent)", "source": "offline_literature_surrogate"},
+    "tisagenlecleucel": {"response_rate_pct": 81.0, "endpoint": "ORR in relapsed/refractory ALL (illustrative)", "source": "offline_cber_surrogate"},
+}
+
+
+def _fetch_clinicaltrials_efficacy(drug: str, timeout: float = 3.0) -> Optional[dict]:
+    """Best-effort ClinicalTrials.gov v2 query; returns None offline."""
+    try:
+        import json
+        import urllib.request
+        from urllib.parse import quote
+
+        url = (
+            "https://clinicaltrials.gov/api/v2/studies?"
+            f"query.term={quote(drug)}&filter.phase=PHASE3&pageSize=5"
+        )
+        req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "VigilAI/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+        studies = data.get("studies") or []
+        if not studies:
+            return None
+        # Extract a crude primary outcome string; efficacy % rarely structured → mark unavailable
+        proto = (studies[0].get("protocolSection") or {})
+        outcomes = ((proto.get("outcomesModule") or {}).get("primaryOutcomes") or [])
+        title = ""
+        if outcomes:
+            title = outcomes[0].get("measure") or outcomes[0].get("description") or ""
+        return {
+            "available": True,
+            "source": "clinicaltrials_gov_v2",
+            "n_studies": len(studies),
+            "primary_endpoint": title or None,
+            "response_rate_pct": None,  # structured % rarely present; fall back to cache
+            "nct_sample": [
+                (s.get("protocolSection") or {}).get("identificationModule", {}).get("nctId")
+                for s in studies[:3]
+            ],
+        }
+    except Exception:
+        return None
+
+
+def evaluate_benefit_risk_ratio(
+    drug_id: str,
+    primary_ae_pt: str,
+    *,
+    severe_ae_rate_pct: Optional[float] = None,
+    post_count: int = 0,
+    strength: str = "WEAK",
+    offline_only: bool = False,
+) -> dict:
+    """PrOACT-URL style Balance Ratio = efficacy_response_% / severe_AE_signal_%."""
+    drug_key = (normalize_drug(drug_id) or drug_id or "").lower().strip()
+    efficacy = dict(_EFFICACY_CACHE.get(drug_key) or {})
+    ct = None if offline_only else _fetch_clinicaltrials_efficacy(drug_id)
+    if ct and ct.get("available"):
+        if ct.get("response_rate_pct") is not None:
+            efficacy["response_rate_pct"] = ct["response_rate_pct"]
+            efficacy["source"] = ct["source"]
+        efficacy["clinicaltrials"] = {
+            "n_studies": ct.get("n_studies"),
+            "primary_endpoint": ct.get("primary_endpoint"),
+            "nct_sample": ct.get("nct_sample"),
+        }
+    if not efficacy.get("response_rate_pct"):
+        # Fallback: map from BENEFIT_KB NNT → crude response surrogate 100/NNT capped
+        benefit = None
+        for e in BENEFIT_KB:
+            if drug_key in e["drugs"]:
+                benefit = e
+                break
+        if benefit and benefit.get("nnt"):
+            efficacy = {
+                "response_rate_pct": round(min(90.0, max(5.0, 100.0 / float(benefit["nnt"]) * 10)), 1),
+                "endpoint": benefit.get("benefit_outcome"),
+                "source": "derived_from_offline_nnt",
+                "indication": benefit.get("indication"),
+            }
+        else:
+            efficacy = {
+                "response_rate_pct": 40.0,
+                "endpoint": "unknown — default surrogate",
+                "source": "default_offline",
+            }
+
+    # Severe AE signal rate surrogate from DMA strength + count
+    if severe_ae_rate_pct is None:
+        base = {"STRONG": 8.0, "MODERATE": 3.5, "WEAK": 1.2}.get((strength or "WEAK").upper(), 1.2)
+        bump = min(10.0, (post_count or 0) * 0.15)
+        severe_ae_rate_pct = round(base + bump, 2)
+    severe_ae_rate_pct = max(0.01, float(severe_ae_rate_pct))
+    bal = round(float(efficacy["response_rate_pct"]) / severe_ae_rate_pct, 3)
+
+    if bal >= 5:
+        tradeoff = "Benefit-dominant (efficacy >> severe AE signal rate)"
+        tone = "favourable"
+    elif bal >= 1.5:
+        tradeoff = "Benefit leans ahead of severe AE burden — monitor"
+        tone = "watch"
+    elif bal >= 0.8:
+        tradeoff = "Contested — efficacy and severe AE signal rates are close"
+        tone = "uncertain"
+    else:
+        tradeoff = "Risk-dominant — severe AE signal rate rivals/exceeds efficacy"
+        tone = "unfavourable"
+
+    # Also attach classic BRAT assess when possible
+    brat = None
+    try:
+        brat = assess(
+            drug=drug_id,
+            event=primary_ae_pt,
+            severity="High" if (strength or "").upper() == "STRONG" else "Moderate",
+            who_umc="Possible",
+            post_count=post_count or 1,
+            atc=None,
+        )
+    except Exception:
+        brat = None
+
+    return {
+        "framework": "PrOACT-URL / BRAT",
+        "drug": drug_id,
+        "primary_ae_pt": primary_ae_pt,
+        "efficacy": efficacy,
+        "severe_ae_signal_rate_pct": severe_ae_rate_pct,
+        "balance_ratio": bal,
+        "balance_formula": "efficacy_response_rate_pct / severe_ae_signal_rate_pct",
+        "tradeoff": tradeoff,
+        "tone": tone,
+        "brat": brat,
+        "proact_dimensions": {
+            "Problem": f"Benefit–risk for {drug_id} vs {primary_ae_pt}",
+            "Objectives": "Maximise clinically meaningful benefit; minimise severe harm",
+            "Alternatives": "Continue / RMMs / restrict / withdraw (human decision)",
+            "Consequences": tradeoff,
+            "Tradeoffs": f"Balance ratio = {bal}",
+            "Uncertainty": "Social-listening SAE rate is a surrogate; trial efficacy may lag indication",
+            "Risk_tolerance": "QPPV / safety board judgment required",
+            "Linked_decisions": "Labeling, REMS/RMP, PBRER section 16–18",
+        },
+        "disclaimer": _PROACT_DISCLAIMER,
+    }

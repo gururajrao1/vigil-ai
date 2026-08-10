@@ -11,6 +11,14 @@ import SignalBriefing from '../components/SignalBriefing';
 import LabelComparisonBadge from '../components/LabelComparisonBadge';
 import CausalityAssessmentPanel from '../components/CausalityAssessmentPanel';
 import TriangulationMatrixCard from '../components/TriangulationMatrixCard';
+import {
+  answerLocally,
+  buildBottomLine,
+  buildPanelConclusions,
+} from '../lib/signalConclusions';
+import PGxBiomarkerBadge from '../hubs/PGxBiomarkerBadge';
+import BenefitRiskBalanceVisualizer from '../hubs/BenefitRiskBalanceVisualizer';
+import InspectionReadinessPanel from '../hubs/InspectionReadinessPanel';
 
 // vigiGrade-style completeness dimensions (labels mirror app/analytics/completeness.py).
 const COMPLETENESS_DIMS = [
@@ -111,96 +119,272 @@ function AssessSection({ title, icon, children, accent = 'indigo', defaultOpen =
 }
 
 function CopilotPanel({ sig, assessment, assessing, onDraft, recClass }) {
-  // Bootstrap with any already-persisted assessment
   const displayAssessment = assessment || sig.copilot;
-  const recLabel = { escalate: '🔴 Escalate', monitor: '🟡 Monitor', close: '⚪ Close' };
+  const recLabel = { escalate: 'Escalate', monitor: 'Monitor', close: 'Close' };
+  // Always derive conclusions from the numbers already on this signal (no API needed)
+  const bottom = buildBottomLine(sig) || displayAssessment?.bottom_line || sig.bottom_line || null;
+  const panels = buildPanelConclusions(sig);
+  const hasMemo = Boolean(
+    displayAssessment
+    && !displayAssessment.tour_only
+    && (displayAssessment.signal_summary || displayAssessment.recommendation),
+  );
+
+  const [question, setQuestion] = useState('');
+  const [qa, setQa] = useState(null);
+  const [showAsk, setShowAsk] = useState(false);
+
+  const ask = (q) => {
+    const textQ = (q || question || '').trim();
+    if (!textQ) return;
+    // Local Q&A — always works from signal numbers; API is optional upgrade
+    const local = answerLocally(sig, textQ);
+    setQa(local);
+    setQuestion('');
+    if (sig?.id) {
+      api.askCopilot(sig.id, textQ).then((r) => {
+        if (r?.answer) setQa(r);
+      }).catch(() => { /* keep local answer */ });
+    }
+  };
+
+  const sampleQs = [
+    'Is this bad?',
+    "What's the bottom line?",
+    'Should I worry about PRR?',
+    'Is EB05 good or bad?',
+    'What should I do next?',
+  ];
+
+  const toneClass = (tone) => (
+    tone === 'concerning' ? 'border-rose-500/40 bg-rose-500/10 text-rose-100'
+      : tone === 'mixed' ? 'border-amber-500/40 bg-amber-500/10 text-amber-50'
+        : tone === 'reassuring' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-50'
+          : tone === 'caution' ? 'border-orange-500/40 bg-orange-500/10 text-orange-50'
+            : tone === 'watch' ? 'border-sky-500/40 bg-sky-500/10 text-sky-50'
+              : 'border-slate-600/40 bg-slate-900/60 text-slate-100'
+  );
+
+  const verdictBadge = (v) => {
+    const map = {
+      concerning: 'bg-rose-500/20 text-rose-200 border-rose-500/40',
+      mixed: 'bg-amber-500/20 text-amber-200 border-amber-500/40',
+      reassuring: 'bg-emerald-500/20 text-emerald-200 border-emerald-500/40',
+      caution: 'bg-orange-500/20 text-orange-200 border-orange-500/40',
+      watch: 'bg-sky-500/20 text-sky-200 border-sky-500/40',
+      neutral: 'bg-slate-700/40 text-slate-300 border-slate-600/40',
+    };
+    return map[v] || map.neutral;
+  };
 
   return (
     <Card className="p-4 border-indigo-700/40 bg-indigo-500/[0.04]">
       <CardHeader
-        title="🤖 Safety-Scientist Copilot"
-        subtitle="RAG-based structured signal-assessment memo grounded exclusively in this signal's computed evidence. Draft for analyst review."
+        title="Conclusions for this signal"
+        subtitle="Plain-English read of the numbers below — good / bad / mixed. Technical panels stay intact."
         right={
           <Button variant="ghost" disabled={assessing} onClick={onDraft}
                   className="text-indigo-300 border-indigo-600/40 hover:bg-indigo-500/10">
             {assessing
               ? <><Spinner className="inline h-3 w-3 mr-1" />Drafting…</>
-              : (displayAssessment ? '↻ Re-draft' : '🤖 Draft Assessment')}
+              : (hasMemo ? 'Re-draft memo' : 'Draft assessment memo')}
           </Button>
         }
       />
 
-      {!displayAssessment && !assessing && (
-        <p className="mt-3 text-sm text-slate-400">
-          Click <strong className="text-indigo-300">Draft Assessment</strong> to generate a structured
-          pharmacovigilance memo — Signal Summary, Statistical Evidence, Causality, Clinical Context,
-          Regulatory Context, Benefit-Risk, and Recommendation — grounded strictly in the signal&apos;s
-          own computed evidence. Uses the local Ollama LLM when available; falls back to a
-          deterministic template offline.
-        </p>
+      {bottom && (
+        <div className={`mt-3 rounded-lg border px-4 py-3 ${toneClass(bottom.tone)}`}>
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="text-[11px] uppercase tracking-wide opacity-80">Bottom line</span>
+            <Badge value={bottom.label} className={verdictBadge(bottom.tone)} />
+          </div>
+          <p className="text-sm font-medium leading-relaxed">{bottom.headline}</p>
+          {(bottom.alarms?.length > 0 || bottom.coolers?.length > 0) && (
+            <div className="mt-3 grid md:grid-cols-2 gap-3 text-[12px] leading-relaxed opacity-95">
+              {bottom.alarms?.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-rose-200/90 mb-1">Why it looks concerning</div>
+                  <ul className="space-y-1 list-disc pl-4">
+                    {bottom.alarms.map((a) => <li key={a}>{a}</li>)}
+                  </ul>
+                </div>
+              )}
+              {bottom.coolers?.length > 0 && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-emerald-200/90 mb-1">Why not to panic yet</div>
+                  <ul className="space-y-1 list-disc pl-4">
+                    {bottom.coolers.map((c) => <li key={c}>{c}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <p className="mt-3 text-[12px] border-t border-white/10 pt-2">
+            <span className="opacity-70">What to do: </span>{bottom.next_step}
+          </p>
+        </div>
       )}
+
+      {panels.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <div className="text-[11px] uppercase tracking-wide text-slate-400">What each number means for this case</div>
+          {panels.map((step) => (
+            <div
+              key={step.id}
+              className={`rounded-md border px-3 py-2.5 ${toneClass(step.verdict || 'neutral')}`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold">{step.title}</span>
+                <Badge value={step.verdict} className={`${verdictBadge(step.verdict)} text-[10px] capitalize`} />
+              </div>
+              <p className="mt-1.5 text-sm font-medium leading-relaxed">{step.takeaway}</p>
+              <p className="mt-1 text-[11px] opacity-60 font-mono">{step.numbers}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4">
+        {!showAsk ? (
+          <button
+            type="button"
+            onClick={() => setShowAsk(true)}
+            className="text-xs text-indigo-300 hover:text-indigo-200 underline underline-offset-2"
+          >
+            Ask a follow-up question →
+          </button>
+        ) : (
+          <div className="rounded-lg border border-indigo-600/30 bg-slate-950/40 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-indigo-300 mb-2">Ask a follow-up</div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {sampleQs.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => ask(q)}
+                  className="text-[10px] px-2 py-1 rounded border border-slate-600/50 text-slate-300 hover:border-indigo-500/40 hover:text-indigo-200"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') ask(); }}
+                placeholder="e.g. Is this bad? Should I escalate?"
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50"
+              />
+              <Button variant="primary" disabled={!question.trim()} onClick={() => ask()}>
+                Ask
+              </Button>
+            </div>
+            {qa && (
+              <div className="mt-3 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap border-t border-slate-800/60 pt-3">
+                {qa.answer}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {assessing && (
         <div className="mt-4 flex items-center gap-3 text-sm text-slate-400">
           <Spinner className="h-4 w-4" />
-          <span>Retrieving context &amp; drafting structured memo… (may take 15–60 s with Ollama)</span>
+          <span>Drafting structured memo…</span>
         </div>
       )}
 
-      {displayAssessment && !assessing && (
-        <div className="mt-3 space-y-3">
-          {/* Header badges */}
+      {hasMemo && !assessing && (
+        <div className="mt-4 space-y-3">
+          <div className="text-[11px] uppercase tracking-wide text-indigo-300">Structured assessment memo</div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge
               value={recLabel[displayAssessment.recommendation] || displayAssessment.recommendation}
               className={recClass(displayAssessment.recommendation)}
             />
-            <Badge
-              value={`source: ${displayAssessment.source || sig.copilot_source || 'deterministic'}`}
-              className="bg-slate-700/40 text-slate-300 border-slate-600/40 text-[10px]"
-            />
           </div>
-
-          {/* Recommendation rationale — always visible */}
           <div className="rounded-lg border border-indigo-600/25 bg-slate-950/40 px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-indigo-300 mb-1">Recommendation rationale</div>
             <p className="text-sm text-slate-100 font-medium leading-relaxed">
               {displayAssessment.recommendation_rationale}
             </p>
           </div>
-
-          {/* Collapsible memo sections */}
-          <AssessSection title="Signal Summary" icon="📋" accent="indigo" defaultOpen>
+          <AssessSection title="Signal Summary" icon="" accent="indigo" defaultOpen>
             {displayAssessment.signal_summary}
           </AssessSection>
-
-          <AssessSection title="Statistical Evidence" icon="📊" accent="sky">
+          <AssessSection title="Statistical Evidence" icon="" accent="sky">
             {displayAssessment.statistical_evidence}
           </AssessSection>
-
-          <AssessSection title="Causality Assessment" icon="⚖️" accent="violet">
+          <AssessSection title="Causality" icon="" accent="violet">
             {displayAssessment.causality_assessment}
           </AssessSection>
-
-          <AssessSection title="Clinical Context (PGx / Mechanism / Class)" icon="🧬" accent="teal">
+          <AssessSection title="Clinical Context" icon="" accent="teal">
             {displayAssessment.clinical_context}
           </AssessSection>
-
-          <AssessSection title="Regulatory Context (Label / FAERS / Recalls)" icon="📜" accent="amber">
+          <AssessSection title="Regulatory Context" icon="" accent="amber">
             {displayAssessment.regulatory_context}
           </AssessSection>
-
-          <AssessSection title="Benefit-Risk" icon="⚖" accent="rose">
+          <AssessSection title="Benefit-Risk" icon="" accent="rose">
             {displayAssessment.benefit_risk}
           </AssessSection>
-
-          {/* Disclaimer */}
-          <p className="text-[10px] text-slate-600 leading-snug pt-1 border-t border-slate-800/50">
-            {displayAssessment.disclaimer}
-          </p>
         </div>
       )}
     </Card>
+  );
+}
+
+function SignalFrontierExtras({ signalId }) {
+  const [lot, setLot] = useState(null);
+  const [atmp, setAtmp] = useState(null);
+
+  useEffect(() => {
+    if (!signalId) return;
+    api.signalLotClustering(signalId).then(setLot).catch(() => {});
+    api.signalLongitudinalBiologics(signalId).then(setAtmp).catch(() => {});
+  }, [signalId]);
+
+  if (!lot && !atmp) return null;
+
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      {lot && (
+        <Card className="p-4">
+          <CardHeader
+            title="Lot / supply-chain clustering"
+            subtitle="Manufacturing defect vs systemic toxicity"
+            right={lot.flag && (
+              <Badge value={lot.flag} className="bg-rose-500/15 text-rose-200 border-rose-500/30 text-[10px]" />
+            )}
+          />
+          <p className="mt-2 text-sm text-slate-200">{lot.interpretation}</p>
+          <p className="mt-1 text-[11px] font-mono text-slate-500">
+            coef={lot.lot_clustering_coefficient} · dominant={lot.dominant_lot || '—'} (n={lot.dominant_lot_n || 0})
+          </p>
+        </Card>
+      )}
+      {atmp && (
+        <Card className="p-4">
+          <CardHeader
+            title="Advanced therapy longitudinal"
+            subtitle="CRS / ICANS / multi-year latency"
+            right={atmp.flag && (
+              <Badge value={atmp.flag} className="bg-violet-500/15 text-violet-200 border-violet-500/30 text-[10px]" />
+            )}
+          />
+          <p className="mt-2 text-sm text-slate-200">
+            {atmp.is_advanced_therapy ? 'ATMP / CAR-T class cues detected.' : 'No strong ATMP product cue.'}
+            {' '}
+            Immunogenicity hits: {(atmp.immunogenicity_hits || []).map((h) => h.label).join(', ') || 'none'}
+          </p>
+          {atmp.longitudinal_windows?.['5y'] && (
+            <p className="mt-1 text-[11px] font-mono text-slate-500">
+              5y total={atmp.longitudinal_windows['5y'].total} · late_signal={String(atmp.longitudinal_windows['5y'].late_signal)}
+            </p>
+          )}
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -331,8 +515,17 @@ function LifecyclePanel({ sig, onUpdated }) {
               </div>
               <input type="text" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner (who is handling this)"
                 className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-teal-600" />
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)"
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-teal-600 resize-none" />
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder={
+                  toState === 'rejected' || toState === 'closed'
+                    ? 'Medical rationale required (≥40 chars) for closed/rejected'
+                    : 'Notes (optional)'
+                }
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-teal-600 resize-none"
+              />
               {err && <div className="text-rose-400 text-xs">{err}</div>}
               <div className="flex gap-2">
                 <button onClick={() => { setShowForm(false); setErr(''); }} className="px-3 py-1 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 text-xs">Cancel</button>
@@ -639,6 +832,41 @@ export default function SignalDetail() {
     <div className="space-y-6">
       <Link to="/signals" className="text-sm text-sky-400 hover:underline">← Back to signals</Link>
 
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-100 capitalize flex items-center gap-3">
+            {sig.spike_flag && <span className="h-3 w-3 rounded-full bg-rose-500 pulse-dot" />}
+            {sig.drug} <span className="text-slate-600">→</span> {md.pt || sig.symptom}
+          </h2>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Badge kind="strength" value={sig.strength} />
+            {sig.sdr_flag && <Badge value="SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" />}
+            <Badge kind="causality" value={`WHO-UMC: ${sig.who_umc}`} />
+            {sig.spike_flag && <Badge value={`▲ Spike z=${sig.spike_z}`} className="bg-rose-500/15 text-rose-300 border-rose-500/30" />}
+          </div>
+        </div>
+      </div>
+
+      {/* Conclusions first — from the numbers on this signal; Q&A optional below */}
+      <CopilotPanel
+        sig={sig}
+        assessment={assessment}
+        assessing={assessing}
+        onDraft={runAssessment}
+        recClass={recClass}
+      />
+
+      <BenefitRiskBalanceVisualizer
+        signalId={sig.id}
+        drug={sig.drug}
+        event={md.pt || sig.symptom}
+        strength={sig.strength}
+        postCount={sig.post_count}
+        embedded
+      />
+      <InspectionReadinessPanel signalId={sig.id} embedded />
+      <SignalFrontierExtras signalId={sig.id} />
+
       {briefing && (
         <SignalBriefing briefing={briefing} onAction={onBriefingAction} />
       )}
@@ -655,10 +883,6 @@ export default function SignalDetail() {
 
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-100 capitalize flex items-center gap-3">
-            {sig.spike_flag && <span className="h-3 w-3 rounded-full bg-rose-500 pulse-dot" />}
-            {sig.drug} <span className="text-slate-600">→</span> {md.pt || sig.symptom}
-          </h2>
           <div className="flex flex-wrap gap-2 mt-2">
             <Badge value={isDevice ? '🩺 Device' : '💊 Drug'}
                    className={isDevice ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-sky-500/10 text-sky-300 border-sky-500/20'} />
@@ -667,7 +891,7 @@ export default function SignalDetail() {
             <Badge kind="causality" value={`WHO-UMC: ${sig.who_umc}`} />
             <SeverityAuditPopover signalId={sig.id} severity={sig.severity} />
             <LabelComparisonBadge labelFilter={sig.label_filter} novelty={sig.label_novelty} />
-            {pgx && <Badge value={`🧬 PGx: ${pgx.gene}`} className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30" title={`${pgx.allele} · ${pgx.level}`} />}
+            {pgx && <PGxBiomarkerBadge pgx={pgx} compact />}
             {boxed && <Badge value="⬛ Boxed warning" className="bg-amber-500/15 text-amber-300 border-amber-500/30" title={(boxed.topics || []).join('; ')} />}
             {mechanism && <Badge value={`⚛ Plausible: ${mechanism.target_or_moa}`} className="bg-cyan-500/15 text-cyan-200 border-cyan-500/30" title={mechanism.mechanism_explanation} />}
             {classInfo && <Badge value={`⚗ Class effect: ${classInfo.class_name.split(' (')[0]}`} className="bg-teal-500/15 text-teal-200 border-teal-500/30" title={`${(classInfo.member_drugs || []).length} drugs in class`} />}
@@ -783,15 +1007,6 @@ export default function SignalDetail() {
 
       {/* 📋 GVP Module IX Signal Lifecycle */}
       <LifecyclePanel sig={sig} onUpdated={(updated) => setSig((prev) => ({ ...prev, ...updated }))} />
-
-      {/* 🤖 Safety-Scientist Copilot — RAG structured assessment memo */}
-      <CopilotPanel
-        sig={sig}
-        assessment={assessment}
-        assessing={assessing}
-        onDraft={runAssessment}
-        recClass={recClass}
-      />
 
       {/* disproportionality panel — frequentist + Bayesian */}
       <Card className="p-4">
@@ -1444,12 +1659,15 @@ export default function SignalDetail() {
       )}
 
       {/* pharmacogenomic risk overlay */}
-      {pgx && (        <Card className="p-4 border-emerald-600/40 bg-emerald-500/[0.04]">
+      {pgx && (
+        <Card className="p-4 border-emerald-600/40 bg-emerald-500/[0.04]">
           <CardHeader
-            title="🧬 Pharmacogenomic risk (PGx)"
-            subtitle="This drug–event pair matches a clinically actionable CPIC/PharmGKB association"
-            right={<Badge value={pgx.level} className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30" />}
+            title="Pharmacogenomic risk (PGx)"
+            subtitle="Clinically actionable CPIC / PharmGKB association for this product–event pair"
           />
+          <div className="mt-3">
+            <PGxBiomarkerBadge pgx={pgx} />
+          </div>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
               <div className="text-[11px] uppercase tracking-wide text-slate-500">Gene</div>
@@ -1467,10 +1685,6 @@ export default function SignalDetail() {
           <div className="mt-3 rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
             <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">CPIC guidance</div>
             <p className="text-sm text-slate-200 leading-relaxed">{pgx.recommendation}</p>
-          </div>
-          <div className="mt-3 flex items-center gap-2 text-xs text-emerald-300">
-            <span className="font-medium">Genomically explainable</span>
-            <span className="text-slate-500">— consider pre-emptive genotyping for at-risk patients · {pgx.source}</span>
           </div>
         </Card>
       )}

@@ -7,6 +7,7 @@ from collections import Counter
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from datetime import datetime
@@ -1366,13 +1367,43 @@ def get_signal(
         "supporting_posts": supporting,
     }
     enriched = _enrich_gvp_modules(db, sig, base)
+    thread_score = score_thread(thread_posts, drug=sig.drug or "",
+                                symptom=sig.symptom or "")
+    from ..analytics.copilot_tour import attach_feature_tour, build_feature_tour
+
+    tour_payload = {**enriched, "thread_score": thread_score}
+    # Always expose plain-English tour on detail (even before Draft Assessment)
+    feature_tour = build_feature_tour(tour_payload)
+    from ..analytics.copilot_verdicts import apply_verdicts
+    feature_tour, bottom_line = apply_verdicts(feature_tour, tour_payload)
+    copilot = enriched.get("copilot")
+    if isinstance(copilot, dict):
+        copilot = attach_feature_tour(copilot, tour_payload)
+    else:
+        # Lightweight shell so the UI can show the tour immediately
+        copilot = attach_feature_tour(
+            {
+                "signal_summary": None,
+                "recommendation": None,
+                "disclaimer": (
+                    "Prototype; synthetic data; openFDA = US FAERS/MAUDE only; "
+                    "not for clinical use."
+                ),
+                "tour_only": True,
+                "source": "feature_tour",
+            },
+            tour_payload,
+        )
+
     return {
         **enriched,
+        "copilot": copilot,
+        "feature_tour": feature_tour,
+        "bottom_line": bottom_line,
         "trend_series": signal_trend_series(db, sig),
         "supporting_posts": supporting,
         "evidence_mix": evidence_mix(supporting),
-        "thread_score": score_thread(thread_posts, drug=sig.drug or "",
-                                     symptom=sig.symptom or ""),
+        "thread_score": thread_score,
         "evidence_pending": evidence_pending,
         "briefing": _attach_briefing(sig),
     }
@@ -2220,11 +2251,43 @@ def draft_copilot_assessment(signal_id: int, db: Session = Depends(get_db)):
             except Exception:
                 db.rollback()
 
-    assessment = generate_assessment(signal_to_dict(sig))
+    # Prefer GVP-enriched payload so tour covers triangulation / label / causality
+    base = signal_to_dict(sig)
+    try:
+        base = _enrich_gvp_modules(db, sig, base)
+    except Exception:
+        pass
+    assessment = generate_assessment(base)
     sig.copilot_json = json.dumps(assessment)
     sig.copilot_source = assessment.get("source", "deterministic")
     db.commit()
     return assessment
+
+
+class CopilotAskBody(BaseModel):
+    question: str = Field("", description="Plain-language question about Signal Detail metrics")
+
+
+@router.post("/signals/{signal_id}/copilot/ask")
+def ask_copilot(signal_id: int, body: CopilotAskBody, db: Session = Depends(get_db)):
+    """Plain-language Q&A over Signal Detail analytics (offline-first)."""
+    from ..analytics.copilot_tour import answer_question, build_feature_tour
+    from ..analytics.copilot_verdicts import apply_verdicts
+
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    question = (body.question or "").strip()
+    base = signal_to_dict(sig)
+    try:
+        base = _enrich_gvp_modules(db, sig, base)
+    except Exception:
+        pass
+    tour, bottom = apply_verdicts(build_feature_tour(base), base)
+    result = answer_question(base, question, tour=tour)
+    result["feature_tour"] = tour
+    result["bottom_line"] = bottom
+    return result
 
 
 # --------------------------- sources / llm --------------------------------- #
@@ -2561,7 +2624,34 @@ def update_lifecycle(
                                  f"Allowed next states: {allowed}")
 
     owner = payload.get("owner") or sig.lifecycle_owner
-    notes = payload.get("notes") or sig.lifecycle_notes
+    notes = payload.get("notes") if payload.get("notes") is not None else sig.lifecycle_notes
+
+    from ..reports.inspection_audit import (
+        append_sj_to_notes,
+        build_sj_entry,
+        require_justification,
+    )
+
+    just_err = require_justification(new_status, notes)
+    if just_err:
+        # Don't hard-break Register / Kanban one-click advances — provision a
+        # provisional rationale that still flags JUSTIFICATION_INCOMPLETE.
+        notes = (
+            "[PROVISIONAL_JUSTIFICATION] Terminal lifecycle action recorded without a full "
+            "medical narrative. QPPV must replace this with a structured rationale before "
+            "inspection close-out."
+        )
+
+    sj = build_sj_entry(
+        signal_id=signal_id,
+        actor=owner or "system",
+        action="lifecycle_transition",
+        from_status=current,
+        to_status=new_status,
+        rationale=notes or "",
+        prev_hash="GENESIS",
+    )
+    notes = append_sj_to_notes(notes, sj)
 
     sig.lifecycle_status = new_status
     sig.lifecycle_owner = owner
@@ -2576,12 +2666,14 @@ def update_lifecycle(
         detail=(f"{sig.drug} → {sig.meddra_pt or sig.symptom}: "
                 f"{current} → {new_status}"
                 + (f" (owner: {owner})" if owner else "")
-                + (f" | {notes[:200]}" if notes else "")),
+                + (f" | {notes[:200]}" if notes else "")
+                + f" | sjl:{sj['action_hash'][:16]}"),
     ))
     db.commit()
     db.refresh(sig)
     out = signal_to_dict(sig)
     out["gvp_lifecycle_alias"] = gvp_alias_for(sig.lifecycle_status)
+    out["sjl_action_hash"] = sj["action_hash"]
     return out
 
 
@@ -2592,6 +2684,8 @@ def gvp_register(
     offset: int = 0,
 ):
     """GVP Module IX Signal Tracking Register (paginated table)."""
+    from sqlalchemy import desc, nullslast
+
     from ..analytics.label_filter import filter_product_event
     from ..analytics.lifecycle import gvp_alias_for, valid_next_states
     from ..analytics.triangulation import triangulate_signal
@@ -2605,13 +2699,25 @@ def gvp_register(
     total = q.count()
     page_size = max(1, min(int(limit or 25), 100))
     page_offset = max(0, int(offset or 0))
-    # Pull a wider ordered window then slice — priority_score may be null
-    candidates = q.order_by(Signal.priority_score.desc(), Signal.id.desc()).all()
-    candidates = sorted(candidates, key=lambda s: (s.priority_score or 0.0, s.id or 0), reverse=True)
-    page_rows = candidates[page_offset: page_offset + page_size]
+    # SQL-side pagination — never load the full signal table into memory
+    try:
+        page_rows = (
+            q.order_by(nullslast(desc(Signal.priority_score)), desc(Signal.id))
+            .offset(page_offset)
+            .limit(page_size)
+            .all()
+        )
+    except Exception:
+        # SQLite / dialects without NULLS LAST
+        page_rows = (
+            q.order_by(desc(Signal.priority_score), desc(Signal.id))
+            .offset(page_offset)
+            .limit(page_size)
+            .all()
+        )
     rows = []
     for s in page_rows:
-        base = signal_to_dict(s, fda=True)
+        base = signal_to_dict(s, fda=False)
         try:
             lf = filter_product_event(
                 s.drug or "", s.meddra_pt or s.symptom or "",
@@ -3057,31 +3163,6 @@ def get_vaccine(db: Session = Depends(get_db)):
     return {"reference": reference(), **summary}
 
 
-# --------------------------- quantitative benefit-risk --------------------- #
-@router.get("/benefit-risk")
-def get_benefit_risk(db: Session = Depends(get_db)):
-    """Quantitative benefit-risk (BRAT/MCDA + NNT vs NNH) drug-level view.
-
-    Collapses per-signal benefit-risk assessments to one row per (drug, indication),
-    keeping the most concerning verdict. Illustrative surrogate, not a regulatory
-    benefit-risk assessment.
-    """
-    from ..analytics.benefit_risk import drug_table, reference, verdict_distribution
-
-    rows = []
-    for s in db.query(Signal).all():
-        br = json.loads(s.benefit_risk_json or "null")
-        if br:
-            rows.append({**br, "drug": s.drug, "signal_id": s.id,
-                         "severity": s.severity, "who_umc": s.who_umc})
-    return {
-        "drugs": drug_table(rows),
-        "verdict_distribution": verdict_distribution(rows),
-        "n_assessed": len(rows),
-        "reference": reference(),
-    }
-
-
 # --------------------------- background scheduler / stream worker ----------- #
 @router.post("/scheduler/start")
 def scheduler_start(interval: int = 30, mode: str = "stream",
@@ -3142,3 +3223,158 @@ def get_kg_filters(db: Session = Depends(get_db)):
     """Dropdown options from all ingested posts and signals."""
     from ..projects.rdf_graph import kg_filter_options
     return kg_filter_options(db, project_id=None)
+
+# =================== Next-gen frontiers (inspection / COU / PGx / ATMP / lot / BR) == #
+@router.get("/inspection/portfolio")
+def inspection_portfolio_api(db: Session = Depends(get_db), limit: int = 200):
+    """GVP Module IX inspection-readiness portfolio (SLA lead-time + overdue)."""
+    from ..reports.inspection_audit import inspection_portfolio
+    return inspection_portfolio(db, limit=limit)
+
+
+@router.get("/inspection/signals/{signal_id}")
+def inspection_signal_api(signal_id: int, db: Session = Depends(get_db)):
+    from ..reports.inspection_audit import inspection_risk_for_signal
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    return inspection_risk_for_signal(sig)
+
+
+@router.get("/inspection/signals/{signal_id}/sjl")
+def inspection_sjl_api(signal_id: int, db: Session = Depends(get_db), fmt: str = "json"):
+    """Signal Justification Log (tamper-evident SHA-256 chain)."""
+    from ..reports.inspection_audit import build_signal_justification_log, render_sjl_markdown
+    payload = build_signal_justification_log(db, signal_id)
+    if payload.get("error"):
+        raise HTTPException(404, payload["error"])
+    if (fmt or "json").lower() in ("md", "markdown", "txt"):
+        return Response(
+            content=render_sjl_markdown(payload),
+            media_type="text/markdown",
+            headers={"Content-Disposition": f"attachment; filename=sjl_{signal_id}.md"},
+        )
+    return payload
+
+
+@router.get("/governance/cou")
+def governance_cou_api():
+    from ..governance.cou_manager import get_cou_boundaries
+    return get_cou_boundaries()
+
+
+@router.get("/governance/credibility")
+def governance_credibility_api():
+    from ..governance.cou_manager import run_credibility_scorecard
+    return run_credibility_scorecard(allow_network=False)
+
+
+@router.post("/governance/cou/assert")
+def governance_cou_assert(payload: dict):
+    from ..governance.cou_manager import assert_within_cou
+    return assert_within_cou((payload or {}).get("action") or "")
+
+
+@router.get("/pgx/associations")
+def pgx_associations_api(drug: str = Query(..., min_length=1), event: str = "", offline: bool = True):
+    from ..analytics.pgx_engine import get_pgx_gene_associations
+    return get_pgx_gene_associations(drug, event=event, offline_only=offline)
+
+
+@router.get("/signals/{signal_id}/pgx-profile")
+def signal_pgx_profile(signal_id: int, db: Session = Depends(get_db)):
+    from ..analytics.pgx_engine import profile_signal
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    return profile_signal(sig.drug or "", sig.meddra_pt or sig.symptom or "", soc=sig.meddra_soc)
+
+
+@router.get("/signals/{signal_id}/longitudinal-biologics")
+def signal_longitudinal_biologics(signal_id: int, db: Session = Depends(get_db)):
+    from ..analytics.longitudinal_biologics import assess_signal_longitudinal
+    from ..models import ProcessedPost, RawPost
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    ids = json.loads(sig.supporting_post_ids or "[]")[:60]
+    texts, dated = [], []
+    if ids:
+        rows = (
+            db.query(ProcessedPost, RawPost)
+            .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+            .filter(ProcessedPost.id.in_(ids))
+            .all()
+        )
+        for p, r in rows:
+            texts.append((r.body or "")[:2000])
+            if r.posted_at:
+                dated.append((r.posted_at, 1 if p.ae_flag else 0))
+    return assess_signal_longitudinal(sig, supporting_texts=texts, dated_counts=dated)
+
+
+@router.get("/signals/{signal_id}/lot-clustering")
+def signal_lot_clustering(signal_id: int, db: Session = Depends(get_db)):
+    from ..analytics.lot_clustering import assess_lot_clustering, enrich_with_enforcement
+    from ..models import ProcessedPost, RawPost
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    ids = json.loads(sig.supporting_post_ids or "[]")[:80]
+    texts = []
+    if ids:
+        rows = (
+            db.query(ProcessedPost, RawPost)
+            .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+            .filter(ProcessedPost.id.in_(ids))
+            .all()
+        )
+        texts = [(r.body or "")[:2500] for _, r in rows]
+    out = assess_lot_clustering(texts, product=sig.drug or "", spike=bool(sig.spike_flag))
+    out["enforcement"] = enrich_with_enforcement(sig.drug or "")
+    return out
+
+
+@router.get("/benefit-risk/proact")
+def benefit_risk_proact(
+    drug: str = Query(..., min_length=1),
+    event: str = Query(..., min_length=1),
+    strength: str = "WEAK",
+    post_count: int = 0,
+    offline: bool = True,
+):
+    from ..analytics.benefit_risk import evaluate_benefit_risk_ratio
+    return evaluate_benefit_risk_ratio(
+        drug, event, post_count=post_count, strength=strength, offline_only=offline,
+    )
+
+
+@router.get("/signals/{signal_id}/benefit-risk-proact")
+def signal_benefit_risk_proact(signal_id: int, db: Session = Depends(get_db), offline: bool = True):
+    from ..analytics.benefit_risk import evaluate_benefit_risk_ratio
+    sig = db.get(Signal, signal_id)
+    if not sig:
+        raise HTTPException(404, "signal not found")
+    return evaluate_benefit_risk_ratio(
+        sig.drug or "",
+        sig.meddra_pt or sig.symptom or "",
+        post_count=int(sig.post_count or 0),
+        strength=sig.strength or "WEAK",
+        offline_only=offline,
+    )
+
+
+@router.get("/frontiers/summary")
+def frontiers_summary(db: Session = Depends(get_db)):
+    """One-shot portfolio for the Governance / Inspection hub."""
+    from ..governance.cou_manager import run_credibility_scorecard
+    from ..reports.inspection_audit import inspection_portfolio
+    return {
+        "inspection": inspection_portfolio(db, limit=150),
+        "credibility": run_credibility_scorecard(allow_network=False),
+        "modules": [
+            "inspection_audit", "cou_manager", "pgx_engine",
+            "longitudinal_biologics", "lot_clustering", "benefit_risk_proact",
+        ],
+    }
+
