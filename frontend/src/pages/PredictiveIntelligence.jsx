@@ -1,9 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 
 const DEMO_TEXT =
   'Started Accutane (isotretinoin) last month and my mood dropped into depression. Denies chest pain. Terrible headaches.';
+
+const MATRIX_PAGE = 50;
+
+/** Collapse cohort rows into densest product→event pairs for filter chips. */
+function topPairsFromMatrix(rows, limit = 12) {
+  const ctr = new Map();
+  for (const r of rows || []) {
+    const p = (r.product || '').trim();
+    const e = (r.event || '').trim();
+    if (!p || !e) continue;
+    const key = `${p}|${e}`;
+    const prev = ctr.get(key) || { product_id: p, target_ae_pt: e, n: 0 };
+    prev.n += Number(r.n_cases) || 0;
+    ctr.set(key, prev);
+  }
+  return [...ctr.values()].sort((a, b) => b.n - a.n).slice(0, limit);
+}
 
 /**
  * Phase 1–2 predictive intelligence workbench:
@@ -12,6 +29,7 @@ const DEMO_TEXT =
 export default function PredictiveIntelligence({ embedded = false }) {
   const [tab, setTab] = useState('matrix');
   const [matrix, setMatrix] = useState(null);
+  const [pairChips, setPairChips] = useState([]);
   const [productId, setProductId] = useState('');
   const [targetAe, setTargetAe] = useState('');
   const [gateText, setGateText] = useState(DEMO_TEXT);
@@ -23,18 +41,53 @@ export default function PredictiveIntelligence({ embedded = false }) {
   const [backends, setBackends] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
 
-  const loadMatrix = () => {
+  const loadMatrix = (pid = productId, ae = targetAe) => {
     setBusy(true);
     setErr(null);
+    const p = (pid ?? productId).trim();
+    const a = (ae ?? targetAe).trim();
     api.featureStoreMatrix({
-      productId: productId.trim() || undefined,
-      targetAe: targetAe.trim() || undefined,
+      productId: p || undefined,
+      targetAe: a || undefined,
       includeExplainability: false,
     })
-      .then(setMatrix)
+      .then((d) => {
+        setMatrix(d);
+        // Keep chip menu from the broadest view we've seen
+        if (!p && !a) {
+          const chips = topPairsFromMatrix(d.matrix || [], 12);
+          setPairChips(chips);
+          // First visit: auto-focus densest pair so filters aren't blank
+          if (!bootstrapped && chips[0]) {
+            setBootstrapped(true);
+            setProductId(chips[0].product_id);
+            setTargetAe(chips[0].target_ae_pt);
+            return api.featureStoreMatrix({
+              productId: chips[0].product_id,
+              targetAe: chips[0].target_ae_pt,
+              includeExplainability: false,
+            }).then(setMatrix);
+          }
+        } else if (pairChips.length === 0) {
+          setPairChips(topPairsFromMatrix(d.matrix || [], 12));
+        }
+      })
       .catch((e) => setErr(e?.message || 'Feature matrix failed'))
       .finally(() => setBusy(false));
+  };
+
+  const applyPair = (p, e) => {
+    setProductId(p);
+    setTargetAe(e);
+    loadMatrix(p, e);
+  };
+
+  const clearFilters = () => {
+    setProductId('');
+    setTargetAe('');
+    loadMatrix('', '');
   };
 
   const runFourGate = () => {
@@ -94,10 +147,14 @@ export default function PredictiveIntelligence({ embedded = false }) {
   };
 
   useEffect(() => {
-    if (tab === 'matrix' && !matrix) loadMatrix();
+    if (tab === 'matrix' && !matrix) loadMatrix('', '');
     if (tab === 'omop' && !omop) loadOmop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  const rows = matrix?.matrix || [];
+  const shown = useMemo(() => rows.slice(0, MATRIX_PAGE), [rows]);
+  const chips = pairChips.length ? pairChips : topPairsFromMatrix(rows, 12);
 
   const tabs = [
     { id: 'matrix', label: 'Feature matrix X' },
@@ -146,68 +203,130 @@ export default function PredictiveIntelligence({ embedded = false }) {
             title="Product–Event–Cohort feature matrix"
             subtitle="PRR / ROR / χ² / EB05 / IC025 + demographics + comorbidities + GNN centrality"
             right={
-              <Button variant="primary" onClick={loadMatrix} disabled={busy}>
-                {busy ? 'Loading…' : 'Refresh'}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={clearFilters} disabled={busy}>All pairs</Button>
+                <Button variant="primary" onClick={() => loadMatrix()} disabled={busy}>
+                  {busy ? 'Loading…' : 'Apply filter'}
+                </Button>
+              </div>
             }
           />
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2 items-center">
             <input
               className="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 w-44"
               placeholder="Product filter"
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && loadMatrix()}
             />
             <input
               className="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sm text-slate-200 w-44"
               placeholder="Event / PT filter"
               value={targetAe}
               onChange={(e) => setTargetAe(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && loadMatrix()}
             />
+            <span className="text-[11px] text-slate-500">
+              Tip: pick a chip below, or type e.g. isotretinoin + depression
+            </span>
           </div>
+          {chips.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">
+                Dense pairs in corpus — click to filter
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {chips.map((p) => {
+                  const on =
+                    productId === p.product_id && targetAe === p.target_ae_pt;
+                  return (
+                    <button
+                      key={`${p.product_id}|${p.target_ae_pt}`}
+                      type="button"
+                      onClick={() => applyPair(p.product_id, p.target_ae_pt)}
+                      className={`rounded border px-2 py-1 text-[11px] capitalize ${
+                        on
+                          ? 'border-sky-500/50 bg-sky-500/15 text-sky-200'
+                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-sky-600/40 hover:text-sky-200'
+                      }`}
+                    >
+                      {p.product_id} → {p.target_ae_pt}{' '}
+                      <span className="text-slate-500">n={p.n}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {busy && !matrix ? (
             <Spinner label="Building feature matrix…" />
           ) : matrix ? (
             <div className="mt-4 space-y-3">
               <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                <span>rows: <span className="text-slate-200">{matrix.n_rows}</span></span>
-                <span>AE posts: <span className="text-slate-200">{matrix.n_source_ae_posts}</span></span>
-                <span>features: <span className="text-slate-200">{matrix.feature_names?.length}</span></span>
+                <span>
+                  rows: <span className="text-slate-200">{matrix.n_rows}</span>
+                </span>
+                <span>
+                  showing: <span className="text-slate-200">{shown.length}</span>
+                  {matrix.n_rows > shown.length ? ` of ${matrix.n_rows}` : ''}
+                </span>
+                <span>
+                  AE posts: <span className="text-slate-200">{matrix.n_source_ae_posts}</span>
+                </span>
+                <span>
+                  features: <span className="text-slate-200">{matrix.feature_names?.length}</span>
+                </span>
+                {(productId || targetAe) && (
+                  <span className="text-sky-300/80 capitalize">
+                    filter: {productId || 'any'} → {targetAe || 'any'}
+                  </span>
+                )}
               </div>
-              <div className="overflow-x-auto rounded border border-slate-800">
-                <table className="min-w-full text-xs">
-                  <thead className="bg-slate-950/80 text-slate-400">
-                    <tr>
-                      <th className="text-left p-2">Product</th>
-                      <th className="text-left p-2">Event</th>
-                      <th className="text-left p-2">Cohort</th>
-                      <th className="text-right p-2">n</th>
-                      <th className="text-right p-2">PRR</th>
-                      <th className="text-right p-2">ROR</th>
-                      <th className="text-right p-2">χ²</th>
-                      <th className="text-right p-2">EB05</th>
-                      <th className="text-right p-2">IC025</th>
-                      <th className="text-right p-2">GNN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(matrix.matrix || []).slice(0, 40).map((r, i) => (
-                      <tr key={i} className="border-t border-slate-800/80 text-slate-300">
-                        <td className="p-2">{r.product}</td>
-                        <td className="p-2">{r.event}</td>
-                        <td className="p-2 font-mono text-[10px] text-slate-500">{r.cohort}</td>
-                        <td className="p-2 text-right tabular-nums">{r.n_cases}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(r.prr_score || 0).toFixed(2)}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(r.ror_score || 0).toFixed(2)}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(r.chi_square || 0).toFixed(1)}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(r.eb05_score || 0).toFixed(2)}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(r.ic025_score || 0).toFixed(2)}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(r.gnn_degree_centrality || 0).toFixed(3)}</td>
+              {shown.length === 0 ? (
+                <p className="text-sm text-slate-400">
+                  No cohort rows for this filter — try another chip or Clear.
+                </p>
+              ) : (
+                <div className="max-h-[28rem] overflow-auto rounded border border-slate-800">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-slate-950 text-slate-400 sticky top-0 z-10">
+                      <tr>
+                        <th className="text-left p-2">Product</th>
+                        <th className="text-left p-2">Event</th>
+                        <th className="text-left p-2">Cohort</th>
+                        <th className="text-right p-2">n</th>
+                        <th className="text-right p-2">PRR</th>
+                        <th className="text-right p-2">ROR</th>
+                        <th className="text-right p-2">χ²</th>
+                        <th className="text-right p-2">EB05</th>
+                        <th className="text-right p-2">IC025</th>
+                        <th className="text-right p-2">GNN</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {shown.map((r, i) => (
+                        <tr key={i} className="border-t border-slate-800/80 text-slate-300">
+                          <td className="p-2 capitalize">{r.product}</td>
+                          <td className="p-2 capitalize">{r.event}</td>
+                          <td className="p-2 font-mono text-[10px] text-slate-500">{r.cohort}</td>
+                          <td className="p-2 text-right tabular-nums">{r.n_cases}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(r.prr_score || 0).toFixed(2)}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(r.ror_score || 0).toFixed(2)}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(r.chi_square || 0).toFixed(1)}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(r.eb05_score || 0).toFixed(2)}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(r.ic025_score || 0).toFixed(2)}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(r.gnn_degree_centrality || 0).toFixed(3)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {matrix.n_rows > shown.length && (
+                <p className="text-[11px] text-slate-500">
+                  Showing top {shown.length} cohort rows (by PRR). Narrow with a product/event chip to see the rest.
+                </p>
+              )}
               <p className="text-[11px] text-slate-500">{matrix.disclaimer}</p>
             </div>
           ) : null}
