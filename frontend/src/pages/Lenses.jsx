@@ -8,8 +8,10 @@ import Ddi from './Ddi';
 import Pregnancy from './Pregnancy';
 import RemineLab from './RemineLab';
 import RiskPopulations from './RiskPopulations';
+import PredictiveIntelligence from './PredictiveIntelligence';
 
 const TABS = [
+  { id: 'intel', label: 'Predictive intel' },
   { id: 'remine', label: 'Remine lab' },
   { id: 'risk', label: 'Risk populations' },
   { id: 'ddi', label: 'DDI findings' },
@@ -26,11 +28,12 @@ export default function Lenses() {
   return (
     <HubShell
       title="Analytic Lenses"
-      subtitle="Remine, proactive risk populations, DDI, pregnancy, SMQ, class effects, vaccine AESI, geo, and vs FAERS."
+      subtitle="Predictive intel, Remine, risk populations, DDI, pregnancy, SMQ, class effects, vaccine AESI, geo, and vs FAERS."
       tabDefs={TABS}
-      defaultTab="remine"
+      defaultTab="intel"
     >
       {(tab) => {
+        if (tab === 'intel') return <PredictiveIntelligence embedded />;
         if (tab === 'remine') return <RemineLab embedded />;
         if (tab === 'risk') return <RiskPopulations embedded />;
         if (tab === 'ddi') return <Ddi embedded />;

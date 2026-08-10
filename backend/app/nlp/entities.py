@@ -41,15 +41,26 @@ _CONDITION_RE = _build_matcher(CONDITIONS)
 
 
 def _enrich_drug(surface: str, start: int, end: int, source: str) -> dict:
+    from .ontology import resolve_product
+
     cleaned = normalize_entity_surface(surface, "drug") or surface
     info = normalize_drug_full(cleaned)
     generic = info["generic"] or cleaned.strip().lower()
+    # Ontology pass collapses INN/USAN duals (acetaminophen → paracetamol) so
+    # synonymous mentions share one signal key, and carries the alias closure.
+    concept = resolve_product(generic or cleaned)
+    canonical = concept.preferred_generic or generic
     return {
         "text": surface,
-        "normalized": generic,
-        "generic": info["generic"] or generic,
-        "atc": info.get("atc"),
-        "rxcui": info.get("rxcui"),
+        "normalized": canonical,
+        "generic": canonical,
+        "atc": info.get("atc") or concept.atc,
+        "rxcui": info.get("rxcui") or concept.rxcui,
+        "concept_id": concept.concept_id or None,
+        # Named ontology_aliases: stage-3 CUI merge owns the plain "aliases" key
+        # for observed surface forms.
+        "ontology_aliases": concept.aliases()[:12],
+        "chebi_id": concept.chebi_id,
         "start": start,
         "end": end,
         "source": source,

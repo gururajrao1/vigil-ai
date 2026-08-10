@@ -221,6 +221,45 @@ export const api = {
       + `&top_n=${topN}`
       + `&include_exploratory=${includeExploratory}`,
     ),
+  ontologyExpand: (term, { online = false } = {}) =>
+    req(`/api/ontology/expand?term=${encodeURIComponent(term)}&online=${online}`),
+  ontologyCompare: (product, { online = false } = {}) =>
+    req(`/api/ontology/compare?product=${encodeURIComponent(product)}&online=${online}`),
+  featureStoreMatrix: ({ productId, targetAe, includeExplainability = false } = {}) => {
+    const q = new URLSearchParams();
+    if (productId) q.set('product_id', productId);
+    if (targetAe) q.set('target_ae_pt', targetAe);
+    q.set('include_explainability', String(includeExplainability));
+    return req(`/api/feature-store/matrix?${q}`);
+  },
+  fourGate: (text, { useTransformer = false, useOptionalBionlp = false, discardNearNeutral = true } = {}) =>
+    req('/api/nlp/four-gate', {
+      method: 'POST',
+      body: JSON.stringify({
+        text,
+        use_transformer: useTransformer,
+        use_optional_bionlp: useOptionalBionlp,
+        discard_near_neutral: discardNearNeutral,
+      }),
+    }),
+  bioieBenchmark: () => req('/api/nlp/bioie-benchmark'),
+  optionalBackends: () => req('/api/nlp/optional-backends'),
+  omopStats: () => req('/api/omop/stats'),
+  omopSync: ({ limit = 200, aeOnly = true } = {}) =>
+    req(`/api/omop/sync?limit=${limit}&ae_only=${aeOnly}`, { method: 'POST' }),
+  privacyHygiene: ({ title = '', body = '', author = '' } = {}) =>
+    req('/api/privacy/hygiene', {
+      method: 'POST',
+      body: JSON.stringify({ title, body, author, bump_duplicate: false }),
+    }),
+  ingestAdapter: (adapter, { limit = 15, query, applyHygiene = true } = {}) => {
+    const q = new URLSearchParams({
+      limit: String(limit),
+      apply_hygiene: String(applyHygiene),
+    });
+    if (query) q.set('query', query);
+    return req(`/api/ingest/adapters/${encodeURIComponent(adapter)}?${q}`, { method: 'POST' });
+  },
   ingestPvDemo: ({ recompute = true } = {}) =>
     req(`/api/ingest/pv-demo?recompute=${recompute}`, { method: 'POST' }),
 

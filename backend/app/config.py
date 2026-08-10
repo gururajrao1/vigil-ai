@@ -62,6 +62,10 @@ class Settings:
         self.icd11_base_url: str = os.getenv(
             "ICD11_BASE_URL", "https://id.who.int/icd"
         ).strip()
+        # ChEBI chemical entities, served through the EBI Ontology Lookup Service
+        self.chebi_base_url: str = os.getenv(
+            "CHEBI_BASE_URL", "https://www.ebi.ac.uk/ols4/api"
+        ).strip()
 
         # Additional keyless evidence connectors (all optional, offline fallback)
         self.dailymed_base_url: str = os.getenv(
@@ -86,6 +90,7 @@ class Settings:
         ).strip()
         self.use_presidio: bool = _b("USE_PRESIDIO", "true")
         self.use_rxnorm: bool = _b("USE_RXNORM", "true")
+        self.use_chebi: bool = _b("USE_CHEBI", "true")
         self.use_online_translation: bool = _b("USE_ONLINE_TRANSLATION", "true")
 
         # Auth
@@ -94,6 +99,12 @@ class Settings:
         self.jwt_expire_minutes: int = int(os.getenv("JWT_EXPIRE_MINUTES", "720"))
         self.seed_admin_email: str = os.getenv("SEED_ADMIN_EMAIL", "admin@vigilai.dev").strip()
         self.seed_admin_password: str = os.getenv("SEED_ADMIN_PASSWORD", "admin123").strip()
+        # Privacy: HMAC salt for pseudonymous author hashing (never store raw handles)
+        self.system_salt: str = os.getenv(
+            "SYSTEM_SALT", self.jwt_secret or "vigilai-dev-salt-change-me"
+        ).strip()
+        # Content-hash dedupe window (days) for unique post denominator N
+        self.dedupe_window_days: int = int(os.getenv("DEDUPE_WINDOW_DAYS", "30"))
         # When true, empty project workspaces are auto-filled with a synthetic demo
         # corpus on startup (background). Keeps Render free cold-starts from showing
         # zeros. Skips workspaces that already have posts (safe with Neon).

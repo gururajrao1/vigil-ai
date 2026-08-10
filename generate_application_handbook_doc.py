@@ -331,7 +331,7 @@ def build():
     )
 
     # --- 11 ---
-    _h(doc, "11. Quick keyword index (find anything)")
+    _h(doc, "12. Quick keyword index (find anything)")
     _table(
         doc,
         ["You want…", "Search / say", "Go to"],
@@ -349,7 +349,7 @@ def build():
     )
 
     # --- 12 ---
-    _h(doc, "12. Disclaimers")
+    _h(doc, "13. Disclaimers")
     _p(
         doc,
         "Prototype; synthetic data is fictional; openFDA = US FAERS/MAUDE (plus other open feeds "

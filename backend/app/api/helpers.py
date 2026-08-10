@@ -297,6 +297,8 @@ def signal_to_dict(s: Signal, fda: bool = True) -> dict:
 
 
 def post_to_dict(p: ProcessedPost, raw: RawPost) -> dict:
+    from ..analytics.evidence_hierarchy import evidence_tier_for_platform
+
     body = raw.body or ""
     # Live Feed should never dump multi-KB binary/PDF streams
     if body.lstrip().startswith("%PDF-") or "\x00" in body[:200]:
@@ -328,6 +330,7 @@ def post_to_dict(p: ProcessedPost, raw: RawPost) -> dict:
         "ae_reason": p.ae_reason,
         "gate_trace": _normalize_gate_trace(p.gate_trace_json),
         "explainability": _gate_explainability(p.gate_trace_json),
+        "evidence_tier": evidence_tier_for_platform(raw.platform),
     }
 
 

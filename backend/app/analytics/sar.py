@@ -50,7 +50,7 @@ def _case_series_summary(db: Session, sig: Signal, limit: int = 8) -> list[dict]
         body = (raw.body or "")[:280]
         out.append({
             "post_id": proc.id,
-            "source": raw.source,
+            "source": raw.platform,
             "posted_at": raw.posted_at.isoformat() if raw.posted_at else None,
             "country": raw.country,
             "ae_confidence": proc.ae_confidence,

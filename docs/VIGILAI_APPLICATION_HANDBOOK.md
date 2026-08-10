@@ -264,7 +264,7 @@ Cold start on free Render: wake `/api/health` once (~30–60s) before a demo.
 | Homepage | `/` | — | Marketing / wake API before login |
 | Dashboard | `/dashboard` | Corpus · Ops KPIs | Volume, AE rate, triage quality |
 | Safety Signals | `/signals` | Detect · Workflow · Alerts | Find → manage → escalate |
-| Analytic Lenses | `/lenses` | Remine · Risk · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS | Stress-test or special-population views |
+| Analytic Lenses | `/lenses` | Predictive intel · Remine · Risk · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS | Stress-test, special-population, and Phase 1–2 intel views |
 | Evidence Explorer | `/graph` | Graph · Story · Glossary | Relationships & patient-slang → PT |
 | Projects | `/projects` | — | Create workspaces + **keywords** for Pathfinder |
 | Source Discovery | `/source-queue` | Pathfinder · Manual URL | Find / approve communities |
@@ -623,12 +623,65 @@ All four gates must pass for `ae_flag = true`:
 
 `ae_confidence ≈ min(0.99, |sentiment| × 0.9 + 0.1)` with full gate traces on supporting posts.
 
+### 10.1 Evidence hierarchy (scale of proof)
+
+Ingested sources are ranked by **confirmatory weight**, not by volume. This is an evidentiary prior for analyst triage — it does **not** rewrite the PRR/ROR 2×2 table (all AE-flagged rows still count equally in DMA).
+
+| Rank | Tier | Examples | Role |
+|------|------|----------|------|
+| **1st** | Research literature (L1) | PubMed, Europe PMC, Semantic Scholar, Cochrane | Highest confirmatory weight among ingest types |
+| **2nd** | Regulatory / ICSR (L2) | FAERS, VAERS, MAUDE, FDA/MHRA notices, DailyMed | Strong for signal detection; reporting bias / incomplete denominators |
+| **3rd** | Social / news (L3) | Reddit, X, forums, Google News | Hypothesis-generating / patient voice; seek L1–L2 corroboration |
+
+On **Signal Detail → Source traceability**, posts are sorted L1→L2→L3, labeled with tier badges, and summarised as an **evidence mix** + confirmation level. Thread corroboration confidence is tempered by mean proof weight so social-only cohorts cannot over-claim “Red” confirmation.
+
 Normalization stack (open surrogates — **not** licensed MedDRA/UMLS):
 
 - Drugs → generic + WHO **ATC** (RxNorm when online)  
 - Symptoms → MedDRA-style **PT/SOC** (+ hybrid RapidFuzz / embedding match)  
 - Devices → **GMDN** / FDA product-code style; failures → **IMDRF**  
 - Missingness is kept as a feature (no silent imputation)
+
+### 10.1b Predictive intelligence (Phase 1–2)
+
+Long-term ClairLabs-aligned stack now has a working Phase 1–2 spine:
+
+| Layer | Path | What it does |
+|-------|------|--------------|
+| Privacy hygiene | `POST /api/privacy/hygiene` | Presidio/regex PII → standardized tokens; `HMAC-SHA256(author, SYSTEM_SALT)`; SHA-256 content dedupe (30-day window) |
+| Ingest adapters | `POST /api/ingest/adapters/{faers\|maude\|literature\|reddit\|clinical_notes}` | Modular connectors with hygiene baked in |
+| OMOP CDM v5.4 staging | `POST /api/omop/sync`, `GET /api/omop/stats` | `person` / `drug_exposure` / `device_exposure` / `condition_occurrence` (open surrogates) |
+| 4-gate NLP engine | `POST /api/nlp/four-gate` | Brand→generic → ontology map → polarity filter → non-negation (+ BioIE P/R/F1 adapter) |
+| Feature store (X) | `GET/POST /api/feature-store/matrix` | Product–Event–Cohort vectors: PRR/ROR/χ²/EB05/IC025, demographics, comorbidities, GNN centrality |
+
+**UI:** **Lenses → Predictive intel** (`/lenses?tab=intel`) — feature matrix, 4-gate playground, OMOP sync/stats, privacy hygiene preview, BioIE eval. Feature matrix defaults `include_explainability=false` for speed. Main ingest (`pipeline.ingest_posts`) always applies hygiene + HMAC author hash + 30-day content-hash dedupe.
+
+FastMCP tool: `get_normalized_feature_matrix` (same payload as the feature-store route). Offline-first; not for clinical use.
+
+### 10.2 Product ontology — brand ↔ generic ↔ chemical
+
+A product is rarely reported under one name. VigilAI resolves every mention to a single **product concept** and keeps all three naming tiers, so one drug is not silently split into several weaker signals.
+
+| Tier | Example (paracetamol concept) | Source |
+|------|-------------------------------|--------|
+| Brand | Tylenol, Dolo 650, Crocin, Calpol, Panadol | curated brand map + RxNorm `BN` when online |
+| Generic / INN | paracetamol (preferred), acetaminophen | curated INN/USAN dual crosswalk + RxNorm `IN`/`PIN` |
+| Chemical | N-(4-hydroxyphenyl)acetamide | curated ChEBI-style names + ChEBI via EBI OLS4 when online |
+
+Terminology backbone follows Gómez-Pérez et al., *Ontologies in Medicinal Chemistry* — **RxNorm** (brand ↔ ingredient), **ChEBI** (chemical entities), **WHO ATC** (class), with the paper's *ontology matching* problem handled by an authored INN/USAN crosswalk. SNOMED-CT, live UMLS and licensed MedDRA are **not** bundled.
+
+**Behaviour**
+
+- Ingest collapses INN duals onto the preferred label (`acetaminophen` → `paracetamol`, `albuterol` → `salbutamol`), so new posts share one signal key.
+- Risk stratification/ranking and Remine search match on the **alias closure**, not raw string equality.
+- Disproportionality math is unchanged; the ontology decides *what counts as the same product*, not how PRR is computed.
+
+**Where to use it**
+
+- **Signal Detail → Product ontology** panel: concept ID, ATC/RxCUI/ChEBI, alias chips per tier, and AE posts per name vs pooled.
+- API: `GET /api/ontology/resolve?term=`, `GET /api/ontology/expand?term=`, `GET /api/ontology/compare?product=`. Add `&online=true` to enrich with keyless RxNorm/ChEBI; everything works offline without it.
+
+A large gap between the best single name and the pooled count means the safety picture is fragmented across naming and should be reviewed as one concept.
 
 ---
 

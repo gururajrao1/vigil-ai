@@ -67,10 +67,10 @@ _COUNTRY_CODES = {
 def ingest_posts(db: Session, posts: List[dict], use_transformer: bool | None = None,
                  use_presidio: bool | None = None, online_translation: bool | None = None,
                  project_id: int | None = None) -> int:
-    from .projects.privacy_gateway import scrub_sync
     from .projects.scope import current_project_id
     from .nlp.text_normalize import normalize_ingest_fields_sync
     from .nlp.content_dedupe import ContentDedupeGate
+    from .privacy.hygiene import author_hash as hmac_author_hash, scrub_text as hygiene_scrub
     from .models import RawPost as _RawPost  # noqa: F401 — clarity for master bump
 
     if project_id is None:
@@ -107,18 +107,23 @@ def ingest_posts(db: Session, posts: List[dict], use_transformer: bool | None = 
             continue
 
         original = p.get("body", "") or ""
-        # Step 4: Privacy gateway (Presidio + regex) before 4-gate NLP
-        scrubbed_src, pii_types = scrub_sync(original, use_presidio=use_presidio)
+        title_raw = p.get("title", "") or ""
+        # Phase-1 privacy hygiene: standardized redaction tokens + HMAC author
+        scrubbed_src, pii_types, _tokens = hygiene_scrub(original, use_presidio=use_presidio)
+        scrubbed_title, pii_title, _ = hygiene_scrub(title_raw, use_presidio=use_presidio)
+        pii_all = sorted(set(pii_types) | set(pii_title))
         # 2) worldwide: detect language + translate to English for NLP
         tr = translate_to_english(scrubbed_src, src=p.get("lang"), online=online_translation)
         from .nlp.stage1_sanitize import repair_scraped_text
         english = repair_scraped_text(tr["text"])
-        pii_all = pii_types
         # 3) only re-scrub when translation actually changed the text (names may
         #    surface differently in English); avoids a redundant NER pass otherwise.
         if tr["translated"] and english != scrubbed_src:
-            english, pii2 = scrub_sync(english, use_presidio=use_presidio)
-            pii_all = sorted(set(pii_types) | set(pii2))
+            english, pii2, _ = hygiene_scrub(english, use_presidio=use_presidio)
+            pii_all = sorted(set(pii_all) | set(pii2))
+
+        # Never persist raw handles — HMAC-SHA256(SYSTEM_SALT)
+        ahash = hmac_author_hash(str(p.get("author") or p.get("username") or ""))
 
         raw = RawPost(
             project_id=pid,
@@ -129,8 +134,8 @@ def ingest_posts(db: Session, posts: List[dict], use_transformer: bool | None = 
                         else p.get("platform", "unknown")),
             product_type=p.get("product_type", "drug"),
             url=p.get("url", ""),
-            author_hash=p.get("author", ""),
-            title=(p.get("title") or "")[:500],
+            author_hash=ahash,
+            title=(scrubbed_title or "")[:500],
             body=english,
             body_original=scrubbed_src if tr["translated"] else None,
             lang=tr["lang"],

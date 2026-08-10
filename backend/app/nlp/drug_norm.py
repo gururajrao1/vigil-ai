@@ -140,8 +140,10 @@ def canonical_product(surface: str) -> Optional[str]:
         return None
 
     # Offline brand→generic only (never RxNorm here — KG rebuilds thousands of labels)
+    from .ontology import preferred_generic
+
     info = _offline(raw)
-    generic = (info.get("generic") or raw).strip().lower()
+    generic = preferred_generic((info.get("generic") or raw).strip().lower())
     if not generic or len(generic) < 3 or generic in _JUNK_PRODUCTS:
         return None
     if is_known_device(generic):

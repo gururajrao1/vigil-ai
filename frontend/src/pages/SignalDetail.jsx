@@ -373,6 +373,83 @@ function AuditButton({ signalId }) {
   );
 }
 
+const TIER_STYLES = {
+  brand: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  generic: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  chemical: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
+  observed: 'bg-slate-600/25 text-slate-300 border-slate-600/40',
+};
+
+function OntologyPanel({ data }) {
+  const concept = data?.concept;
+  if (!concept?.preferred_generic) return null;
+  const pooled = data.pooled || {};
+  const byAlias = data.by_alias || [];
+  const maxCount = byAlias.reduce((m, a) => Math.max(m, a.n_ae_posts || 0), 0) || 1;
+
+  return (
+    <Card className="p-4">
+      <CardHeader
+        title="Product ontology — brand ↔ generic ↔ chemical"
+        subtitle="One concept, every name it is reported under"
+        right={
+          <Badge
+            value={`${pooled.n_ae_posts ?? 0} AE posts pooled`}
+            className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+          />
+        }
+      />
+      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+        <span>concept: <span className="text-slate-200 font-mono">{concept.concept_id}</span></span>
+        <span>preferred: <span className="text-slate-200">{concept.preferred_generic}</span></span>
+        {concept.atc && <span>ATC: <span className="text-slate-200 font-mono">{concept.atc}</span></span>}
+        {concept.rxcui && <span>RxCUI: <span className="text-slate-200 font-mono">{concept.rxcui}</span></span>}
+        {concept.chebi_id && <span>ChEBI: <span className="text-slate-200 font-mono">{concept.chebi_id}</span></span>}
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {[
+          ['generic', [concept.preferred_generic, ...(concept.generics || [])]],
+          ['brand', concept.brands || []],
+          ['chemical', concept.chemicals || []],
+        ].filter(([, names]) => names.length > 0).map(([tier, names]) => (
+          <div key={tier} className="flex items-start gap-2 flex-wrap">
+            <span className="text-[11px] uppercase tracking-wide text-slate-500 w-16 pt-1">{tier}</span>
+            <div className="flex flex-wrap gap-1.5 flex-1">
+              {names.map((n) => (
+                <Badge key={n} value={n} className={TIER_STYLES[tier]} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {byAlias.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-slate-800 space-y-1.5">
+          <div className="text-[11px] text-slate-500 mb-1">
+            AE posts per name in this workspace — gaps mean the signal is split across naming
+          </div>
+          {byAlias.slice(0, 8).map((a) => (
+            <div key={a.alias} className="flex items-center gap-2 text-xs">
+              <span className="w-40 truncate text-slate-300" title={a.alias}>{a.alias}</span>
+              <div className="flex-1 h-2 rounded bg-slate-900 overflow-hidden">
+                <div
+                  className="h-full bg-sky-500/60"
+                  style={{ width: `${Math.round((a.n_ae_posts / maxCount) * 100)}%` }}
+                />
+              </div>
+              <span className="w-10 text-right tabular-nums text-slate-400">{a.n_ae_posts}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-3 text-sm text-slate-300">{data.verdict}</p>
+      <p className="mt-2 text-[11px] text-slate-500">{data.disclaimer}</p>
+    </Card>
+  );
+}
+
 export default function SignalDetail() {
   const { id } = useParams();
   const [sig, setSig] = useState(null);
@@ -392,10 +469,12 @@ export default function SignalDetail() {
   const [sarPreview, setSarPreview] = useState(null);
   const [selectedMaskers, setSelectedMaskers] = useState([]);
   const [pvDemoBusy, setPvDemoBusy] = useState(false);
+  const [ontology, setOntology] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     setSig(null);
+    setOntology(null);
     setLoadErr(null);
     setAssessment(null);
     setUnmask(null);
@@ -447,6 +526,16 @@ export default function SignalDetail() {
 
     return () => { cancelled = true; };
   }, [id]);
+
+  const productName = sig?.drug;
+  useEffect(() => {
+    if (!productName) return undefined;
+    let cancelled = false;
+    api.ontologyCompare(productName)
+      .then((o) => { if (!cancelled) setOntology(o); })
+      .catch(() => { if (!cancelled) setOntology(null); });
+    return () => { cancelled = true; };
+  }, [productName]);
 
   if (loadErr) {
     return (
@@ -1871,13 +1960,44 @@ export default function SignalDetail() {
             <span>contradicting: <span className="text-slate-200">{sig.thread_score.contradicting}</span></span>
             <span>AE-flagged: <span className="text-slate-200">{sig.thread_score.ae_flagged}</span></span>
             <span>n: <span className="text-slate-200">{sig.thread_score.n_posts}</span></span>
+            {sig.thread_score.mean_proof_weight != null && (
+              <span>mean proof weight: <span className="text-slate-200">{sig.thread_score.mean_proof_weight}</span></span>
+            )}
           </div>
         </Card>
       )}
 
+      {ontology && <OntologyPanel data={ontology} />}
+
       {/* supporting posts with explainability */}
       <Card id="signal-supporting-posts" className="p-4">
-        <CardHeader title="Source traceability" subtitle={`${sig.supporting_posts?.length || 0} supporting posts with per-gate reasoning`} />
+        <CardHeader
+          title="Source traceability"
+          subtitle={`${sig.supporting_posts?.length || 0} supporting posts · sorted by proof tier (literature → regulatory → social)`}
+        />
+        {sig.evidence_mix && (
+          <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge
+                value={sig.evidence_mix.confirmation_level?.level?.replace(/_/g, ' ') || 'mix'}
+                className={
+                  sig.evidence_mix.confirmation_level?.level === 'strong'
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    : sig.evidence_mix.confirmation_level?.level === 'hypothesis_generating'
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                      : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                }
+              />
+              <span className="text-slate-400">{sig.evidence_mix.confirmation_level?.note}</span>
+            </div>
+            <div className="flex flex-wrap gap-3 text-[11px] text-slate-500">
+              <span>L1 literature: <span className="text-violet-300">{sig.evidence_mix.n_literature}</span></span>
+              <span>L2 regulatory: <span className="text-sky-300">{sig.evidence_mix.n_regulatory}</span></span>
+              <span>L3 social/news: <span className="text-slate-300">{sig.evidence_mix.n_social}</span></span>
+              <span>mean proof: <span className="text-slate-200">{sig.evidence_mix.mean_proof_weight}</span></span>
+            </div>
+          </div>
+        )}
         <div className="mt-4 space-y-4">
           {(sig.supporting_posts || []).map((p) => (
             <div key={p.id} className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
@@ -1887,6 +2007,20 @@ export default function SignalDetail() {
                   {p.country && <span className="text-emerald-400 normal-case"> · {p.country}</span>}
                 </span>
                 <div className="flex items-center gap-2 flex-wrap">
+                  {p.evidence_tier && (
+                    <span title={p.evidence_tier.proof || ''}>
+                      <Badge
+                        value={`L${p.evidence_tier.tier} · ${p.evidence_tier.short}`}
+                        className={
+                          p.evidence_tier.tier === 1
+                            ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
+                            : p.evidence_tier.tier === 2
+                              ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                              : 'bg-slate-600/25 text-slate-300 border-slate-600/40'
+                        }
+                      />
+                    </span>
+                  )}
                   {p.translated && <Badge value={`translated from ${p.lang_name}`} className="bg-cyan-500/15 text-cyan-300 border-cyan-500/30" />}
                   {p.pii_found?.length > 0 && <Badge value={`PII scrubbed: ${p.pii_found.join(', ')}`} className="bg-slate-700/40 text-slate-300 border-slate-600/40" />}
                   <Badge value={`${p.sentiment.label} ${p.sentiment.score}`} className={p.sentiment.label === 'NEGATIVE' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' : 'bg-slate-600/20 text-slate-300 border-slate-600/30'} />

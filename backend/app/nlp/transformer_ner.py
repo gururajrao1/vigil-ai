@@ -73,16 +73,30 @@ _NER_STOPWORDS = {
 _MIN_SCORE = 0.60
 
 
+_AVAILABLE_CACHE: bool | None = None
+
+
 def available() -> bool:
-    """Whether transformer NER is enabled and importable (does not force a load)."""
+    """Whether transformer NER is enabled and importable.
+
+    Uses ``find_spec`` so this does NOT import torch/transformers — importing
+    torch for the first time can take 1–2 minutes on a cold container and was
+    turning ``/api/health`` into a gateway-timeout (502/504) on first request.
+    The result is cached; the heavy import still happens lazily in
+    ``_get_pipeline`` only when NER actually runs.
+    """
+    global _AVAILABLE_CACHE
     if not settings.use_transformer_ner:
         return False
+    if _AVAILABLE_CACHE is not None:
+        return _AVAILABLE_CACHE
     try:
-        import torch  # noqa: F401
-        import transformers  # noqa: F401
-        return True
+        from importlib.util import find_spec
+
+        _AVAILABLE_CACHE = bool(find_spec("torch") and find_spec("transformers"))
     except Exception:
-        return False
+        _AVAILABLE_CACHE = False
+    return _AVAILABLE_CACHE
 
 
 def _get_pipeline():

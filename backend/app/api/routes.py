@@ -969,6 +969,44 @@ def normalize_labels(db: Session = Depends(get_db)):
     return scrub
 
 
+# --------------------------- product ontology ------------------------------ #
+@router.get("/ontology/resolve")
+def ontology_resolve(term: str, online: bool = False):
+    """Resolve any product surface to its concept (brand / generic / chemical)."""
+    from ..nlp.ontology import ontology_stack, resolve_product
+
+    concept = resolve_product(term, online=online)
+    return {
+        "term": term,
+        "concept": concept.to_dict(),
+        "ontology_stack": ontology_stack(),
+    }
+
+
+@router.get("/ontology/expand")
+def ontology_expand(term: str, online: bool = False):
+    """Full alias closure for a product term, grouped by naming tier."""
+    from ..nlp.ontology import expand_product, known_dual_groups, ontology_stack
+
+    return {
+        "term": term,
+        **expand_product(term, online=online),
+        "inn_dual_groups": known_dual_groups(),
+        "ontology_stack": ontology_stack(),
+    }
+
+
+@router.get("/ontology/compare")
+def ontology_compare(product: str, online: bool = False, db: Session = Depends(get_db)):
+    """Per-alias vs pooled AE counts — shows naming fragmentation for a product."""
+    from ..analytics.ontology_compare import compare_product_aliases
+    from ..projects.scope import current_project_id
+
+    return compare_product_aliases(
+        db, product, project_id=current_project_id(), online=online
+    )
+
+
 @router.post("/normalize/label-novelty")
 def normalize_label_novelty(db: Session = Depends(get_db)):
     """Recompute FDA-label novelty tiers (in_label / novel / boxed) for existing signals."""
@@ -1262,7 +1300,9 @@ def get_signal(
         .all()
     ) if ids else []
     supporting = [post_to_dict(p, r) for p, r in rows]
+    from ..analytics.evidence_hierarchy import annotate_posts, evidence_mix
     from ..analytics.thread_score import score_thread
+    supporting = annotate_posts(supporting)
     thread_posts = []
     for p, r in rows:
         ents = json.loads(p.entities_json or "{}")
@@ -1275,11 +1315,13 @@ def get_signal(
             "symptoms": ents.get("symptoms") or [],
             "body": r.body or "",
             "title": r.title or "",
+            "platform": r.platform,
         })
     return {
         **signal_to_dict(sig),
         "trend_series": signal_trend_series(db, sig),
         "supporting_posts": supporting,
+        "evidence_mix": evidence_mix(supporting),
         "thread_score": score_thread(thread_posts, drug=sig.drug or "",
                                      symptom=sig.symptom or ""),
         "evidence_pending": evidence_pending,
@@ -1890,6 +1932,159 @@ def risk_strata_rank(
     )
     out["candidate_pairs"] = (list_candidate_pairs(db, project_id=pid, limit=12).get("pairs") or [])
     return out
+
+
+# -------------- Phase 1–2: privacy / OMOP / 4-gate / feature store --------- #
+@router.post("/privacy/hygiene")
+def privacy_hygiene(payload: dict, db: Session = Depends(get_db)):
+    """Run PII scrub + HMAC author hash + 30-day content-hash dedupe on one record."""
+    from ..privacy.hygiene import hygiene_pipeline
+    from ..projects.scope import current_project_id
+
+    result = hygiene_pipeline(
+        {
+            "title": payload.get("title") or "",
+            "body": payload.get("body") or payload.get("text") or "",
+            "author": payload.get("author") or payload.get("username") or "",
+        },
+        db=db,
+        project_id=payload.get("project_id") or current_project_id(),
+        bump_duplicate=bool(payload.get("bump_duplicate", False)),
+    )
+    return result.to_dict()
+
+
+@router.post("/omop/sync")
+def omop_sync(
+    limit: int = 500,
+    ae_only: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Backfill OMOP CDM v5.4 staging tables from the VigilAI AE corpus."""
+    from ..db.schemas.omop_mapper import sync_omop_from_corpus
+    from ..projects.scope import current_project_id
+
+    return sync_omop_from_corpus(
+        db, project_id=current_project_id(), limit=limit, ae_only=ae_only
+    )
+
+
+@router.get("/omop/stats")
+def omop_stats(db: Session = Depends(get_db)):
+    from ..db.schemas.omop_cdm import (
+        OmopConditionOccurrence,
+        OmopDeviceExposure,
+        OmopDrugExposure,
+        OmopPerson,
+    )
+
+    return {
+        "persons": db.query(OmopPerson).count(),
+        "drug_exposures": db.query(OmopDrugExposure).count(),
+        "device_exposures": db.query(OmopDeviceExposure).count(),
+        "condition_occurrences": db.query(OmopConditionOccurrence).count(),
+        "cdm": "OMOP CDM v5.4 staging (open surrogates)",
+    }
+
+
+@router.post("/nlp/four-gate")
+def nlp_four_gate(payload: dict):
+    """Run the Phase-2 4-gate deterministic NLP engine on raw text."""
+    from ..nlp.four_gate_engine import run_four_gates
+
+    text = payload.get("text") or ""
+    if not text.strip():
+        raise HTTPException(422, "text is required")
+    return run_four_gates(
+        text,
+        use_transformer=bool(payload.get("use_transformer", False)),
+        use_optional_bionlp=bool(payload.get("use_optional_bionlp", False)),
+        discard_near_neutral=bool(payload.get("discard_near_neutral", True)),
+    )
+
+
+@router.get("/nlp/bioie-benchmark")
+def nlp_bioie_benchmark(corpus: str = "bc5cdr", path: str | None = None):
+    """Precision/recall/F1 adapter for BC5CDR / NCBI Disease–style corpora."""
+    from ..nlp.bioie_benchmark import evaluate_corpus
+
+    return evaluate_corpus(corpus=corpus, path=path)
+
+
+@router.get("/nlp/optional-backends")
+def nlp_optional_backends():
+    """Report optional RoBERTa / scispaCy availability without forcing a model load."""
+    from ..nlp.bionlp_optional import optional_backends_status
+
+    return optional_backends_status()
+
+
+@router.get("/feature-store/matrix")
+@router.post("/feature-store/matrix")
+def feature_store_matrix(
+    product_id: str | None = None,
+    target_ae_pt: str | None = None,
+    include_explainability: bool = False,
+    min_n: int = 1,
+    db: Session = Depends(get_db),
+):
+    """Product–Event–Cohort feature matrix X (FastMCP ``get_normalized_feature_matrix``).
+
+    ``include_explainability`` defaults False for speed — sample 4-gate traces
+    are opt-in (they re-run NLP on corpus snippets).
+    """
+    from ..analytics.feature_store import get_normalized_feature_matrix
+    from ..projects.scope import current_project_id
+
+    return get_normalized_feature_matrix(
+        db,
+        product_id=product_id,
+        target_ae_pt=target_ae_pt,
+        project_id=current_project_id(),
+        include_explainability=include_explainability,
+    )
+
+
+@router.post("/ingest/adapters/{adapter_name}")
+def run_ingest_adapter(
+    adapter_name: str,
+    limit: int = 20,
+    query: str | None = None,
+    apply_hygiene: bool = True,
+    source: str = "pubmed",
+    mode: str = "health",
+    db: Session = Depends(get_db),
+):
+    """Run a Phase-1 modular ingestion adapter (faers/maude/literature/reddit/clinical_notes)."""
+    from ..ingestion.adapters import (
+        ClinicalNotesAdapter,
+        FaersAdapter,
+        LiteratureAdapter,
+        MaudeAdapter,
+        RedditAdapter,
+    )
+    from ..projects.scope import current_project_id
+
+    adapters = {
+        "faers": FaersAdapter,
+        "maude": MaudeAdapter,
+        "literature": LiteratureAdapter,
+        "reddit": RedditAdapter,
+        "clinical_notes": ClinicalNotesAdapter,
+    }
+    cls = adapters.get(adapter_name.lower())
+    if not cls:
+        raise HTTPException(404, f"Unknown adapter. Choose from: {sorted(adapters)}")
+    result = cls().run(
+        db=db,
+        project_id=current_project_id(),
+        apply_hygiene=apply_hygiene,
+        limit=limit,
+        query=query,
+        source=source,
+        mode=mode,
+    )
+    return result.to_dict()
 
 
 @router.post("/signals/{signal_id}/narrative")

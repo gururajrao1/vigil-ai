@@ -191,7 +191,17 @@ def _product_match(product: str, focus: str) -> bool:
     a, b = (product or "").lower(), (focus or "").lower()
     if not a or not b:
         return False
-    return a == b or b in a or a in b
+    if a == b or b in a or a in b:
+        return True
+    # Ontology closure: a brand/INN-dual mention counts as the same product
+    # (tylenol ≡ acetaminophen ≡ paracetamol) instead of splitting the cohort.
+    try:
+        from ..nlp.ontology import aliases_for_product
+
+        return bool(aliases_for_product(a) & aliases_for_product(b))
+    except Exception:  # pragma: no cover - defensive, keeps analytics running
+        logger.debug("ontology product match failed for %r/%r", a, b, exc_info=True)
+        return False
 
 
 def _actionable(domain: str, factors: List[dict], product: str, ae: str) -> str:

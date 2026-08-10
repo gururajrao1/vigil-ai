@@ -58,6 +58,29 @@ def rank_high_risk_populations_impl(
         db.close()
 
 
+def get_normalized_feature_matrix_impl(
+    product_id: str = "",
+    target_ae_pt: str = "",
+    project_id: Optional[int] = None,
+    include_explainability: bool = True,
+) -> dict:
+    """Phase-2 feature store entry for FastMCP / API."""
+    from ..analytics.feature_store import get_normalized_feature_matrix
+    from ..database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return get_normalized_feature_matrix(
+            db,
+            product_id=product_id or None,
+            target_ae_pt=target_ae_pt or None,
+            project_id=project_id,
+            include_explainability=include_explainability,
+        )
+    finally:
+        db.close()
+
+
 def _build_mcp():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -73,10 +96,11 @@ def _build_mcp():
     mcp = FastMCP(
         "vigilai-risk-strata",
         instructions=(
-            "VigilAI proactive risk stratification & ranking. Use "
-            "predict_high_risk_populations for logistic segment scores, or "
-            "rank_high_risk_populations for Risk Elevation Multiplier ranking "
-            "with mitigation rules. Offline-first; not for clinical decisions."
+            "VigilAI proactive risk stratification, ranking, and feature store. "
+            "Use predict_high_risk_populations / rank_high_risk_populations for "
+            "strata, or get_normalized_feature_matrix for the Product-Event-Cohort "
+            "ML feature matrix X with 4-gate explainability. Offline-first; "
+            "not for clinical decisions."
         ),
     )
 
@@ -127,6 +151,31 @@ def _build_mcp():
             product_id=product_id,
             target_ae_pt=target_ae_pt,
             top_n=top_n,
+        )
+        return json.dumps(out, ensure_ascii=False)
+
+    @mcp.tool()
+    async def get_normalized_feature_matrix(
+        product_id: str = "",
+        target_ae_pt: str = "",
+        include_explainability: bool = True,
+    ) -> str:
+        """Return the VigilAI Product–Event–Cohort feature matrix X with
+        PRR/ROR/χ²/EB05/IC025, demographics, comorbidities, polypharmacy,
+        GNN degree centrality, and optional 4-gate NLP explainability traces.
+
+        Args:
+            product_id: Optional product filter (brand or generic).
+            target_ae_pt: Optional MedDRA-style Preferred Term filter.
+            include_explainability: Attach sample 4-gate traces (default True).
+
+        Returns:
+            JSON with feature_names, matrix rows, dense X, and explainability.
+        """
+        out = get_normalized_feature_matrix_impl(
+            product_id=product_id,
+            target_ae_pt=target_ae_pt,
+            include_explainability=include_explainability,
         )
         return json.dumps(out, ensure_ascii=False)
 

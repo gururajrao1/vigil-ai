@@ -10,16 +10,36 @@ from ..config import settings
 
 def _playwright_available() -> bool:
     try:
-        import playwright  # noqa: F401
-        return True
-    except ImportError:
+        from importlib.util import find_spec
+
+        return find_spec("playwright") is not None
+    except Exception:
         return False
 
 
 def _presidio_available() -> bool:
-    from ..nlp.pii import _presidio
-    analyzer, _ = _presidio()
-    return analyzer is not None
+    """Report Presidio availability WITHOUT building the engine.
+
+    Building the analyzer loads the spaCy model (~60s cold), which turned
+    /api/health and pipeline_capabilities into a gateway-timeout on first hit.
+    Report the already-built engine if present, else probe importability with
+    find_spec; the real engine still builds lazily on the first PII scrub.
+    """
+    if not settings.use_presidio:
+        return False
+    from .. import nlp  # noqa: F401
+    from ..nlp import pii as _pii
+
+    if _pii._ANALYZER is not None:
+        return True
+    if _pii._PRESIDIO_TRIED:  # already attempted and failed — don't retry here
+        return _pii._ANALYZER is not None
+    try:
+        from importlib.util import find_spec
+
+        return bool(find_spec("presidio_analyzer") and find_spec("en_core_web_sm"))
+    except Exception:
+        return False
 
 
 def _storage_state_configured() -> bool:

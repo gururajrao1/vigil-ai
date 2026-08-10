@@ -488,11 +488,22 @@ def build_remine_lab(
     matching = cards
     term = (q or "").strip().lower()
     if term:
+        # Alias-aware: searching a brand (tylenol) finds its concept's cards
+        # even though the corpus stores the preferred generic (paracetamol).
+        from ..nlp.ontology import aliases_for_product
+
+        term_aliases = {a for a in aliases_for_product(term) if len(a) >= 3}
+        term_aliases.add(term)
+
+        def _hits(value: str) -> bool:
+            low = (value or "").lower()
+            return any(alias in low for alias in term_aliases)
+
         matching = [
             c for c in matching
-            if term in c["drug"].lower()
+            if _hits(c["drug"])
             or term in c["event"].lower()
-            or any(term in m.lower() for m in c["maskers"])
+            or any(_hits(m) for m in c["maskers"])
         ]
 
     only = (only or "all").lower()

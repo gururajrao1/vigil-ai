@@ -98,12 +98,23 @@ class ContentDedupeGate:
     duplicate_traces: list[dict[str, Any]] = field(default_factory=list)
 
     def warm_from_db(self, db, *, limit: int = 50_000) -> int:
-        """Load existing content hashes for the project into the cache."""
+        """Load existing content hashes for the project into the cache.
+
+        Only hashes ingested within ``settings.dedupe_window_days`` (default 30)
+        count toward the unique-post denominator gate — older rows are ignored
+        so historical archives don't permanently block re-ingest of the same
+        narrative after the window.
+        """
+        from datetime import datetime, timedelta
+
+        from ..config import settings
         from ..models import RawPost
 
+        cutoff = datetime.utcnow() - timedelta(days=max(1, int(settings.dedupe_window_days)))
         q = db.query(RawPost.id, RawPost.content_hash).filter(
             RawPost.content_hash.isnot(None),
             RawPost.content_hash != "",
+            RawPost.ingested_at >= cutoff,
         )
         if self.project_id is not None:
             from sqlalchemy import or_
