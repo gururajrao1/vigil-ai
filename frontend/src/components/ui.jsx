@@ -106,3 +106,58 @@ export function Button({ children, onClick, variant = 'primary', disabled, class
     </button>
   );
 }
+
+/** Compact prev/next pager for long tables. page is 1-based. */
+export function PaginationBar({
+  page,
+  pageSize,
+  total,
+  onPageChange,
+  className = '',
+  label = 'rows',
+}) {
+  const totalPages = Math.max(1, Math.ceil((total || 0) / Math.max(1, pageSize || 1)));
+  const safePage = Math.min(Math.max(1, page || 1), totalPages);
+  const from = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const to = Math.min(total, safePage * pageSize);
+  if (total <= pageSize) {
+    return (
+      <div className={`flex items-center justify-between gap-2 text-[11px] text-slate-500 ${className}`}>
+        <span>
+          {total} {label}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className={`flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 ${className}`}>
+      <span>
+        Showing <span className="text-slate-200 tabular-nums">{from}–{to}</span> of{' '}
+        <span className="text-slate-200 tabular-nums">{total}</span> {label}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          disabled={safePage <= 1}
+          onClick={() => onPageChange?.(safePage - 1)}
+          className="px-2 py-1 border border-slate-700 disabled:opacity-40 hover:border-sky-500/40 hover:text-sky-200"
+          style={{ borderRadius: 4 }}
+        >
+          Prev
+        </button>
+        <span className="font-mono text-slate-300 px-1">
+          {safePage} / {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={safePage >= totalPages}
+          onClick={() => onPageChange?.(safePage + 1)}
+          className="px-2 py-1 border border-slate-700 disabled:opacity-40 hover:border-sky-500/40 hover:text-sky-200"
+          style={{ borderRadius: 4 }}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}

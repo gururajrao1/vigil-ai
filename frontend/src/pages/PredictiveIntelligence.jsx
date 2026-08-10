@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
-import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardHeader, PaginationBar, Spinner } from '../components/ui';
 
 const DEMO_TEXT =
   'Started Accutane (isotretinoin) last month and my mood dropped into depression. Denies chest pain. Terrible headaches.';
 
-const MATRIX_PAGE = 50;
+const MATRIX_PAGE = 25;
 
 /** Collapse cohort rows into densest product→event pairs for filter chips. */
 function topPairsFromMatrix(rows, limit = 12) {
@@ -42,6 +42,7 @@ export default function PredictiveIntelligence({ embedded = false }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [matrixPage, setMatrixPage] = useState(1);
 
   const loadMatrix = (pid = productId, ae = targetAe) => {
     setBusy(true);
@@ -81,12 +82,14 @@ export default function PredictiveIntelligence({ embedded = false }) {
   const applyPair = (p, e) => {
     setProductId(p);
     setTargetAe(e);
+    setMatrixPage(1);
     loadMatrix(p, e);
   };
 
   const clearFilters = () => {
     setProductId('');
     setTargetAe('');
+    setMatrixPage(1);
     loadMatrix('', '');
   };
 
@@ -153,8 +156,11 @@ export default function PredictiveIntelligence({ embedded = false }) {
   }, [tab]);
 
   const rows = matrix?.matrix || [];
-  const shown = useMemo(() => rows.slice(0, MATRIX_PAGE), [rows]);
-  const chips = pairChips.length ? pairChips : topPairsFromMatrix(rows, 12);
+  const shown = useMemo(() => {
+    const start = (Math.max(1, matrixPage) - 1) * MATRIX_PAGE;
+    return rows.slice(start, start + MATRIX_PAGE);
+  }, [rows, matrixPage]);
+  const chips = pairChips.length ? pairChips : topPairsFromMatrix(rows, 24);
 
   const tabs = [
     { id: 'matrix', label: 'Feature matrix X' },
@@ -267,10 +273,6 @@ export default function PredictiveIntelligence({ embedded = false }) {
                   rows: <span className="text-slate-200">{matrix.n_rows}</span>
                 </span>
                 <span>
-                  showing: <span className="text-slate-200">{shown.length}</span>
-                  {matrix.n_rows > shown.length ? ` of ${matrix.n_rows}` : ''}
-                </span>
-                <span>
                   AE posts: <span className="text-slate-200">{matrix.n_source_ae_posts}</span>
                 </span>
                 <span>
@@ -282,6 +284,13 @@ export default function PredictiveIntelligence({ embedded = false }) {
                   </span>
                 )}
               </div>
+              <PaginationBar
+                page={matrixPage}
+                pageSize={MATRIX_PAGE}
+                total={rows.length}
+                onPageChange={setMatrixPage}
+                label="cohort rows"
+              />
               {shown.length === 0 ? (
                 <p className="text-sm text-slate-400">
                   No cohort rows for this filter — try another chip or Clear.
@@ -322,11 +331,13 @@ export default function PredictiveIntelligence({ embedded = false }) {
                   </table>
                 </div>
               )}
-              {matrix.n_rows > shown.length && (
-                <p className="text-[11px] text-slate-500">
-                  Showing top {shown.length} cohort rows (by PRR). Narrow with a product/event chip to see the rest.
-                </p>
-              )}
+              <PaginationBar
+                page={matrixPage}
+                pageSize={MATRIX_PAGE}
+                total={rows.length}
+                onPageChange={setMatrixPage}
+                label="cohort rows"
+              />
               <p className="text-[11px] text-slate-500">{matrix.disclaimer}</p>
             </div>
           ) : null}

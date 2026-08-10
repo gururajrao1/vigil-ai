@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
 import { useProject } from '../projectContext';
-import { Badge, Card, Spinner } from '../components/ui';
+import { Badge, Card, PaginationBar, Spinner } from '../components/ui';
 import SeverityAuditPopover from '../components/SeverityAuditPopover';
 import BidirectionalProfilePanel from '../components/views/BidirectionalProfilePanel';
 
@@ -56,6 +56,8 @@ export default function Signals({ embedded = false }) {
   const [profile, setProfile] = useState(null); // { mode: 'drug'|'event', query: string }
   // Pin a drug to the top when deep-linking from SMQ (keep full SMQ set visible)
   const [pinDrug, setPinDrug] = useState(searchParams.get('pin') || '');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   // Sync deep-link tokens from Dashboard / SMQ / chart clicks
   useEffect(() => {
@@ -205,6 +207,14 @@ export default function Signals({ embedded = false }) {
       }
       return (b[sortBy] || 0) - (a[sortBy] || 0);
     });
+
+  useEffect(() => { setPage(1); }, [
+    filter, region, product, drugQ, symptomQ, textQ, socQ, smq, noveltyFilter, sortBy,
+    sdrOnly, spikingOnly, pgxOnly, boxedOnly, mechanismOnly, classEffectOnly, acOnly,
+    calibratedOnly, vaccineOnly, spatialOnly, wellDocOnly, hrElevatedOnly, maxsprtOnly, pinDrug,
+  ]);
+
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -378,6 +388,14 @@ export default function Signals({ embedded = false }) {
       {!signals ? <Spinner /> : (
         <Card className="overflow-hidden">
           <div className="app-table-scroll">
+          <PaginationBar
+            className="px-4 py-2 border-b border-slate-800"
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={rows.length}
+            onPageChange={setPage}
+            label="signals"
+          />
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-800">
@@ -397,7 +415,7 @@ export default function Signals({ embedded = false }) {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && (
+              {pageRows.length === 0 && (
                 <tr>
                   <td colSpan={13} className="px-4 py-8 text-center text-slate-500">
                     {loadError
@@ -406,7 +424,7 @@ export default function Signals({ embedded = false }) {
                   </td>
                 </tr>
               )}
-              {rows.map((s) => {
+              {pageRows.map((s) => {
                 const isPinned = pinNorm && (s.drug || '').toLowerCase() === pinNorm;
                 return (
                 <tr
@@ -557,6 +575,14 @@ export default function Signals({ embedded = false }) {
               })}
             </tbody>
           </table>
+          <PaginationBar
+            className="px-4 py-2 border-t border-slate-800"
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={rows.length}
+            onPageChange={setPage}
+            label="signals"
+          />
           </div>
         </Card>
       )}

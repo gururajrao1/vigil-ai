@@ -479,7 +479,8 @@ export const api = {
   narrativeCausality: (body) =>
     req('/api/nlp/causality', { method: 'POST', body: JSON.stringify(body) }),
   triangulation: (id) => req(`/api/signals/${id}/triangulation`),
-  gvpRegister: (limit = 100) => req(`/api/gvp/register?limit=${limit}`),
+  gvpRegister: ({ limit = 25, offset = 0 } = {}) =>
+    req(`/api/gvp/register?limit=${limit}&offset=${offset}`),
   exportPbrerPdfUrl: () => `${BASE}/api/gvp/pbrer.pdf`,
   exportPbrerDocxUrl: () => `${BASE}/api/gvp/pbrer.docx`,
 

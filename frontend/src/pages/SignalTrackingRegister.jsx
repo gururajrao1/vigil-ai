@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, getToken } from '../api';
-import { Button, Card, Spinner } from '../components/ui';
+import { Button, Card, PaginationBar, Spinner } from '../components/ui';
 
 const BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+const PAGE_SIZE = 25;
 
 /** GVP Module IX Signal Tracking Register. */
 export default function SignalTrackingRegister({ embedded = false }) {
@@ -11,23 +12,33 @@ export default function SignalTrackingRegister({ embedded = false }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [acting, setActing] = useState(null);
+  const [page, setPage] = useState(1);
 
-  const load = () => {
+  const load = (nextPage = page) => {
     setBusy(true);
     setErr(null);
-    api.gvpRegister()
-      .then(setData)
+    const offset = (Math.max(1, nextPage) - 1) * PAGE_SIZE;
+    api.gvpRegister({ limit: PAGE_SIZE, offset })
+      .then((d) => {
+        setData(d);
+        setPage(d.page || nextPage);
+      })
       .catch((e) => setErr(e?.message || 'Register failed'))
       .finally(() => setBusy(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(1); }, []);
+
+  const goPage = (p) => {
+    setPage(p);
+    load(p);
+  };
 
   const advance = async (id, status) => {
     setActing(id);
     try {
       await api.updateLifecycle(id, { status });
-      await load();
+      await load(page);
     } catch (e) {
       setErr(e?.message || String(e));
     }
@@ -54,6 +65,7 @@ export default function SignalTrackingRegister({ embedded = false }) {
   if (busy && !data) return <Spinner label="Loading GVP register…" />;
 
   const rows = data?.rows || [];
+  const total = data?.total ?? rows.length;
 
   return (
     <div className="space-y-4">
@@ -67,7 +79,7 @@ export default function SignalTrackingRegister({ embedded = false }) {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button variant="primary" disabled={busy} onClick={load}>
+        <Button variant="primary" disabled={busy} onClick={() => load(page)}>
           {busy ? 'Refreshing…' : 'Refresh'}
         </Button>
         <Button
@@ -84,6 +96,14 @@ export default function SignalTrackingRegister({ embedded = false }) {
 
       {err && <p className="text-sm text-rose-300">{err}</p>}
 
+      <PaginationBar
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        onPageChange={goPage}
+        label="signals"
+      />
+
       <Card className="overflow-hidden">
         <div className="overflow-x-auto max-h-[32rem]">
           <table className="min-w-full text-xs">
@@ -99,7 +119,12 @@ export default function SignalTrackingRegister({ embedded = false }) {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {busy && (
+                <tr>
+                  <td colSpan={7} className="p-3 text-slate-500">Loading page…</td>
+                </tr>
+              )}
+              {!busy && rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-4 text-slate-500">
                     No signals in register — run Detect / Load PV demo.
@@ -165,6 +190,14 @@ export default function SignalTrackingRegister({ embedded = false }) {
           </table>
         </div>
       </Card>
+
+      <PaginationBar
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={total}
+        onPageChange={goPage}
+        label="signals"
+      />
 
       {data?.disclaimer && (
         <p className="text-[10px] text-slate-500">{data.disclaimer}</p>

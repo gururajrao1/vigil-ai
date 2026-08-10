@@ -1933,7 +1933,7 @@ def risk_strata(
     from ..projects.scope import current_project_id
 
     pid = current_project_id()
-    candidates = list_candidate_pairs(db, project_id=pid, limit=12)
+    candidates = list_candidate_pairs(db, project_id=pid, limit=40)
     pairs = candidates.get("pairs") or []
 
     if not product_id or not target_ae_pt:
@@ -2017,7 +2017,7 @@ def risk_strata_rank(
         project_id=pid,
         include_exploratory=include_exploratory,
     )
-    out["candidate_pairs"] = (list_candidate_pairs(db, project_id=pid, limit=12).get("pairs") or [])
+    out["candidate_pairs"] = (list_candidate_pairs(db, project_id=pid, limit=40).get("pairs") or [])
     return out
 
 
@@ -2586,8 +2586,12 @@ def update_lifecycle(
 
 
 @router.get("/gvp/register")
-def gvp_register(db: Session = Depends(get_db), limit: int = 100):
-    """GVP Module IX Signal Tracking Register (table for Safety Signals hub)."""
+def gvp_register(
+    db: Session = Depends(get_db),
+    limit: int = 25,
+    offset: int = 0,
+):
+    """GVP Module IX Signal Tracking Register (paginated table)."""
     from ..analytics.label_filter import filter_product_event
     from ..analytics.lifecycle import gvp_alias_for, valid_next_states
     from ..analytics.triangulation import triangulate_signal
@@ -2598,10 +2602,15 @@ def gvp_register(db: Session = Depends(get_db), limit: int = 100):
     if pid is not None:
         from sqlalchemy import or_
         q = q.filter(or_(Signal.project_id == pid, Signal.project_id.is_(None), Signal.project_id == 0))
-    signals = q.order_by(Signal.priority_score.desc()).limit(min(limit, 200)).all()
-    signals = sorted(signals, key=lambda s: s.priority_score or 0.0, reverse=True)
+    total = q.count()
+    page_size = max(1, min(int(limit or 25), 100))
+    page_offset = max(0, int(offset or 0))
+    # Pull a wider ordered window then slice — priority_score may be null
+    candidates = q.order_by(Signal.priority_score.desc(), Signal.id.desc()).all()
+    candidates = sorted(candidates, key=lambda s: (s.priority_score or 0.0, s.id or 0), reverse=True)
+    page_rows = candidates[page_offset: page_offset + page_size]
     rows = []
-    for s in signals:
+    for s in page_rows:
         base = signal_to_dict(s, fda=True)
         try:
             lf = filter_product_event(
@@ -2639,6 +2648,11 @@ def gvp_register(db: Session = Depends(get_db), limit: int = 100):
     return {
         "rows": rows,
         "n": len(rows),
+        "total": total,
+        "limit": page_size,
+        "offset": page_offset,
+        "page": (page_offset // page_size) + 1 if page_size else 1,
+        "pages": max(1, (total + page_size - 1) // page_size) if page_size else 1,
         "disclaimer": (
             "GVP Module IX–shaped signal tracking register over VigilAI corpus. "
             "Prototype; not a validated QMS record."

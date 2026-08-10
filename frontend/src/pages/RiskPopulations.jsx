@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
-import { Badge, Button, Card, Spinner } from '../components/ui';
+import { Badge, Button, Card, PaginationBar, Spinner } from '../components/ui';
 
 /** Proactive risk stratification + REM ranking of high-risk subpopulations. */
 export default function RiskPopulations({ embedded = false }) {
@@ -13,6 +13,8 @@ export default function RiskPopulations({ embedded = false }) {
   const [targetAe, setTargetAe] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [pairPage, setPairPage] = useState(1);
+  const PAIR_PAGE = 12;
 
   const loadRank = (pid, ae) => {
     if (!pid?.trim() || !ae?.trim()) {
@@ -126,6 +128,7 @@ export default function RiskPopulations({ embedded = false }) {
 
   const findings = data.ranked || data.findings || data.segments || [];
   const pairs = data.candidate_pairs || [];
+  const pairSlice = pairs.slice((pairPage - 1) * PAIR_PAGE, pairPage * PAIR_PAGE);
   const isRank = mode === 'rank' || data.method === 'risk_elevation_multiplier';
 
   return (
@@ -199,8 +202,16 @@ export default function RiskPopulations({ embedded = false }) {
       {pairs.length > 0 && (
         <Card className="p-3">
           <div className="text-[10px] uppercase text-slate-500 mb-2">Candidate pairs in corpus</div>
+          <PaginationBar
+            className="mb-2"
+            page={pairPage}
+            pageSize={PAIR_PAGE}
+            total={pairs.length}
+            onPageChange={setPairPage}
+            label="pairs"
+          />
           <div className="flex flex-wrap gap-1.5">
-            {pairs.slice(0, 10).map((p) => (
+            {pairSlice.map((p) => (
               <button
                 key={`${p.product_id}|${p.target_ae_pt}`}
                 type="button"
