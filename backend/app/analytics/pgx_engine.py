@@ -169,14 +169,29 @@ def get_pgx_gene_associations(drug_name: str, *, event: str = "", offline_only: 
 
 
 def profile_signal(drug: str, event: str, *, soc: Optional[str] = None, offline_only: bool = True) -> dict:
-    """Enrich a Product→PT pair with PGx badges for Signal Detail."""
+    """Enrich a Product→PT pair with PGx badges for Signal Detail.
+
+    Only an event-matched hit counts as actionable — a drug-level association whose
+    reaction set does not include this event is reported separately, so we never
+    over-call PGx (e.g. codeine -> headache).
+    """
     hit = offline_match(drug, event, soc=soc)
     assoc = get_pgx_gene_associations(drug, event=event, offline_only=offline_only)
+    associations = assoc.get("associations") or []
     return {
-        "is_pgx_actionable": bool(hit) or assoc.get("is_pgx_actionable"),
+        "is_pgx_actionable": bool(hit),
         "pgx": hit,
-        "associations": assoc.get("associations") or [],
-        "badge": (hit or {}).get("badge") or assoc.get("badge"),
-        "level_badge": (hit or {}).get("level_badge") or assoc.get("badge"),
+        "associations": associations,
+        "has_other_associations": bool(associations) and not hit,
+        "verdict": (
+            f"Actionable PGx association for {drug} \u2192 {event}." if hit
+            else (
+                f"{drug} has known gene associations, but none map to {event}."
+                if associations else
+                f"No curated CPIC/PharmGKB association for {drug} \u2192 {event}."
+            )
+        ),
+        "badge": (hit or {}).get("badge"),
+        "level_badge": (hit or {}).get("level_badge"),
         "disclaimer": _DISCLAIMER,
     }

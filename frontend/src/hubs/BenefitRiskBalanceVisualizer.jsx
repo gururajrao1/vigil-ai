@@ -10,6 +10,7 @@ export default function BenefitRiskBalanceVisualizer({
   strength = 'WEAK',
   postCount = 0,
   embedded = false,
+  sampleNote = '',
 }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(null);
@@ -45,10 +46,21 @@ export default function BenefitRiskBalanceVisualizer({
   return (
     <Card className={embedded ? 'p-4' : 'p-4 border-teal-700/40'}>
       <CardHeader
-        title="Benefit–risk balance (PrOACT-URL / BRAT)"
+        title="Benefit–risk balance"
         subtitle="Efficacy response rate vs severe AE signal rate — executive trade-off scale."
-        right={<Button variant="ghost" onClick={load} disabled={busy}>↻ Recompute</Button>}
+        right={(
+          <div className="flex items-center gap-2">
+            <Badge
+              value="PrOACT-URL / BRAT"
+              className="bg-teal-500/20 text-teal-100 border-teal-400/40 text-[10px]"
+            />
+            <Button variant="ghost" onClick={load} disabled={busy}>↻ Recompute</Button>
+          </div>
+        )}
       />
+      {sampleNote && (
+        <p className="mt-2 text-[11px] text-amber-200/80">{sampleNote}</p>
+      )}
       {busy && !data && <div className="mt-3"><Spinner label="Computing balance…" /></div>}
       {err && <p className="mt-3 text-sm text-rose-300">{err}</p>}
       {data && (
@@ -76,14 +88,19 @@ export default function BenefitRiskBalanceVisualizer({
           </div>
 
           {data.proact_dimensions && (
-            <details className="text-[12px] text-slate-300">
-              <summary className="cursor-pointer text-teal-300">PrOACT-URL dimensions</summary>
-              <ul className="mt-2 space-y-1 list-disc pl-4">
+            <div className="rounded-md border border-teal-700/30 bg-teal-500/5 p-3">
+              <div className="text-[10px] uppercase tracking-wide text-teal-300 mb-1.5">
+                PrOACT-URL dimensions
+              </div>
+              <dl className="space-y-1.5 text-[12px]">
                 {Object.entries(data.proact_dimensions).map(([k, v]) => (
-                  <li key={k}><span className="text-slate-500">{k}:</span> {v}</li>
+                  <div key={k}>
+                    <dt className="text-slate-500 capitalize">{k.replace(/_/g, ' ')}</dt>
+                    <dd className="text-slate-200 leading-relaxed">{v}</dd>
+                  </div>
                 ))}
-              </ul>
-            </details>
+              </dl>
+            </div>
           )}
           <p className="text-[10px] text-slate-600">{data.disclaimer}</p>
         </div>

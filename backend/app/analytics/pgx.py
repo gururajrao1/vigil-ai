@@ -153,6 +153,60 @@ PGX_TABLE: List[dict] = [
                           "CYP2D6 phenotype to balance efficacy and tolerability.",
         "level": "CPIC Level A/B", "source": "CPIC / PharmGKB",
     },
+    {
+        "id": "ondansetron_cyp2d6",
+        "drugs": ["ondansetron", "tropisetron"],
+        "gene": "CYP2D6", "allele": "CYP2D6 ultrarapid metabolizer (gene duplication)",
+        "phenotype": "CYP2D6 ultrarapid metabolizer",
+        "reactions": {"vomiting", "nausea", "drug ineffective", "lack of efficacy",
+                      "treatment failure", "retching"},
+        "socs": {"GI"},
+        "recommendation": "Select an alternative antiemetic not metabolised by CYP2D6 in "
+                          "ultrarapid metabolizers — ondansetron is cleared too fast to "
+                          "control emesis reliably.",
+        "level": "CPIC Level A", "source": "CPIC / PharmGKB",
+    },
+    {
+        "id": "ppi_cyp2c19",
+        "drugs": ["omeprazole", "esomeprazole", "lansoprazole", "pantoprazole", "dexlansoprazole"],
+        "gene": "CYP2C19", "allele": "CYP2C19 loss-of-function or increased-function alleles",
+        "phenotype": "CYP2C19 poor / rapid / ultrarapid metabolizer",
+        "reactions": {"drug ineffective", "lack of efficacy", "treatment failure",
+                      "heartburn", "reflux", "diarrhea", "diarrhoea", "headache"},
+        "socs": {"GI"},
+        "recommendation": "Increase dose in CYP2C19 rapid/ultrarapid metabolizers (risk of "
+                          "therapeutic failure); consider dose reduction on chronic therapy "
+                          "in poor metabolizers.",
+        "level": "CPIC Level A", "source": "CPIC / PharmGKB",
+    },
+    {
+        "id": "voriconazole_cyp2c19",
+        "drugs": ["voriconazole"],
+        "gene": "CYP2C19", "allele": "CYP2C19 poor / ultrarapid metabolizer",
+        "phenotype": "CYP2C19 non-normal metabolizer",
+        "reactions": {"visual disturbance", "blurred vision", "hallucination",
+                      "confusion", "hepatic injury", "liver damage", "abnormal liver function",
+                      "drug ineffective", "treatment failure"},
+        "socs": {"NERV", "HEPAT", "EYE"},
+        "recommendation": "Choose an alternative azole in CYP2C19 ultrarapid metabolizers "
+                          "(subtherapeutic exposure) and in poor metabolizers (toxic exposure, "
+                          "hepatic and visual adverse events).",
+        "level": "CPIC Level A", "source": "CPIC / PharmGKB",
+    },
+    {
+        "id": "tacrolimus_cyp3a5",
+        "drugs": ["tacrolimus"],
+        "gene": "CYP3A5", "allele": "CYP3A5 *1 (expresser)",
+        "phenotype": "CYP3A5 normal / intermediate metabolizer (expresser)",
+        "reactions": {"drug ineffective", "lack of efficacy", "treatment failure",
+                      "transplant rejection", "rejection", "kidney injury",
+                      "renal impairment", "tremor"},
+        "socs": {"RENAL", "IMMUN"},
+        "recommendation": "Increase the starting dose in CYP3A5 expressers — standard dosing "
+                          "gives subtherapeutic trough concentrations and rejection risk. "
+                          "Guide with therapeutic drug monitoring.",
+        "level": "CPIC Level A", "source": "CPIC / PharmGKB",
+    },
 ]
 
 # drug (generic) -> entries index

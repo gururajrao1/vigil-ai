@@ -334,6 +334,132 @@ function CopilotPanel({ sig, assessment, assessing, onDraft, recClass }) {
   );
 }
 
+/**
+ * Pharmacogenomic overlay. Always renders a verdict so the reviewer knows PGx was
+ * checked — an actionable gene hit, related gene associations, or a clean screen.
+ */
+function PGxPanel({ pgx, profile, drug, event }) {
+  const actionable = Boolean(pgx || profile?.is_pgx_actionable);
+  const hit = pgx || profile?.pgx || null;
+  const associations = profile?.associations || [];
+  const source = hit?.source || associations[0]?.source || 'CPIC / PharmGKB (offline curated)';
+
+  const border = actionable
+    ? 'border-emerald-600/40 bg-emerald-500/[0.04]'
+    : 'border-slate-700/50';
+
+  return (
+    <Card className={`p-4 ${border}`}>
+      <CardHeader
+        title="Pharmacogenomic risk (PGx)"
+        subtitle="Is this product–event pair explainable by a known gene–drug association?"
+        right={(
+          <Badge
+            value={actionable ? 'Actionable association' : 'Screened · no Level-A match'}
+            className={actionable
+              ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/35 text-[10px]'
+              : 'bg-slate-600/25 text-slate-300 border-slate-600/40 text-[10px]'}
+          />
+        )}
+      />
+
+      {actionable && hit ? (
+        <>
+          <div className="mt-3">
+            <PGxBiomarkerBadge pgx={hit} profile={profile} />
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">Gene</div>
+              <div className="text-lg font-semibold text-emerald-200">{hit.gene}</div>
+            </div>
+            <div className="rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">Risk allele</div>
+              <div className="text-sm font-mono text-emerald-200 mt-1">{hit.allele}</div>
+            </div>
+            <div className="rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-500">At-risk phenotype</div>
+              <div className="text-sm text-slate-200 mt-1">{hit.phenotype}</div>
+            </div>
+          </div>
+          {hit.recommendation && (
+            <div className="mt-3 rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">CPIC guidance</div>
+              <p className="text-sm text-slate-200 leading-relaxed">{hit.recommendation}</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="mt-3 space-y-2">
+          <p className="text-sm text-slate-300 leading-relaxed">
+            No clinically actionable CPIC/PharmGKB association links{' '}
+            <span className="capitalize text-slate-100">{drug}</span> to{' '}
+            <span className="text-slate-100">{event}</span>. Genetics is unlikely to be the
+            explanation here — look to dose, interactions, or the subpopulation lenses instead.
+          </p>
+          {associations.length > 0 && (
+            <div className="rounded-lg border border-slate-700/50 bg-slate-950/40 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+                Known for this product (different reaction)
+              </div>
+              <ul className="space-y-1">
+                {associations.slice(0, 4).map((a, i) => (
+                  <li key={a.gene ? `${a.gene}-${i}` : i} className="text-[12px] text-slate-300">
+                    <span className="font-semibold text-slate-200">{a.gene}</span>
+                    {a.allele && <span className="font-mono text-slate-400"> · {a.allele}</span>}
+                    {a.level && <span className="text-slate-500"> · {a.level}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500">
+        <span>Source: {source}</span>
+        <a
+          href="https://cpicpgx.org/guidelines/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-emerald-400/80 hover:underline"
+        >
+          CPIC guidelines
+        </a>
+        <a
+          href={`https://www.pharmgkb.org/search?query=${encodeURIComponent(drug || '')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-emerald-400/80 hover:underline"
+        >
+          PharmGKB
+        </a>
+      </div>
+      {profile?.disclaimer && (
+        <p className="mt-1 text-[10px] text-slate-600">{profile.disclaimer}</p>
+      )}
+    </Card>
+  );
+}
+
+/** One-line, non-PV reading of the GVP Module 1 label comparison. */
+function labelPlainLanguage(labelFilter, novelty) {
+  const tier = (labelFilter?.tag || novelty || 'UNKNOWN').toString().toUpperCase();
+  const weber = labelFilter?.weber?.weber_adjusted
+    ? ' Reporting-noise gate raised (launch window or media spike).'
+    : '';
+  if (tier === 'BOXED_COVERED' || tier === 'BOXED') {
+    return `Label: already carries a boxed warning covering this event.${weber}`;
+  }
+  if (tier === 'ESTABLISHED_REACTION' || tier === 'IN_LABEL') {
+    return `Label: this reaction is already described on the product label.${weber}`;
+  }
+  if (tier === 'UNKNOWN') {
+    return `Label: no label text available to compare against yet.${weber}`;
+  }
+  return `Label: not found on the product label — treat as a potentially novel reaction.${weber}`;
+}
+
 function SignalFrontierExtras({ signalId }) {
   const [lot, setLot] = useState(null);
   const [atmp, setAtmp] = useState(null);
@@ -344,46 +470,93 @@ function SignalFrontierExtras({ signalId }) {
     api.signalLongitudinalBiologics(signalId).then(setAtmp).catch(() => {});
   }, [signalId]);
 
-  if (!lot && !atmp) return null;
+  // Only surface these when they carry a finding — empty panels are noise.
+  const showLot = Boolean(lot?.relevant);
+  const showAtmp = Boolean(atmp?.relevant);
+  if (!showLot && !showAtmp) return null;
+
+  const window5y = atmp?.longitudinal_windows?.['5y'];
+  const contamination = Object.entries(lot?.contamination_cues || {});
 
   return (
     <div className="grid md:grid-cols-2 gap-4">
-      {lot && (
+      {showLot && (
         <Card className="p-4">
           <CardHeader
             title="Lot / supply-chain clustering"
-            subtitle="Manufacturing defect vs systemic toxicity"
+            subtitle="One bad batch, or the product itself?"
             right={lot.flag && (
               <Badge value={lot.flag} className="bg-rose-500/15 text-rose-200 border-rose-500/30 text-[10px]" />
             )}
           />
-          <p className="mt-2 text-sm text-slate-200">{lot.interpretation}</p>
-          <p className="mt-1 text-[11px] font-mono text-slate-500">
-            coef={lot.lot_clustering_coefficient} · dominant={lot.dominant_lot || '—'} (n={lot.dominant_lot_n || 0})
-          </p>
-        </Card>
-      )}
-      {atmp && (
-        <Card className="p-4">
-          <CardHeader
-            title="Advanced therapy longitudinal"
-            subtitle="CRS / ICANS / multi-year latency"
-            right={atmp.flag && (
-              <Badge value={atmp.flag} className="bg-violet-500/15 text-violet-200 border-violet-500/30 text-[10px]" />
-            )}
-          />
-          <p className="mt-2 text-sm text-slate-200">
-            {atmp.is_advanced_therapy ? 'ATMP / CAR-T class cues detected.' : 'No strong ATMP product cue.'}
-            {' '}
-            Immunogenicity hits: {(atmp.immunogenicity_hits || []).map((h) => h.label).join(', ') || 'none'}
-          </p>
-          {atmp.longitudinal_windows?.['5y'] && (
-            <p className="mt-1 text-[11px] font-mono text-slate-500">
-              5y total={atmp.longitudinal_windows['5y'].total} · late_signal={String(atmp.longitudinal_windows['5y'].late_signal)}
+          <p className="mt-2 text-sm text-slate-200 leading-relaxed">{lot.interpretation}</p>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <MiniStat label="Narratives w/ lot" value={`${lot.n_with_lot}/${lot.n_documents}`} />
+            <MiniStat label="Concentration" value={lot.lot_clustering_coefficient} />
+            <MiniStat label="Distinct lots" value={lot.n_distinct_lots ?? '—'} />
+          </div>
+          {lot.dominant_lot && (
+            <p className="mt-2 text-[11px] text-slate-400">
+              Most-named lot <span className="font-mono text-slate-200">{lot.dominant_lot}</span>
+              {' '}({lot.dominant_lot_n} mentions)
+            </p>
+          )}
+          {contamination.length > 0 && (
+            <p className="mt-1 text-[11px] text-amber-200/90">
+              Contamination language: {contamination.map(([k, v]) => `${k} (${v})`).join(', ')}
+            </p>
+          )}
+          {lot.enforcement?.available && (
+            <p className="mt-1 text-[11px] text-slate-400">
+              openFDA enforcement records found for this product.
             </p>
           )}
         </Card>
       )}
+      {showAtmp && (
+        <Card className="p-4">
+          <CardHeader
+            title="Longitudinal / delayed-toxicity watch"
+            subtitle="Multi-year surveillance for biologics and advanced therapies"
+            right={atmp.flag && (
+              <Badge value={atmp.flag} className="bg-violet-500/15 text-violet-200 border-violet-500/30 text-[10px]" />
+            )}
+          />
+          <p className="mt-2 text-sm text-slate-200 leading-relaxed">{atmp.interpretation}</p>
+          {(atmp.immunogenicity_hits || []).length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {atmp.immunogenicity_hits.map((h) => (
+                <li key={h.event_id} className="text-[12px] text-slate-300">
+                  <span className="text-violet-200 font-semibold">{h.label}</span>
+                  <span className="text-slate-500">
+                    {' '}· typical onset {h.typical_onset_days?.[0]}–{h.typical_onset_days?.[1]}d
+                    {h.onset_days_extracted != null && ` · reported ~${h.onset_days_extracted}d`}
+                  </span>
+                  {h.onset_plausible === false && (
+                    <span className="text-amber-300"> · outside typical window</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {window5y && (
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <MiniStat label="5y reports" value={window5y.total} />
+              <MiniStat label="Latest year" value={window5y.latest_year_count} />
+              <MiniStat label="Late-signal z" value={window5y.latest_z} />
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value }) {
+  return (
+    <div className="rounded-md border border-slate-700/50 bg-slate-950/40 px-2 py-1.5">
+      <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-sm font-mono text-slate-100">{value ?? '—'}</div>
     </div>
   );
 }
@@ -666,6 +839,7 @@ export default function SignalDetail() {
   const [selectedMaskers, setSelectedMaskers] = useState([]);
   const [pvDemoBusy, setPvDemoBusy] = useState(false);
   const [ontology, setOntology] = useState(null);
+  const [pgxProfile, setPgxProfile] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -719,6 +893,10 @@ export default function SignalDetail() {
     api.signalCasefile(id).then((c) => { if (!cancelled) setCasefile(c); }).catch(() => {});
     api.signalDdi(id).then((d) => { if (!cancelled) setDdi(d); }).catch(() => {});
     api.signalSar(id).then((s) => { if (!cancelled) setSarPreview(s); }).catch(() => {});
+    // PGx engine profile (offline CPIC/PharmGKB + optional live enrichment)
+    api.signalPgxProfile(id)
+      .then((p) => { if (!cancelled) setPgxProfile(p); })
+      .catch(() => { if (!cancelled) setPgxProfile(null); });
 
     return () => { cancelled = true; };
   }, [id]);
@@ -838,12 +1016,16 @@ export default function SignalDetail() {
             {sig.spike_flag && <span className="h-3 w-3 rounded-full bg-rose-500 pulse-dot" />}
             {sig.drug} <span className="text-slate-600">→</span> {md.pt || sig.symptom}
           </h2>
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
             <Badge kind="strength" value={sig.strength} />
             {sig.sdr_flag && <Badge value="SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" />}
             <Badge kind="causality" value={`WHO-UMC: ${sig.who_umc}`} />
             {sig.spike_flag && <Badge value={`▲ Spike z=${sig.spike_z}`} className="bg-rose-500/15 text-rose-300 border-rose-500/30" />}
+            <LabelComparisonBadge labelFilter={sig.label_filter} novelty={sig.label_novelty} />
           </div>
+          <p className="mt-1.5 text-xs text-slate-400">
+            {labelPlainLanguage(sig.label_filter, sig.label_novelty)}
+          </p>
         </div>
       </div>
 
@@ -890,8 +1072,9 @@ export default function SignalDetail() {
             {sig.sdr_flag && <Badge value="SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" title="Signal of Disproportionate Reporting" />}
             <Badge kind="causality" value={`WHO-UMC: ${sig.who_umc}`} />
             <SeverityAuditPopover signalId={sig.id} severity={sig.severity} />
-            <LabelComparisonBadge labelFilter={sig.label_filter} novelty={sig.label_novelty} />
-            {pgx && <PGxBiomarkerBadge pgx={pgx} compact />}
+            {(pgx || pgxProfile?.is_pgx_actionable) && (
+              <PGxBiomarkerBadge pgx={pgx} profile={pgxProfile} compact />
+            )}
             {boxed && <Badge value="⬛ Boxed warning" className="bg-amber-500/15 text-amber-300 border-amber-500/30" title={(boxed.topics || []).join('; ')} />}
             {mechanism && <Badge value={`⚛ Plausible: ${mechanism.target_or_moa}`} className="bg-cyan-500/15 text-cyan-200 border-cyan-500/30" title={mechanism.mechanism_explanation} />}
             {classInfo && <Badge value={`⚗ Class effect: ${classInfo.class_name.split(' (')[0]}`} className="bg-teal-500/15 text-teal-200 border-teal-500/30" title={`${(classInfo.member_drugs || []).length} drugs in class`} />}
@@ -1658,36 +1841,8 @@ export default function SignalDetail() {
         </Card>
       )}
 
-      {/* pharmacogenomic risk overlay */}
-      {pgx && (
-        <Card className="p-4 border-emerald-600/40 bg-emerald-500/[0.04]">
-          <CardHeader
-            title="Pharmacogenomic risk (PGx)"
-            subtitle="Clinically actionable CPIC / PharmGKB association for this product–event pair"
-          />
-          <div className="mt-3">
-            <PGxBiomarkerBadge pgx={pgx} />
-          </div>
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">Gene</div>
-              <div className="text-lg font-semibold text-emerald-200">{pgx.gene}</div>
-            </div>
-            <div className="rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">Risk allele</div>
-              <div className="text-sm font-mono text-emerald-200 mt-1">{pgx.allele}</div>
-            </div>
-            <div className="rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wide text-slate-500">At-risk phenotype</div>
-              <div className="text-sm text-slate-200 mt-1">{pgx.phenotype}</div>
-            </div>
-          </div>
-          <div className="mt-3 rounded-lg border border-emerald-600/20 bg-slate-950/40 px-3 py-2">
-            <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">CPIC guidance</div>
-            <p className="text-sm text-slate-200 leading-relaxed">{pgx.recommendation}</p>
-          </div>
-        </Card>
-      )}
+      {/* pharmacogenomic risk overlay — always reports a result, hit or clean */}
+      <PGxPanel pgx={pgx} profile={pgxProfile} drug={sig.drug} event={md.pt || sig.symptom} />
 
       {/* FDA boxed (black-box) warning overlay */}
       {boxed && (

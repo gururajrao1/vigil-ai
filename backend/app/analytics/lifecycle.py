@@ -111,6 +111,7 @@ def is_valid_transition(from_state: str, to_state: str) -> bool:
 GVP_ALIAS_TO_STATE: dict[str, str] = {
     "detection": "new",
     "validation": "under_evaluation",
+    "confirmation": "validated",
     "prioritization": "prioritized",
     "assessment": "assessed",
     "regulatory_action": "assessed",  # action notes live on assessed→closed
@@ -127,7 +128,7 @@ GVP_ALIAS_TO_STATE: dict[str, str] = {
 STATE_TO_GVP_ALIAS: dict[str, str] = {
     "new": "DETECTION",
     "under_evaluation": "VALIDATION",
-    "validated": "VALIDATION",
+    "validated": "CONFIRMATION",
     "prioritized": "PRIORITIZATION",
     "assessed": "ASSESSMENT",
     "closed": "CLOSED",

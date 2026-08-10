@@ -29,6 +29,10 @@ export default function COUGovernanceScorecard({ embedded = false }) {
   const band = data?.credibility_band;
   const bm = data?.benchmark || {};
   const cou = data?.cou || {};
+  // Prefer the rationale payload; fall back to plain strings on older API builds.
+  const boundaries = cou.not_validated_rationale?.length
+    ? cou.not_validated_rationale
+    : (cou.not_validated_for || []).map((item) => ({ item }));
 
   return (
     <Card className={embedded ? 'p-4' : 'p-4 border-indigo-700/40'}>
@@ -60,19 +64,45 @@ export default function COUGovernanceScorecard({ embedded = false }) {
             <Stat label="Recall" value={bm.recall} />
             <Stat label="F1" value={bm.f1} />
           </div>
-          <div className="grid md:grid-cols-2 gap-3 text-[12px]">
-            <div className="rounded-md border border-emerald-700/30 bg-emerald-500/5 p-3">
-              <div className="text-[10px] uppercase text-emerald-300 mb-1">Validated for</div>
-              <ul className="list-disc pl-4 space-y-1 text-slate-200">
-                {(cou.validated_for || []).map((x) => <li key={x}>{x}</li>)}
-              </ul>
+          <div className="rounded-md border border-emerald-700/30 bg-emerald-500/5 p-3 text-[12px]">
+            <div className="text-[10px] uppercase text-emerald-300 mb-1">
+              Validated for (demo scope)
             </div>
-            <div className="rounded-md border border-rose-700/30 bg-rose-500/5 p-3">
-              <div className="text-[10px] uppercase text-rose-300 mb-1">Not validated for</div>
-              <ul className="list-disc pl-4 space-y-1 text-slate-200">
-                {(cou.not_validated_for || []).map((x) => <li key={x}>{x}</li>)}
-              </ul>
+            <ul className="list-disc pl-4 space-y-1 text-slate-200">
+              {(cou.validated_for || []).map((x) => <li key={x}>{x}</li>)}
+            </ul>
+          </div>
+
+          <div className="rounded-md border border-rose-600/40 bg-rose-500/10 p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="text-[11px] uppercase tracking-wide text-rose-200 font-semibold">
+                Not validated for — hard boundaries
+              </div>
+              <Badge
+                value="Human decision required"
+                className="bg-rose-500/20 text-rose-100 border-rose-400/40 text-[10px]"
+              />
             </div>
+            {cou.boundary_stance && (
+              <p className="mt-1.5 text-[11px] text-rose-100/80 leading-relaxed">
+                {cou.boundary_stance}
+              </p>
+            )}
+            <ul className="mt-2 space-y-2">
+              {boundaries.map((b) => (
+                <li key={b.item} className="border-t border-rose-500/20 pt-2 first:border-t-0 first:pt-0">
+                  <div className="text-[12px] font-semibold text-rose-100">{b.item}</div>
+                  {b.why && (
+                    <p className="mt-0.5 text-[11px] text-slate-300 leading-relaxed">{b.why}</p>
+                  )}
+                  {b.human_control && (
+                    <p className="mt-0.5 text-[11px] text-amber-200/90">
+                      Stays with: {b.human_control}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
           <p className="text-[11px] text-slate-400">{cou.intended_use}</p>
           <p className="text-[10px] text-slate-600">{data.disclaimer}</p>

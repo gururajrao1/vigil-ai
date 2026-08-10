@@ -103,10 +103,37 @@ def assess_lot_clustering(
     if not manufacturing and contam_counter and coef >= 0.6 and top_n >= 2:
         manufacturing = True
 
+    # Nothing to show a reviewer unless narratives actually carried lot/batch or
+    # contamination language — otherwise the panel is empty filler.
+    relevant = bool(n_with_lot or contam_counter or manufacturing)
+
+    if manufacturing:
+        interpretation = (
+            f"≥{int(threshold * 100)}% of lot-tagged AEs concentrate in lot {top_lot} — "
+            "prefer manufacturing / supply-chain investigation over systemic toxicity."
+        )
+    elif n_with_lot:
+        interpretation = (
+            f"{n_with_lot} of {n_docs} narratives named a lot/batch, spread across "
+            f"{len(lot_counter)} lot(s) — no single lot dominates, so this still reads as a "
+            "product-wide effect rather than one bad batch."
+        )
+    elif contam_counter:
+        interpretation = (
+            "Contamination or recall language appears without lot identifiers — worth "
+            "checking enforcement reports, but not attributable to a batch yet."
+        )
+    else:
+        interpretation = (
+            "No lot, batch, or contamination cues in these narratives, so a manufacturing "
+            "origin cannot be assessed from this text."
+        )
+
     return {
         "product": product,
         "n_documents": n_docs,
         "n_with_lot": n_with_lot,
+        "n_distinct_lots": len(lot_counter),
         "lot_counts": dict(lot_counter.most_common(20)),
         "ndc_counts": dict(ndc_counter.most_common(10)),
         "packaging_counts": dict(pack_counter.most_common(10)),
@@ -115,13 +142,9 @@ def assess_lot_clustering(
         "dominant_lot_n": top_n,
         "lot_clustering_coefficient": coef,
         "threshold": threshold,
+        "relevant": relevant,
         "flag": "MANUFACTURING_LOT_DEFECT" if manufacturing else None,
-        "interpretation": (
-            f"≥{int(threshold * 100)}% of lot-tagged AEs concentrate in lot {top_lot} — "
-            "prefer manufacturing / supply-chain investigation over systemic toxicity."
-            if manufacturing else
-            "No dominant lot concentration meeting the manufacturing-defect gate."
-        ),
+        "interpretation": interpretation,
         "disclaimer": _DISCLAIMER,
     }
 

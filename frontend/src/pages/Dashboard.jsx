@@ -5,6 +5,7 @@ import Kpis from './Kpis';
 import InspectionReadinessPanel from '../hubs/InspectionReadinessPanel';
 import COUGovernanceScorecard from '../hubs/COUGovernanceScorecard';
 import BenefitRiskBalanceVisualizer from '../hubs/BenefitRiskBalanceVisualizer';
+import FrontierModuleStrip from '../hubs/FrontierModuleStrip';
 
 const TABS = [
   { id: 'corpus', label: 'Corpus metrics' },
@@ -28,6 +29,7 @@ export default function Dashboard() {
           if (tab === 'governance') {
             return (
               <div className="space-y-4">
+                <FrontierModuleStrip />
                 <InspectionReadinessPanel embedded />
                 <COUGovernanceScorecard embedded />
                 <BenefitRiskBalanceVisualizer
@@ -36,6 +38,7 @@ export default function Dashboard() {
                   event="nausea"
                   strength="MODERATE"
                   postCount={12}
+                  sampleNote="Worked example on a fixed pair — open any signal to run this on your own data."
                 />
               </div>
             );

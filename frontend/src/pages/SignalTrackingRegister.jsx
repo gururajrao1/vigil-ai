@@ -2,9 +2,23 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, getToken } from '../api';
 import { Button, Card, PaginationBar, Spinner } from '../components/ui';
+import LabelComparisonBadge from '../components/LabelComparisonBadge';
 
 const BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
 const PAGE_SIZE = 25;
+
+// Plain-language lifecycle names (mirrors STATE_LABELS in app/analytics/lifecycle.py).
+const LC_STATE_LABELS = {
+  new: 'Inbox',
+  under_evaluation: 'Looking into it',
+  validated: 'Looks real',
+  prioritized: 'High priority',
+  assessed: 'Written up',
+  closed: 'Done',
+  rejected: 'Not a concern',
+};
+
+const stateLabel = (s) => LC_STATE_LABELS[s] || String(s || '').replace(/_/g, ' ');
 
 /** GVP Module IX Signal Tracking Register. */
 export default function SignalTrackingRegister({ embedded = false }) {
@@ -78,6 +92,20 @@ export default function SignalTrackingRegister({ embedded = false }) {
         </div>
       )}
 
+      <Card className="p-3 border-slate-800">
+        <div className="text-[11px] uppercase tracking-wide text-slate-500">How this works</div>
+        <p className="mt-1 text-sm text-slate-300 leading-relaxed">
+          Detect finds product → event signals. The register is the queue that tracks each one
+          while a reviewer works it: label status, triangulation, and priority are snapshots, and
+          the action buttons move a signal one step along the governed workflow. Open a row to do
+          the full assessment on Signal Detail.
+        </p>
+        <p className="mt-2 text-[11px] font-mono text-slate-500">
+          Inbox → Looking into it → Looks real → High priority → Written up → Done
+          <span className="text-slate-600"> (or Not a concern at any stage)</span>
+        </p>
+      </Card>
+
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" disabled={busy} onClick={() => load(page)}>
           {busy ? 'Refreshing…' : 'Refresh'}
@@ -139,7 +167,15 @@ export default function SignalTrackingRegister({ embedded = false }) {
                       </Link>
                     </td>
                     <td className="p-2">{r.strength}</td>
-                    <td className="p-2 font-mono text-[10px]">{r.label_tag || '—'}</td>
+                    <td className="p-2">
+                      <LabelComparisonBadge
+                        labelFilter={{
+                          tag: r.label_tag,
+                          weber: { weber_adjusted: r.weber_adjusted },
+                        }}
+                        novelty={r.label_novelty}
+                      />
+                    </td>
                     <td className="p-2 font-mono text-[10px]">
                       {r.triangulation_tier || '—'}
                       {r.triangulated_risk_score != null && (
@@ -147,22 +183,25 @@ export default function SignalTrackingRegister({ embedded = false }) {
                       )}
                     </td>
                     <td className="p-2">
-                      <div className="text-slate-200">{r.gvp_alias || r.lifecycle_status}</div>
-                      <div className="text-[10px] text-slate-500">{r.lifecycle_status}</div>
+                      <div className="text-slate-200">{stateLabel(r.lifecycle_status)}</div>
+                      <div className="text-[10px] text-slate-500">
+                        GVP {r.gvp_alias || '—'}
+                      </div>
                     </td>
                     <td className="p-2 text-right tabular-nums">{r.priority_score}</td>
                     <td className="p-2">
                       <div className="flex flex-wrap gap-1">
-                        {(r.next_states || []).slice(0, 3).map((st) => (
+                        {(r.next_states || []).map((st) => (
                           <button
                             key={st}
                             type="button"
                             disabled={acting === r.id}
                             onClick={() => advance(r.id, st)}
+                            title={`Move to ${stateLabel(st)} (${st})`}
                             className="text-[10px] border border-slate-700 px-1.5 py-0.5 text-slate-300 hover:border-sky-500/40 hover:text-sky-200"
                             style={{ borderRadius: 4 }}
                           >
-                            → {st}
+                            → {stateLabel(st)}
                           </button>
                         ))}
                         <button

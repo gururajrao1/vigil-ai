@@ -3369,12 +3369,55 @@ def frontiers_summary(db: Session = Depends(get_db)):
     """One-shot portfolio for the Governance / Inspection hub."""
     from ..governance.cou_manager import run_credibility_scorecard
     from ..reports.inspection_audit import inspection_portfolio
+
+    inspection = inspection_portfolio(db, limit=150)
+    credibility = run_credibility_scorecard(allow_network=False)
     return {
-        "inspection": inspection_portfolio(db, limit=150),
-        "credibility": run_credibility_scorecard(allow_network=False),
+        "inspection": inspection,
+        "credibility": credibility,
         "modules": [
-            "inspection_audit", "cou_manager", "pgx_engine",
-            "longitudinal_biologics", "lot_clustering", "benefit_risk_proact",
+            {
+                "id": "inspection_audit",
+                "label": "Inspection readiness",
+                "where": "Dashboard · Inspection & COU",
+                "summary": (
+                    f"{inspection.get('n_overdue', 0)} of {inspection.get('n_open', 0)} "
+                    "open signals past SLA"
+                ),
+            },
+            {
+                "id": "cou_manager",
+                "label": "Context of Use",
+                "where": "Dashboard · Inspection & COU",
+                "summary": (
+                    f"Credibility index {credibility.get('model_credibility_index')} "
+                    f"({credibility.get('credibility_band')})"
+                ),
+            },
+            {
+                "id": "pgx_engine",
+                "label": "Pharmacogenomics",
+                "where": "Signal Detail",
+                "summary": "CPIC / PharmGKB gene–drug screen per signal",
+            },
+            {
+                "id": "longitudinal_biologics",
+                "label": "Delayed-toxicity watch",
+                "where": "Signal Detail",
+                "summary": "Multi-year windows for biologics and advanced therapies",
+            },
+            {
+                "id": "lot_clustering",
+                "label": "Lot clustering",
+                "where": "Signal Detail",
+                "summary": "Separates one bad batch from a product-wide effect",
+            },
+            {
+                "id": "benefit_risk_proact",
+                "label": "PrOACT-URL benefit–risk",
+                "where": "Signal Detail + below",
+                "summary": "Weighs the signal against the product's therapeutic benefit",
+            },
         ],
     }
 

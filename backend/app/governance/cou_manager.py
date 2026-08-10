@@ -38,11 +38,54 @@ DEFAULT_COU = {
     "offline_first": True,
 }
 
+# Why each boundary is out of scope, and which human control remains mandatory.
+# These are deliberate limits — they are NOT a backlog of features to "validate".
+NOT_VALIDATED_RATIONALE: list[dict] = [
+    {
+        "item": "Autonomous ICSR regulatory filing",
+        "why": (
+            "Social posts are not identifiable ICSRs: the four validity elements "
+            "(identifiable reporter, patient, product, event) cannot be confirmed offline, "
+            "and E2B output here is a demo template."
+        ),
+        "human_control": "Case processor + QPPV confirm validity before any submission.",
+    },
+    {
+        "item": "Autonomous benefit–risk regulatory determination",
+        "why": (
+            "No trial efficacy data is ingested; NNT/NNV are illustrative literature ranges "
+            "and NNH is a report-derived proxy, so the balance is a prompt, not a determination."
+        ),
+        "human_control": "Safety committee owns the benefit–risk conclusion.",
+    },
+    {
+        "item": "Clinical prescribing or patient-level PGx decisions",
+        "why": (
+            "PGx here is a curated CPIC/PharmGKB surrogate matched at signal level, with no "
+            "patient genotype, indication, or comorbidity context."
+        ),
+        "human_control": "Treating clinician and validated PGx decision support.",
+    },
+    {
+        "item": "Replacement of QPPV medical judgment",
+        "why": (
+            "Causality, severity, and label impact are deterministic cue-based drafts over "
+            "noisy text; they cannot weigh unreported clinical context."
+        ),
+        "human_control": "QPPV / medical reviewer signs every assessment.",
+    },
+]
+
 
 def get_cou_boundaries(overrides: Optional[dict] = None) -> dict:
     out = dict(DEFAULT_COU)
     if overrides:
         out.update(overrides)
+    out["not_validated_rationale"] = [dict(x) for x in NOT_VALIDATED_RATIONALE]
+    out["boundary_stance"] = (
+        "These four uses are permanent scope boundaries for this prototype, not pending work. "
+        "Every one of them terminates in a named human decision-maker."
+    )
     out["disclaimer"] = _DISCLAIMER
     return out
 

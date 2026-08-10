@@ -26,6 +26,15 @@ _ATMP_CUES = re.compile(
     re.I,
 )
 
+# Wider biologic cues. These are NOT advanced therapies, but they share the
+# delayed-onset / immunogenicity surveillance problem, so they justify a
+# longitudinal view (INN stems: -mab, -cept, -kinra; plus vaccines/biosimilars).
+_BIOLOGIC_CUES = re.compile(
+    r"\b(\w+(?:mab|cept|kinra|ase))\b|\b(biologic|biosimilar|monoclonal|"
+    r"immunoglobulin|vaccine|mrna)\b",
+    re.I,
+)
+
 # Delayed biologic / ATMP event lexicon with typical latency bands (days)
 _ONSET_PATTERNS: list[dict[str, Any]] = [
     {
@@ -84,6 +93,12 @@ _ONSET_DAY_RE = re.compile(
 def is_advanced_therapy(product: str, text: str = "") -> bool:
     blob = f"{product or ''} {text or ''}"
     return bool(_ATMP_CUES.search(blob))
+
+
+def is_biologic(product: str, text: str = "") -> bool:
+    """Broader biologic class (mAbs, fusion proteins, vaccines, biosimilars)."""
+    blob = f"{product or ''} {text or ''}"
+    return bool(_BIOLOGIC_CUES.search(blob))
 
 
 def extract_onset_days(text: str) -> Optional[float]:
@@ -205,21 +220,69 @@ def assess_signal_longitudinal(
         seen.add(h["event_id"])
         uniq.append(h)
 
+    biologic = is_biologic(product, blob)
+
     series = dated_counts or []
     windows = {
         f"{y}y": multi_year_buckets(series, years=y)
         for y in (1, 2, 3, 5)
     }
+    late = bool((windows.get("5y") or {}).get("late_signal"))
+
+    if atmp:
+        product_class = "advanced_therapy"
+    elif biologic:
+        product_class = "biologic"
+    else:
+        product_class = "small_molecule_or_device"
+
+    # Only worth showing when the product class or the data says something.
+    relevant = bool(atmp or biologic or uniq or late)
+
+    if uniq:
+        labels = ", ".join(sorted({h["label"] for h in uniq}))
+        interpretation = (
+            f"Delayed-onset immune events detected in narratives ({labels}). "
+            "Check onset timing against the typical latency bands below."
+        )
+    elif late:
+        interpretation = (
+            "Reporting is concentrated in the most recent year of a multi-year window — "
+            "consistent with a late-emerging safety issue rather than launch-time noise."
+        )
+    elif atmp:
+        interpretation = (
+            "Advanced therapy: surveillance should run for years, not the usual "
+            "30–90 day window. No delayed-toxicity cues found yet."
+        )
+    elif biologic:
+        interpretation = (
+            "Biologic product: immunogenicity and delayed reactions can appear long after "
+            "exposure. No delayed-toxicity cues found yet."
+        )
+    else:
+        interpretation = (
+            "Not an advanced therapy or biologic, and no delayed-onset pattern in the "
+            "multi-year buckets."
+        )
+
     return {
         "product": product,
         "event": event,
         "is_advanced_therapy": atmp,
+        "is_biologic": biologic,
+        "product_class": product_class,
+        "relevant": relevant,
+        "interpretation": interpretation,
         "immunogenicity_hits": uniq,
         "n_immunogenicity_mentions": len(immuno),
         "longitudinal_windows": windows,
+        "late_signal": late,
         "flag": (
             "ATMP_DELAYED_TOXICITY_WATCH"
-            if atmp and (uniq or (windows.get("5y") or {}).get("late_signal"))
+            if atmp and (uniq or late)
+            else "BIOLOGIC_DELAYED_TOXICITY_WATCH"
+            if biologic and (uniq or late)
             else None
         ),
         "disclaimer": _DISCLAIMER,
