@@ -29,14 +29,14 @@ _ATMP_CUES = re.compile(
 # Wider biologic cues. These are NOT advanced therapies, but they share the
 # delayed-onset / immunogenicity surveillance problem, so they justify a
 # longitudinal view.
-# WHO INN stems are matched against the product name only — stems like -ase
-# collide with ordinary words ("disease", "increase") in free text.
+# Matched against the product name only: WHO INN stems like -ase collide with
+# ordinary words ("disease", "increase"), and a reporter mentioning a vaccine
+# in passing must not reclassify the drug they were actually taking.
 _BIOLOGIC_INN_STEMS = re.compile(
     r"\b(?=\w{6,}\b)\w+(?:mab|cept|kinra|ase|tide)\b",
     re.I,
 )
 
-# Explicit class words are safe to match anywhere.
 _BIOLOGIC_KEYWORDS = re.compile(
     r"\b(biologic|biosimilar|monoclonal antibody|monoclonal|immunoglobulin|"
     r"vaccine|mrna|fusion protein|recombinant)\b",
@@ -103,11 +103,14 @@ def is_advanced_therapy(product: str, text: str = "") -> bool:
     return bool(_ATMP_CUES.search(blob))
 
 
-def is_biologic(product: str, text: str = "") -> bool:
-    """Broader biologic class (mAbs, fusion proteins, vaccines, biosimilars)."""
-    if _BIOLOGIC_INN_STEMS.search(product or ""):
-        return True
-    return bool(_BIOLOGIC_KEYWORDS.search(f"{product or ''} {text or ''}"))
+def is_biologic(product: str) -> bool:
+    """Broader biologic class (mAbs, fusion proteins, vaccines, biosimilars).
+
+    Classified from the product name alone — product class is a property of the
+    product, not of whatever else a reporter happened to mention.
+    """
+    name = product or ""
+    return bool(_BIOLOGIC_INN_STEMS.search(name) or _BIOLOGIC_KEYWORDS.search(name))
 
 
 def extract_onset_days(text: str) -> Optional[float]:
@@ -229,7 +232,7 @@ def assess_signal_longitudinal(
         seen.add(h["event_id"])
         uniq.append(h)
 
-    biologic = is_biologic(product, blob)
+    biologic = is_biologic(product)
 
     series = dated_counts or []
     windows = {
