@@ -1,7 +1,7 @@
 # VigilAI — Application Handbook
 
 > **Who this is for:** anyone joining a demo, onboarding, investor walkthrough, or clinical-ops review who needs the *where / how / what / why* of VigilAI in one place.  
-> **How to use:** §6 (hubs) + **§7 step-by-step for every major feature** + §12 keyword packs.  
+> **How to use:** §6 (hubs) + **§7 step-by-step** + **§9 metrics** + **§19 when output looks empty** + §12 keyword packs.  
 > **Live app:** https://vigil-ai-eight.vercel.app · **API:** https://vigil-ai-api.onrender.com  
 > **Default login:** `admin@vigilai.dev` / `admin123` (also `analyst@…` / `viewer@…` — see §3)  
 > **Companion docs:** `README.md` (slide map) · `ARCHITECTURE.md` · `DEMO_SCRIPT.md` · `DEPLOY_FREE.md` · deeper panel lore in `FEATURE_USAGE_GUIDE.md`
@@ -15,9 +15,20 @@ Use these terms in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the **Pr
 | You want… | Search / say | Go to |
 |-----------|--------------|-------|
 | Main signal table | `Detect`, `SDR`, `PRR` | `/signals` |
-| Plain-English “what’s going on” | `briefing`, `Signal Detail` | Click any signal row |
+| GVP tracking register | `Register`, `lifecycle`, `PBRER` | `/signals?tab=register` |
+| Plain-English conclusions | `Conclusions`, `briefing`, `Copilot` | Top of Signal Detail |
+| Label novel vs in-label | `label filter`, `Novel`, `Weber` | Signal Detail hero badges |
+| Causality draft | `WHO-UMC`, `Naranjo`, `causality` | Signal Detail |
+| Multi-source agreement | `triangulation` | Signal Detail |
+| Benefit–risk (PrOACT) | `PrOACT`, `BRAT`, `benefit–risk` | Signal Detail (near top) |
+| Pharmacogenomics | `PGx`, `CPIC`, `PharmGKB` | Signal Detail PGx card |
+| Inspection / SLA | `inspection`, `SJL`, `overdue` | `/dashboard?tab=governance` |
+| FDA COU / credibility | `COU`, `credibility`, `not validated for` | `/dashboard?tab=governance` |
 | Competition bias / remine | `Remine`, `masking`, `unmask` | `/lenses?tab=remine` |
-| High-risk patient segments | `risk populations`, `comorbidity` | `/lenses?tab=risk` |
+| High-risk patient segments / REM | `REM ranking`, `risk populations` | `/lenses?tab=risk` |
+| Predictive feature matrix | `Predictive intel`, `4-gate`, `OMOP` | `/lenses?tab=intel` |
+| Lot / manufacturing | `lot clustering`, `batch` | Signal Detail (when relevant) |
+| Biologic / ATMP delayed toxicity | `longitudinal`, `CRS`, `ICANS` | Signal Detail (when relevant) |
 | Drug–drug interactions | `DDI`, `polypharmacy` | `/lenses?tab=ddi` |
 | Pregnancy / teratogen | `pregnancy`, `congenital` | `/lenses?tab=pregnancy` |
 | Syndrome pools | `SMQ` | `/lenses?tab=smq` |
@@ -30,8 +41,21 @@ Use these terms in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the **Pr
 | Narrow what Pathfinder finds | `keywords`, `project` | `/projects` |
 | Synthetic stress data | `Forge` | `/forge` |
 | Export ICSR | `E2B`, `CIOMS`, `SAR` | Signal Detail |
+| Empty REM / “why nothing?” | `empty result`, §19 | [§19](#19-when-you-dont-see-expected-output) |
 
-**Demo jump products** (type into Signals search): `warfarin`, `rivaroxaban`, `semaglutide`, `paroxetine`, `lithium`, `coronary stent`, `catheter`, `pacemaker`, `MMR`, `covid-19 mrna vaccine`.
+**Demo jump products** (type into Signals search): `warfarin`, `apixaban`, `paracetamol`, `isotretinoin`, `rivaroxaban`, `semaglutide`, `ondansetron`, `adalimumab`, `coronary stent`, `pacemaker`, `MMR`, `covid-19 mrna vaccine`.
+
+**Best pairs for demos that usually *show* output**
+
+| Goal | Open / enter |
+|------|----------------|
+| PGx actionable | Signal `warfarin → Haemorrhage` |
+| PGx clean screen | Signal `apixaban → Haemorrhage` |
+| Label + conclusions | Signal `paracetamol → Hepatic injury` or `apixaban → Haemorrhage` |
+| REM ranking with ≥1 stratum | Risk tab: `paracetamol` + `Hepatic injury` → **Rank strata** |
+| REM empty (teaching “gates held”) | Risk tab: `pacemaker` + `device-related adverse event` |
+| PrOACT balance | Any Signal Detail near top (badge **PrOACT-URL / BRAT**) |
+| Inspection + COU | `/dashboard?tab=governance` |
 
 ---
 
@@ -55,6 +79,7 @@ Use these terms in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the **Pr
 16. [Repo map (for engineers)](#16-repo-map-for-engineers)
 17. [Disclaimers](#17-disclaimers)
 18. [Glossary](#18-glossary)
+19. [When you don’t see expected output](#19-when-you-dont-see-expected-output)
 
 ---
 
@@ -238,10 +263,11 @@ Cold start on free Render: wake `/api/health` once (~30–60s) before a demo.
 | 3. NLP | Drugs→generic/ATC; symptoms→MedDRA-style PT/SOC; devices→GMDN/IMDRF | Comparable coding for stats |
 | 4. 4-gate AE | Product · symptom · negative sentiment · non-negated | Explainable “is this an AE?” |
 | 5. Recompute | Aggregate pairs → PRR/ROR/χ²/EBGM/IC · strength · SDR · spikes | Regulator-shaped ranking |
-| 6. Lenses | Remine, DDI, pregnancy, risk, SMQ… | Sensitivity / special populations — **do not overwrite** stored SDR |
+| 6. Lenses | Remine, DDI, pregnancy, REM risk, SMQ, Predictive intel… | Sensitivity / special populations — **do not overwrite** stored SDR |
 | 7. Evidence | PubMed / DailyMed / recalls / MAUDE (background) | Corroborate, don’t block UI |
-| 8. Workflow | Inbox → looking into it → … → done / not a concern | Ops ownership |
-| 9. Export | SAR PDF/MD · E2B R2/R3 · CIOMS I (demo templates) | Hand-off story |
+| 8. GVP / Register | Label · causality · triangulation · lifecycle queue | Ops tracking (Module IX–shaped) |
+| 9. Frontiers | Inspection SLA · COU · PGx · PrOACT · lot / longitudinal | Governance + specialised overlays |
+| 10. Export | SAR · PBRER · E2B R2/R3 · CIOMS I (demo templates) | Hand-off story |
 
 ---
 
@@ -251,20 +277,22 @@ Cold start on free Render: wake `/api/health` once (~30–60s) before a demo.
 
 1. Open https://vigil-ai-eight.vercel.app → **Login**.  
 2. Header: confirm project (**General Pharmacovigilance** is the default).  
-3. **Data Sources** → **Load PV demo pack** (if Remine/DDI/Pregnancy look empty).  
-4. **Safety Signals → Detect** → type `warfarin` or `semaglutide` in the jump box → open a row.  
-5. Read the **plain-English briefing** at the top, then scroll to gates / DMA / remine.  
-6. **Lenses → Remine lab** → filter **Needs review** → Run remine on warfarin / haemorrhage.  
-7. Optional: **Evidence Explorer** graph → pick the same product–event.
+3. **Data Sources** → **Load PV demo pack** (if Remine/DDI/Pregnancy/Register look thin).  
+4. **Safety Signals → Detect** → type `warfarin` or `paracetamol` → open a row.  
+5. Read **Conclusions for this signal** first, then the label badge line, then PrOACT, then gates / DMA.  
+6. **Safety Signals → Register** — see the same signal as a queue row; try a lifecycle action (`→ Looking into it`).  
+7. **Dashboard → Inspection & COU** — overdue SLAs + “Not validated for” boundaries.  
+8. **Lenses → Risk populations → REM ranking** — try `paracetamol` + `Hepatic injury` (expect ranked strata) *and* optionally `pacemaker` + device event (expect empty gates — see §19).  
+9. Optional: **Lenses → Remine lab** → filter **Needs review** → Run remine on warfarin / haemorrhage.
 
 ### 6.2 Navigation map
 
 | Hub | Route | Tabs | Use it when… |
 |-----|-------|------|----------------|
 | Homepage | `/` | — | Marketing / wake API before login |
-| Dashboard | `/dashboard` | Corpus · Ops KPIs | Volume, AE rate, triage quality |
-| Safety Signals | `/signals` | Detect · Workflow · Alerts | Find → manage → escalate |
-| Analytic Lenses | `/lenses` | Predictive intel · Remine · Risk · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS | Stress-test, special-population, and Phase 1–2 intel views |
+| Dashboard | `/dashboard` | Corpus · Ops KPIs · **Inspection & COU** | Volume, triage quality, inspection SLA, COU credibility, module strip |
+| Safety Signals | `/signals` | Detect · **Register** · Workflow · Alerts | Find → track (GVP IX) → manage → escalate |
+| Analytic Lenses | `/lenses` | Predictive intel · Remine · **Risk (REM)** · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS | Stress-test, special-population, Phase 1–2 intel |
 | Evidence Explorer | `/graph` | Graph · Story · Glossary | Relationships & patient-slang → PT |
 | Projects | `/projects` | — | Create workspaces + **keywords** for Pathfinder |
 | Source Discovery | `/source-queue` | Pathfinder · Manual URL | Find / approve communities |
@@ -278,11 +306,16 @@ Legacy URLs (`/lifecycle`, `/alerts`, `/smq`, …) redirect into the hubs above.
 
 ### 6.3 Signal Detail — what non-technical readers should look at first
 
-1. **Briefing card** — worry level, why bullets, glossary, next-step buttons.  
-2. **Supporting posts** — gate checkmarks (why it counted as an AE).  
-3. **Disproportionality strip** — PRR / IC025 / EB05 / strength / SDR.  
-4. **Competition-bias remine** — only when peers share the event.  
-5. **SAR / E2B / workflow** — “what would we do next.”
+1. **Conclusions card** — overall verdict (concerning / mixed / reassuring / caution) from the numbers on this signal.  
+2. **Hero badges + label line** — strength, SDR, WHO-UMC, **label novel vs in-label**.  
+3. **PrOACT benefit–risk** — does the therapeutic benefit outweigh this AE signal (illustrative).  
+4. **Inspection readiness** — SLA / overdue for this signal (and SJL export when offered).  
+5. **Triangulation + causality** — multi-source agreement and WHO-UMC/Naranjo draft.  
+6. **PGx card** — always present: actionable gene hit *or* “screened, no Level-A match”.  
+7. **Supporting posts** — gate checkmarks (why it counted as an AE).  
+8. **Disproportionality strip** — PRR / IC025 / EB05 / strength / SDR.  
+9. **Lot / longitudinal panels** — only when relevant (lot cues or biologic/ATMP/late-signal).  
+10. **SAR / E2B / workflow** — “what would we do next.”
 
 Evidence (PubMed etc.) may say “pending” briefly — enrichment is backgrounded so device signals (e.g. coronary stent) no longer hang forever.
 
@@ -308,33 +341,94 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 
 **Say:** “Ops quality of the safety team, not just science.”
 
+### 7.2b Dashboard — Inspection & COU (governance frontiers)
+
+1. Switch to **Inspection & COU** (`/dashboard?tab=governance`).  
+2. **Governance modules** strip — six modules with one-line status and where each lives in the app.  
+3. **Inspection readiness** — open signals, overdue vs SLA (urgent ~14 days for STRONG, routine ~30 days), justification gaps, refresh.  
+4. **FDA model credibility & Context of Use** — Credibility Index + band; **Validated for (demo scope)** vs the rose **Not validated for — hard boundaries** (each item has *why* + *which human owns it*).  
+5. **PrOACT sample** at the bottom is a **worked example** on a fixed pair (labelled as such) — open any Signal Detail to run PrOACT on your own product–event.
+
+**Powered by:** portfolio over the VigilAI signal table; BioIE offline surrogate (BC5CDR / NCBI Disease–style) for the credibility scorecard; SLA clocks are GVP Module IX–aligned *teaching* surrogates.
+
+**Say:** “Inspection asks ‘are we late?’ COU asks ‘what is this model allowed to claim?’ Empty overdue list can mean the portfolio is healthy — not that inspection is broken.”  
+**Gotcha:** Credibility Index is a prototype scorecard, **not** a SaMD clearance. The four “Not validated for” items are permanent scope boundaries (autonomous ICSR filing, autonomous BR determination, clinical PGx prescribing, replacing QPPV) — we do **not** “validate” into those uses.
+
 ### 7.3 Safety Signals — Detect
 
 1. Open **Safety Signals → Detect**.  
 2. In the **jump box**, type a product (`warfarin`, `semaglutide`, `coronary stent`) and press Enter (optional second box for event).  
-3. Use strength / product-type / region / SDR / spike filters as needed.  
+3. Use strength / product-type / region / SDR / spike / **Novel** / **PGx** filters as needed.  
 4. Sort by **PRR**, **EB05**, or **IC025** depending on the story.  
 5. Click a **row** → Signal Detail.  
+
+Row chips you may see: SDR · PGx · Novel / In label · MaxSPRT · HR · Calibrated · geo / vaccine / class.  
+**Note:** the Detect **Novel** chip is **label novelty**, not PrOACT. PrOACT is on Signal Detail.
 
 **Clear filters** with the Clear control on the search box when done.  
 **Gotcha:** empty table after a weird filter combo — clear search + set strength to ALL.
 
+### 7.3b Safety Signals — Register (GVP Module IX tracking)
+
+1. Open **Safety Signals → Register** (`/signals?tab=register`).  
+2. Read **How this works** — Detect finds signals; Register is the **queue** that tracks them.  
+3. Scan columns: Product → Event · Strength · **Label badge** · Triangulation · Lifecycle · Priority · Actions.  
+4. Lifecycle shows plain language (**Inbox**, **Looking into it**, …) plus GVP alias (DETECTION → VALIDATION → CONFIRMATION → …).  
+5. Click **→ Looking into it** (or next allowed state) to advance; open the product→event link for full Detail.  
+6. Export **PBRER** (PDF/DOCX) for the portfolio, or per-row **SAR PDF** / **PBRER**.
+
+**Workflow (what the buttons mean)**
+
+```
+Inbox → Looking into it → Looks real → High priority → Written up → Done
+                         ↘ Not a concern (reject) at most stages
+```
+
+| Plain label | Stored state | GVP alias |
+|-------------|--------------|-----------|
+| Inbox | `new` | DETECTION |
+| Looking into it | `under_evaluation` | VALIDATION |
+| Looks real | `validated` | CONFIRMATION |
+| High priority | `prioritized` | PRIORITIZATION |
+| Written up | `assessed` | ASSESSMENT |
+| Done | `closed` | CLOSED |
+| Not a concern | `rejected` | REJECTED |
+
+**Powered by:** same VigilAI `Signal` table as Detect (SQL-paginated); label tags from DailyMed / offline label-gap + Weber gate; triangulation from social DMA × openFDA-style regulatory × OMOP staging surrogates; priority from strength × seriousness × novelty × velocity × MaxSPRT weights.
+
+**Say:** “Register is operations. Detail is science. Detect is discovery.”  
+**Gotcha:** Register hanging forever was an old full-table load bug — current API pages with `limit`/`offset`. If reject/close asks for notes, a short provisional justification is accepted for demos.  
+**Empty?** No signals in project — run Detect / Load PV demo pack.
+
 ### 7.4 Signal Detail (full walk)
 
-1. From Detect, open any row.  
-2. **Briefing card (top)** — worry level, why bullets, glossary, next-step buttons (scroll to posts / remine / workflow, or export SAR).  
-3. **Header** — product → event; spike dot if rising.  
-4. **Badge strip** — strength, SDR, WHO-UMC, severity, device/drug badges.  
-5. **Disproportionality** — PRR / ROR / χ² / EB05 / IC025 / expected vs observed.  
-6. **Supporting posts** — expand a post; check gate ✓/✕ (product, symptom, sentiment, negation).  
-7. **Competition-bias remine** (if peers share the event) — select maskers → **Remine** → read before/after PRR and interpretation.  
-8. **Casefile / trajectory** — how the signal moved over time (when present).  
-9. **Evidence** — PubMed / labels / recalls (may load a few seconds later).  
-10. **Exports** — SAR PDF/MD, E2B R2/R3, CIOMS.  
-11. **Workflow panel** — assign state (Inbox → Looking into it → …).  
+1. From Detect or Register, open any row (good demos: `warfarin→Haemorrhage`, `apixaban→Haemorrhage`, `paracetamol→Hepatic injury`).  
+2. **Conclusions for this signal** — bottom-line verdict from PRR / n / calibration / SDR (local, works offline). Optional Ask Q&A.  
+3. **Hero badges** — strength, SDR, WHO-UMC, spike, **label comparison** + one-line plain reading.  
+4. **PrOACT benefit–risk** — badge **PrOACT-URL / BRAT**; efficacy vs severe-AE bars; dimensions open by default.  
+5. **Inspection readiness** (embedded) — lead time vs SLA; Export SJL when offered.  
+6. **Lot / longitudinal** — appear only when relevant (see §7.4b).  
+7. **Triangulation matrix** — Social / Regulatory / RWD pillars.  
+8. **Causality assessment** — WHO-UMC + Naranjo-style draft (human must validate).  
+9. **PGx card** — always shown (actionable **or** clean screen + CPIC/PharmGKB links).  
+10. **Supporting posts** — gate ✓/✕.  
+11. **Disproportionality** — PRR / ROR / χ² / EB05 / IC025.  
+12. **Competition-bias remine** (if peers share the event).  
+13. **Exports** — SAR, E2B R2/R3, CIOMS.  
+14. **Workflow panel** — same states as Register.
 
-**Say for non-tech:** start at the briefing; only open stats if asked.  
-**Gotcha:** first open of a heavy device signal may show evidence “pending” — wait or soft-refresh; page should not spin forever.
+**Say for non-tech:** start at Conclusions + label line + PrOACT; open DMA only if asked.
+
+#### 7.4b Lot clustering & longitudinal / delayed-toxicity (conditional panels)
+
+| Panel | Where | When it appears | What it means |
+|-------|-------|-----------------|---------------|
+| **Lot / supply-chain** | Signal Detail | Narratives mention lot/batch/NDC **or** contamination/recall cues **or** manufacturing flag | Concentrated lot → prefer manufacturing investigation; spread lots → product-wide effect |
+| **Longitudinal / delayed-toxicity** | Signal Detail | Product is ATMP/CAR-T **or** biologic (INN stems / vaccine) **or** CRS/ICANS-type hits **or** late-year spike in multi-year buckets | Extends surveillance thinking beyond 30–90 days |
+
+**Powered by:** heuristic NLP over supporting post text; optional openFDA enforcement enrich for lots; multi-year buckets from post dates; CRS/ICANS lexicons for ATMPs.
+
+**Gotcha:** most social DOAC/paracetamol signals correctly **hide** these panels — that is success, not a missing feature. See §19.
 
 ### 7.5 Safety Signals — Workflow
 
@@ -342,7 +436,7 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 2. Drag or move cards across kanban columns (Inbox → Looking into it → … → Done / Not a concern).  
 3. Open a card to jump back to Signal Detail.  
 
-**Say:** “Same lifecycle states as on the detail page — team ownership.”
+**Say:** “Same lifecycle states as Register and Detail — team ownership.”
 
 ### 7.6 Safety Signals — Alert inbox
 
@@ -365,15 +459,39 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 **Say:** “Read-only sensitivity — Detect baselines are not overwritten. Judge threshold crossing, not raw PRR rise.”  
 **Outcomes:** see §9.2 (`unmasked`, `co_reported`, `amplified`, …).
 
-### 7.8 Risk populations
+### 7.8 Risk populations + REM ranking
 
-1. **Lenses → Risk populations**.  
-2. Enter a **product** and **target AE** (e.g. product from Detect, AE PT).  
-3. Click **Predict segments** (adjust min confidence if shown).  
-4. Read high-risk segments: predicted risk, relative elevation, contributing factors (age / sex / comorbidity).  
+1. **Lenses → Risk populations** (`/lenses?tab=risk`).  
+2. Two modes:  
+   - **REM ranking** (default) — ranks demographic/comorbidity strata by **Risk Elevation Multiplier**.  
+   - **Logistic segments** — predictive segment scores (often still shows cards when REM is empty).  
+3. Enter **product** + **target AE** (MedDRA-style PT), or click a **candidate pair** chip.  
+4. Click **Rank strata** (or **Load PV demo** if corpus is thin).  
 
-**Say:** “Proactive strata — who might be hurt *before* the next severe case piles up.”  
-**Gotcha:** thin corpus → few segments; load demo pack or Forge then recompute.
+**What REM is**
+
+\[
+\mathrm{REM} = \frac{P(\mathrm{AE}\mid \mathrm{Drug}\cap\mathrm{Subpopulation})}{P(\mathrm{AE}\mid \mathrm{Drug}\cap\mathrm{General\ cohort})}
+\]
+
+**Gates to appear in the ranked list (default):** REM ≥ **1.5** and Yates χ² ≥ **4.0** (plus enough exposed mass). Strata that fail are **intentionally omitted**.
+
+**Metrics shown under the verdict**
+
+| Field | Meaning |
+|-------|---------|
+| `n_exposed` | Drug/device-exposed rows used for the 2×2-within-drug view |
+| `baseline P(AE)` | Overall AE rate among exposed |
+| `domain` | `drug` vs `device` (changes mitigation language) |
+| `needs_demo_seed` | Hint that exposure is thin (&lt; ~12) — load demo pack |
+
+**Demo that shows ranked cards:** `paracetamol` → `Hepatic injury` (often **Region · North America**, REM ≈ 2+).  
+**Demo that correctly shows none:** `pacemaker` → `device-related adverse event` with `n_exposed≈9` and high baseline — **no subpopulation cleared the gates**.
+
+**Powered by:** VigilAI processed posts / risk feature strata (age, sex, comorbidity, region lexicons → open UMLS/ICD-style cues); optional sklearn/SHAP when installed, else deterministic attribution; FastMCP `rank_high_risk_populations`.
+
+**Say when empty:** “The ranking ran. No subgroup cleared REM ≥ 1.5 and χ² ≥ 4. With tiny n and a high baseline, we stay silent rather than invent a fragile high-risk segment.” Full script in §19.  
+**Gotcha:** chip **N=** counts and `n_exposed` can differ slightly (broader product matching) — both can still be too small for REM.
 
 ### 7.9 DDI findings
 
@@ -515,19 +633,30 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 |---------|------|-----|-------|
 | Detect table | Ranked product→event with PRR, EB05, IC025, SDR, filters, search | Hero triage list | `/signals` |
 | Jump search | Type drug / vaccine / device / event | Avoid scrolling 300+ rows | Detect search boxes |
-| Signal briefing | Deterministic plain-English summary | Non-technical stakeholders | Top of Signal Detail |
-| 4-gate AE | Explainable gates + confidence | Auditability | Supporting posts |
+| Signal conclusions | Deterministic good/bad/mixed verdict from loaded numbers | Non-technical stakeholders | Top of Signal Detail |
+| Signal briefing | Plain-English worry level + next steps | Same audience | Signal Detail |
+| 4-gate AE | Explainable gates + confidence | Auditability | Supporting posts · Predictive intel |
 | Disproportionality | PRR/ROR/χ² + Bayesian EBGM/IC | Regulator-shaped ranking | Detail + Detect |
 | Spike / MaxSPRT | Time + sequential boundaries | Emerging / repeated-look control | Detail / alerts |
 | WHO-UMC cues | Temporal, de/rechallenge… | Causality language | Detail |
 | Workflow + alerts | Kanban + inbox actions | Ops ownership | `/signals?tab=…` |
 
+### GVP Modules 1–4 & Register
+
+| Feature | What | Why | Where |
+|---------|------|-----|-------|
+| **Label filter** | In-label vs novel vs boxed; Weber gate↑ on launch/media noise | Separate known label text from novel candidates | Signal Detail hero · Register Label column · Detect Novel chip |
+| **Causality draft** | WHO-UMC + Naranjo-style automation | Structured medical draft for QPPV | Signal Detail |
+| **Triangulation** | Social DMA × Regulatory (FAERS/MAUDE) × RWD (OMOP staging) | Cross-source corroboration | Signal Detail · Register column |
+| **Signal Register** | Paginated GVP IX tracking + lifecycle + SAR/PBRER | Operational queue | `/signals?tab=register` |
+
 ### Analytic lenses (overlays — do **not** overwrite stored SDR)
 
 | Lens | What | Why | Where |
 |------|------|-----|-------|
-| **Remine lab** | Screens **every** remine-eligible pair; case-level unmask; MR split into co-reporting × comparator; outcomes: unmasked / co_reported / vanished / attenuated / amplified / stable | Competition bias (Pariente / Maignen / ENCePP Ch.11) | `/lenses?tab=remine` |
-| **Risk populations** | Logistic (NumPy IRLS; optional sklearn/LGBM) segments by age/sex/comorbidity | Proactive risk mitigation before severe harm | `/lenses?tab=risk` |
+| **Remine lab** | Screens remine-eligible pairs; case-level unmask; outcomes unmasked / co_reported / vanished / attenuated / amplified / stable | Competition bias (Pariente / Maignen / ENCePP Ch.11) | `/lenses?tab=remine` |
+| **Risk populations / REM** | REM ranking + logistic segments by age/sex/comorbidity/region | Proactive risk mitigation before severe harm | `/lenses?tab=risk` |
+| **Predictive intel** | Feature matrix, 4-gate playground, OMOP, privacy hygiene, BioIE | Phase 1–2 ClairLabs-aligned spine | `/lenses?tab=intel` |
 | **DDI** | Co-mention pairs vs chance + clinical risk flags | Polypharmacy AE patterns | `/lenses?tab=ddi` |
 | **Pregnancy** | Exposure + congenital / perinatal events | Special-population PV | `/lenses?tab=pregnancy` |
 | **SMQ** | Pool PTs into syndrome signals | Catch fragmented reporting | `/lenses?tab=smq` |
@@ -535,6 +664,18 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 | **Vaccine** | AESI / Brighton-style focus | Vaccine safety lens | `/lenses?tab=vaccine` |
 | **Geo** | Spatial concentration vs expected | Cluster detection | `/lenses?tab=spatial` |
 | **vs FAERS** | Social signal vs openFDA pattern | Divergence / corroboration | `/lenses?tab=divergence` |
+
+### Governance frontiers (Inspection · COU · PGx · PrOACT · lot · ATMP)
+
+| Feature | What | Why | Where |
+|---------|------|-----|-------|
+| **Inspection readiness** | SLA clocks, overdue, justification gaps, SJL export | GVP IX inspection-style ops | Dashboard Inspection & COU · Signal Detail |
+| **COU + credibility** | Context of Use boundaries + BioIE Credibility Index | Declare what the model may / may not claim | Dashboard Inspection & COU |
+| **Frontiers strip** | Module readiness roll-up | One-glance “what’s live where” | Dashboard Inspection & COU |
+| **PGx** | CPIC/PharmGKB curated gene–drug–reaction match | Genomically explainable toxicity triage | Signal Detail (always) · Detect PGx chip when actionable |
+| **PrOACT / BRAT** | Efficacy vs severe AE balance + 8 PrOACT-URL dimensions | Contextualise signal vs therapeutic benefit | Signal Detail · Dashboard sample |
+| **Lot clustering** | Lot/batch concentration vs systemic toxicity | Manufacturing vs molecule | Signal Detail when relevant |
+| **Longitudinal / delayed toxicity** | Multi-year windows; CRS/ICANS for ATMP; biologics watch | Late harms beyond short PV windows | Signal Detail when relevant |
 
 ### Evidence & export
 
@@ -544,7 +685,8 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 | Story mode | Guided A-vs-B narrative | `/graph?tab=story` |
 | Glossary | Patient slang → PT | `/graph` glossary tab |
 | Casefile trajectory | Snapshots over time | Signal Detail |
-| SAR | GVP Module IX–shaped PDF/MD | Signal Detail |
+| SAR | GVP Module IX–shaped PDF/MD | Signal Detail · Register |
+| PBRER | Aggregate / per-signal draft PDF/DOCX | Register · `/api/gvp/pbrer*` |
 | E2B R2/R3 · CIOMS I | Demo XML / form templates | Signal Detail |
 
 ### Workspace ops
@@ -553,7 +695,7 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 |---------|------|-----|
 | Projects + keywords | Therapeutic workspaces; keywords drive Pathfinder & literature narrowing | Swift, scoped retrieval |
 | Pathfinder | Suggest forums/communities from keywords | Source discovery without manual URL hunting |
-| PV demo pack | VAERS + FAERS bulk samples + pregnancy/DDI-friendly ICSRs | Instant remine / DDI / pregnancy demos |
+| PV demo pack | VAERS + FAERS bulk samples + pregnancy/DDI-friendly ICSRs | Instant remine / DDI / pregnancy / REM demos |
 | Data Forge | Synthetic narratives + quality loop | Zero-PHI stress testing |
 | Network registry | Live connectors vs licensed **surrogates** | Honest architecture |
 
@@ -561,7 +703,7 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 
 ## 9. Signal science (how numbers work)
 
-### 8.1 2×2 disproportionality
+### 9.1 2×2 disproportionality
 
 | Cell | Meaning |
 |------|---------|
@@ -570,21 +712,24 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 | **c** | Other products + target event |
 | **d** | Rest |
 
-- **PRR** = (a/(a+b)) / (c/(c+d))  
-- **ROR** = (a·d) / (b·c)  
-- Continuity: **Haldane–Anscombe +0.5** on all cells  
-- **χ² (Yates)** for independence  
-- **EBGM / EB05** — MGPS-style Bayesian shrinkage (FDA-flavored)  
-- **IC / IC025** — BCPNN (UMC-flavored)  
-- **SDR** — composite “signal of disproportionate reporting” when any regulator-style criterion fires  
+- **PRR** = (a/(a+b)) / (c/(c+d)) — how much more often this event is reported with this product vs other products  
+- **ROR** = (a·d) / (b·c) — reporting odds ratio (similar story, different algebra)  
+- Continuity: **Haldane–Anscombe +0.5** on all cells (stabilises small counts)  
+- **χ² (Yates)** — independence test; VigilAI strength uses χ² ≥ 4 with PRR ≥ 2 and n ≥ 3 for STRONG  
+- **EBGM / EB05** — MGPS-style Bayesian shrinkage; EB05 is the **5% lower bound** (FDA-flavored). High PRR with tiny n often fails EB05  
+- **IC / IC025** — BCPNN information component; IC025 is the lower bound (UMC-flavored)  
+- **SDR** — composite “signal of disproportionate reporting” when a regulator-style criterion fires  
+- **Calibrated / empirical null** — optional survival against negative-control style calibration  
 
 **Strength tiers**
 
-| Tier | Rule |
-|------|------|
-| STRONG | PRR ≥ 2, χ² ≥ 4, count ≥ 3 |
-| MODERATE | PRR ≥ 1.5, count ≥ 2 |
-| WEAK | else |
+| Tier | Rule | Plain reading |
+|------|------|---------------|
+| STRONG | PRR ≥ 2, χ² ≥ 4, count ≥ 3 | Disproportionate and not a one-off |
+| MODERATE | PRR ≥ 1.5, count ≥ 2 | Elevated but thinner |
+| WEAK | else | Watch / insufficient |
+
+**Conclusions card** combines these with n and calibration into concerning / mixed / reassuring / caution — e.g. huge PRR + n=3 + failed calibration → “loud but fragile.”
 
 ### 9.2 Remine outcomes (read carefully)
 
@@ -601,12 +746,85 @@ Evidence tiers: **evaluable** (≥3 cases, Evans), **provisional** (2), **explor
 
 Remine is **read-only sensitivity** — Detect table baselines are not overwritten.
 
-### 9.3 Risk populations (proactive strata)
+### 9.3 Risk populations & REM ranking
 
+**Logistic segments (Predict segments tab)**  
 Input: product + target AE PT.  
 Features: age bracket, sex, comorbidity vector (lexicon→UMLS/ICD-style cues), severity ordinal.  
 Output: predicted risk, relative elevation vs baseline, top contributing factors.  
 Also exposed as FastMCP tool `predict_high_risk_populations`.
+
+**REM ranking (Rank strata tab)**
+
+| Symbol | Meaning |
+|--------|---------|
+| REM | Risk in stratum ÷ risk in general drug-exposed cohort |
+| Yates χ² | Independence of AE vs stratum membership among exposed |
+| Gate | Default keep if REM ≥ 1.5 **and** χ² ≥ 4 |
+| Attribution | Which feature (age/sex/comorbidity/region) drove the REM excess |
+| Mitigation | Drug → Section 5 / contraindications language; Device → engineering / procedure RCA |
+
+Empty ranked list after a successful run means **gates filtered everything** — see §19. Thin exposure (`n_exposed` &lt; 5 or AE count &lt; 2) returns an insufficient-mass verdict and `needs_demo_seed`.
+
+### 9.4 Label filter & Weber
+
+| Tag / chip | Meaning |
+|------------|---------|
+| IN-LABEL / ESTABLISHED | Event appears in surrogate label / DailyMed-style text |
+| BOXED | Covered by a boxed-warning topic |
+| NOVEL / OFF-LABEL novel | Not found on the surrogate label — candidate for novelty review |
+| WEBER GATE↑ | Launch window or media-spike adjustment **raises alert gates** without rewriting stored PRR cells |
+
+**Data:** curated approval anchors + DailyMed / offline label-gap; not a complete regulatory calendar.
+
+### 9.5 Triangulation
+
+| Pillar | Typical input | Pass idea |
+|--------|---------------|-----------|
+| Social / News DMA | VigilAI PRR/χ²/strength | STRONG or PRR≥2 & χ²≥4 & n≥3 |
+| Regulatory | openFDA FAERS/MAUDE-style corroboration | Known / elevated in regulatory stream |
+| RWD | OMOP staging surrogate | Support in structured staging |
+
+Scores combine into `triangulated_risk_score`, `urgency_tier`, and a badge (e.g. INSUFFICIENT TRIANGULATION when only social is loud).
+
+### 9.6 Causality (WHO-UMC + Naranjo draft)
+
+Deterministic cue scoring (temporal +0.35, dechallenge +0.25, rechallenge +0.30, confounder −0.20, openFDA-known +0.20) → Certain / Probable / Possible / Unlikely / Unassessable. Naranjo-style questions over narrative. **Always a draft** — Possible/Unassessable skew is common when de/rechallenge text is missing (§19).
+
+### 9.7 PGx
+
+| Result | Meaning |
+|--------|---------|
+| Actionable | Curated CPIC/PharmGKB row matches **drug + this reaction** (or SOC family) |
+| Other associations | Drug has gene links, but not for *this* event |
+| Clean screen | No curated Level-A style match |
+
+**Data:** offline table in `pgx.py` (abacavir/HLA-B*57:01, warfarin/CYP2C9–VKORC1, clopidogrel/CYP2C19, ondansetron/CYP2D6, …) + optional live PharmGKB/CPIC HTTP with disk cache. Matching is deliberately **precise** — drug alone does not flag. Not clinical decision support.
+
+### 9.8 PrOACT-URL / BRAT benefit–risk
+
+| Piece | Meaning |
+|-------|---------|
+| Efficacy / NNT (or NNV) | Illustrative literature-range benefit from curated offline KB (+ ATC class fallback) |
+| Severe AE signal % / NNH | Report-derived **proxy** for harm (not incidence) |
+| Balance ratio | Benefit vs severe-AE framing |
+| Tone | favourable / watch / unfavourable |
+| PrOACT-URL dimensions | Problem, Objectives, Alternatives, Consequences, Tradeoffs, Uncertainty, Risk tolerance, Linked decisions |
+
+**Say:** “Illustrative surrogate — safety committee still owns the determination.”
+
+### 9.9 Inspection SLA
+
+| Clock | Default teaching value |
+|-------|------------------------|
+| Urgent (STRONG) | ~14 days |
+| Routine | ~30 days |
+| Overdue | Lead time &gt; SLA while still open |
+| SJL | Signal Justification Log (markdown + hashed actions) — prototype audit trail |
+
+### 9.10 Lot clustering coefficient
+
+Share of lot-tagged AE mentions concentrated in the dominant lot (0–1). Manufacturing-style flag when coefficient ≥ ~0.80, enough mentions, and spike or multi-lot evidence. No lot strings in narratives → panel hidden.
 
 ---
 
@@ -644,14 +862,28 @@ Normalization stack (open surrogates — **not** licensed MedDRA/UMLS):
 
 ### 10.1c GVP Signal Management OS (Modules 1–4)
 
-| Module | UI path | API |
-|--------|---------|-----|
-| Label filter + Weber gates | **Signal Detail** — label badge (`[IN-LABEL]` / `[OFF-LABEL: NOVEL]`) | `GET /api/label-filter` |
-| WHO-UMC + Naranjo causality | **Signal Detail** — Causality assessment panel | `POST /api/nlp/causality` · MCP `evaluate_narrative_causality` |
-| Triangulation matrix | **Signal Detail** — Multi-source triangulation card | `GET /api/signals/{id}/triangulation` |
-| GVP IX register + PBRER/SAR | **Safety Signals → Register** (`/signals?tab=register`) | `GET /api/gvp/register`, `/api/gvp/pbrer.pdf|.docx`, existing SAR routes |
+| Module | UI path | API | Dataset / engine |
+|--------|---------|-----|------------------|
+| Label filter + Weber gates | **Signal Detail** hero badge + plain line; Register Label column; Detect Novel/In-label chips | `GET /api/label-filter` | DailyMed / offline label-gap + boxed warnings + curated launch anchors |
+| WHO-UMC + Naranjo causality | **Signal Detail** — Causality assessment panel | `POST /api/nlp/causality` · MCP `evaluate_narrative_causality` | Deterministic lexicons over supporting narratives |
+| Triangulation matrix | **Signal Detail** card; Register triangulation column | `GET /api/signals/{id}/triangulation` | Social DMA + openFDA FAERS/MAUDE surrogates + OMOP staging |
+| GVP IX register + PBRER/SAR | **Safety Signals → Register** | `GET /api/gvp/register`, `/api/gvp/pbrer.pdf|.docx`, SAR routes | Paginated `Signal` table + lifecycle transitions |
 
 All generated SAR/PBRER documents carry an AI-assisted draft disclaimer requiring QPPV/Medical Reviewer validation.
+
+### 10.1d Governance frontiers (Inspection · COU · PGx · PrOACT · lot · ATMP)
+
+| Module | UI | API | Powered by |
+|--------|----|-----|------------|
+| Inspection readiness | Dashboard Inspection & COU · Detail | `/api/inspection/portfolio`, `/api/inspection/signals/{id}`, `/sjl` | Signal lifecycle timestamps + SLA clocks + justification rules |
+| COU + credibility | Dashboard Inspection & COU | `/api/governance/cou`, `/credibility` | Declared COU + offline BioIE P/R/F1 → Credibility Index |
+| Frontiers strip | Dashboard Inspection & COU | `/api/frontiers/summary` | Roll-up of inspection + credibility + module descriptors |
+| PGx | Signal Detail always-on card | `/api/signals/{id}/pgx-profile`, `/api/pgx/associations` | Curated CPIC/PharmGKB table + optional live APIs |
+| PrOACT / BRAT | Signal Detail · Dashboard sample | `/api/benefit-risk/proact`, `/signals/{id}/benefit-risk-proact` | Offline benefit KB (NNT/NNV) + report-derived NNH proxy |
+| Lot clustering | Signal Detail if relevant | `/api/signals/{id}/lot-clustering` | Lot/batch/NDC NLP + optional openFDA enforcement |
+| Longitudinal / delayed toxicity | Signal Detail if relevant | `/api/signals/{id}/longitudinal-biologics` | Product-name biologic/ATMP class + multi-year buckets + CRS/ICANS lexicons |
+
+MCP tools (when wired): `get_pgx_gene_associations`, `evaluate_benefit_risk_ratio`, `get_inspection_lead_time_metrics`.
 
 ### 10.1b Predictive intelligence (Phase 1–2)
 
@@ -823,11 +1055,27 @@ Fast / demo-friendly: Google News, life-science news, FDA RSS, FAERS live/bulk, 
 
 Slower / key-gated: YouTube, X/Twitter, Reddit direct / Pullpush.
 
+### What powers which feature (cheat sheet)
+
+| Feature family | Primary data | Offline fallback |
+|----------------|--------------|------------------|
+| Detect / DMA | VigilAI AE-flagged posts → 2×2 | Always local DB |
+| Label filter | DailyMed / label text + curated boxed warnings | Offline label-gap KB |
+| Triangulation regulatory pillar | openFDA FAERS / MAUDE | Empty / low score if unreachable |
+| Remine / DDI / Pregnancy / Risk | Same processed corpus (+ demo pack ICSRs) | Load PV demo pack |
+| Predictive intel / OMOP | Feature store over corpus + OMOP staging | Offline hygiene + local matrix |
+| PGx | Curated CPIC/PharmGKB table | Optional live PharmGKB/CPIC APIs |
+| PrOACT | Curated benefit KB by drug/ATC | Always offline |
+| Lot / longitudinal | Supporting post text + dates | Heuristics only |
+| COU credibility | BioIE offline gold corpora | Placeholder metrics if evaluator missing |
+| Inspection | Signal lifecycle fields in DB | N/A |
+
 ### Live vs surrogate
 
 | Kind | Examples | Reality in VigilAI |
 |------|----------|--------------------|
-| **Live / free** | openFDA FAERS & MAUDE, PubMed, DailyMed, MHRA FSNs | Real network calls when online; fixtures offline |
+| **Live / free** | openFDA FAERS & MAUDE, PubMed, DailyMed, MHRA FSNs, PharmGKB/CPIC (optional) | Real network calls when online; fixtures / cache offline |
+| **Curated offline** | PGx table, benefit NNT KB, Weber launch dates, MedDRA-style lexicons | Ship with the app; teaching surrogates |
 | **Surrogate / registry slot** | WHO VigiBase/VigiLyze, FDA Sentinel, NESTcc | Documented as architecture honesty — exploration over *our* corpus, not licensed bulk ingest |
 
 ---
@@ -902,8 +1150,10 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 - Synthetic / demo data is **fictional**.  
 - openFDA coverage is **US FAERS / MAUDE** (plus other open feeds as wired).  
 - MedDRA coding is an **open surrogate**, not a licensed MedDRA distribution.  
-- E2B / CIOMS / SAR are **demo templates**, not validated submission artifacts.  
-- **Not for clinical use** and not a substitute for a validated PV system.
+- E2B / CIOMS / SAR / PBRER / SJL are **demo templates**, not validated submission artifacts.  
+- PGx, PrOACT NNT/NNH, and COU credibility are **teaching surrogates** — not clinical decision support or SaMD clearance.  
+- **Not for clinical use** and not a substitute for a validated PV system.  
+- COU **Not validated for** items (autonomous ICSR filing, autonomous benefit–risk determination, patient-level PGx prescribing, replacing QPPV) are **permanent scope boundaries**, not a backlog.
 
 ---
 
@@ -914,7 +1164,11 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 | **AE** | Adverse event |
 | **AESI** | Adverse event of special interest (often vaccines) |
 | **ATC** | WHO Anatomical Therapeutic Chemical drug class |
+| **ATMP** | Advanced therapy medicinal product (e.g. CAR-T, gene therapy) |
 | **BCPNN / IC025** | Bayesian confidence propagation; IC lower bound |
+| **BRAT** | Benefit–Risk Action Team style multi-criteria framing |
+| **COU** | Context of Use — declared intended use / non-use of an AI/ML model |
+| **CRS / ICANS** | Cytokine release syndrome / immune effector cell–associated neurotoxicity |
 | **DMA** | Disproportionality analysis methods |
 | **EBGM / EB05** | Empirical Bayes geometric mean; 5% lower bound |
 | **GMDN** | Global Medical Device Nomenclature |
@@ -922,14 +1176,109 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 | **ICSR** | Individual Case Safety Report |
 | **IMDRF** | International Medical Device Regulators Forum terms |
 | **MAUDE** | FDA device adverse event database |
+| **MaxSPRT** | Maximised sequential probability ratio test (repeated-look control) |
 | **MedDRA PT/SOC** | Preferred Term / System Organ Class |
+| **NNT / NNH / NNV** | Number needed to treat / harm / vaccinate (illustrative here) |
+| **PBRER** | Periodic Benefit–Risk Evaluation Report (draft export) |
+| **PGx** | Pharmacogenomics — gene–drug associations |
 | **PRR / ROR** | Proportional Reporting Ratio / Reporting Odds Ratio |
+| **PrOACT-URL** | Problem, Objectives, Alternatives, Consequences, Tradeoffs, Uncertainty, Risk tolerance, Linked decisions |
+| **REM** | Risk Elevation Multiplier (stratum vs general exposed cohort) |
 | **Remine** | Recompute DMA after removing competitor (masker) cases |
 | **SDR** | Signal of Disproportionate Reporting |
+| **SJL** | Signal Justification Log (inspection-style audit export) |
 | **SMQ** | Standardised MedDRA Query (syndrome pool) |
 | **VAERS** | US vaccine adverse event reporting system |
+| **Weber effect** | Early post-launch reporting noise inflation |
 | **WHO-UMC** | Uppsala Monitoring Centre causality categories |
 
 ---
 
-*Document version aligned with Remine corpus-wide screening, Signal briefing, Risk populations, and project keyword packs. For slide-ready bullets see `README.md`; for deploy steps see `DEPLOY_FREE.md`.*
+## 19. When you don’t see expected output
+
+Use this section in demos when someone says “is it broken?” Most empty views are **filters holding**, **thin data**, or **correct non-relevance** — not API failure.
+
+### 19.1 How to tell broken vs intentional silence
+
+| Symptom | Likely broken | Likely intentional |
+|---------|---------------|--------------------|
+| Red error / “API not on this backend” / endless spinner | Yes — redeploy/push or wake Render | — |
+| HTTP **422** on raw API URL | Missing required query params (`drug`, `event`, `product_id`) | Expected validation |
+| Verdict text + formula + `n_exposed=…` but **zero cards** | — | Gates / sample size |
+| Panel **absent** on Detail (lot / longitudinal) | — | Not relevant for this product/text |
+| PGx card says **Screened · no Level-A match** | — | Clean result |
+| Detect table empty | Over-filtered search | Clear filters |
+
+### 19.2 REM ranking — “No subpopulation cleared REM ≥ 1.5 & χ² ≥ 4”
+
+**What happened:** The engine ran. No age/sex/comorbidity/region slice cleared the statistical gates.
+
+**Common reasons**
+
+1. **Tiny exposure** — e.g. pacemaker with `n_exposed≈9`. Sub-slices become 1–3 rows; χ² cannot clear 4.  
+2. **High baseline P(AE)** — if ~50%+ of exposed already have the event, REM ≥ 1.5 is almost impossible.  
+3. **Homogeneous reporting** — no coded demographic/comorbidity diversity in the posts.  
+4. **Wrong pair** — product/event spelling doesn’t match the corpus.
+
+**What to say**
+
+> “This isn’t an error — the ranking ran. No subgroup cleared REM at least 1.5 and chi-square at least 4. With only about nine exposed cases and a high baseline rate, we don’t invent a high-risk subpopulation. Empty can mean ‘not enough evidence yet.’”
+
+**What to try next**
+
+- Rank `paracetamol` + `Hepatic injury` (usually ≥1 stratum).  
+- Switch to **Logistic segments** tab (often still shows cards).  
+- Click **Load PV demo** / ingest more sources to raise `n_exposed`.  
+- Confirm `needs_demo_seed` in the metadata line.
+
+### 19.3 Lot / longitudinal panels missing
+
+| Missing panel | Usually means |
+|---------------|---------------|
+| Lot clustering | No lot/batch/NDC/contamination language in supporting posts |
+| Longitudinal / delayed toxicity | Product is not ATMP/biologic/vaccine **and** no CRS/ICANS hits **and** no late-year spike |
+
+Product class is inferred from the **product name**, not from random words in the narrative (so a post mentioning “vaccine” does not reclassify apixaban).
+
+### 19.4 PGx not lighting up
+
+- **apixaban → haemorrhage** — correctly non-actionable (no curated Level-A pair).  
+- **warfarin → hypertension** — warfarin has PGx for *bleeding*, not hypertension → “other associations” message.  
+- **warfarin → haemorrhage** — should be actionable.  
+
+If *everything* is blank (no card at all), the UI build is stale — hard-refresh; the card should always report a verdict.
+
+### 19.5 Triangulation “INSUFFICIENT”
+
+Social pillar passed, regulatory/RWD did not — classic “loud on forums, thin in FAERS/MAUDE surrogate.” Teaching point, not a crash.
+
+### 19.6 Causality Possible / Unassessable
+
+Missing dechallenge / rechallenge / temporal phrases in free text. Automation is cue-based; sparse social narratives skew Possible/Unassessable by design.
+
+### 19.7 PrOACT “I don’t see proACT”
+
+- Detect **Novel** chip ≠ PrOACT.  
+- Open **Signal Detail** — card near the top with badge **PrOACT-URL / BRAT**.  
+- Dashboard sample is labelled as a worked example on a fixed pair.
+
+### 19.8 Register / Detect truncated or hung
+
+Current builds SQL-paginate Register and table UIs. If Register spins for minutes, the API may still be on an old build — check `/api/gvp/register?limit=5` returns quickly.
+
+### 19.9 Inspection shows zero overdue
+
+Healthy portfolio or all signals still inside SLA. Contrast with the `n_overdue` tile on Dashboard governance when teaching inspection risk.
+
+### 19.10 Quick recovery checklist
+
+1. Hard-refresh the browser (Ctrl+Shift+R).  
+2. Confirm API health: https://vigil-ai-api.onrender.com/api/health  
+3. **Data Sources → Load PV demo pack**.  
+4. Clear Detect filters; retry a known pair from the keyword index.  
+5. For REM: use the paracetamol / hepatic injury teaching pair.  
+6. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
+
+---
+
+*Document version aligned with GVP Modules 1–4, Signal Register, REM ranking, Signal conclusions, Inspection/COU frontiers, PGx always-on card, PrOACT visibility, lot/longitudinal relevance gating, and empty-result teaching scripts (§19). For slide-ready bullets see `README.md`; for deploy steps see `DEPLOY_FREE.md`.*

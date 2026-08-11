@@ -121,7 +121,7 @@ def build():
        align=WD_ALIGN_PARAGRAPH.CENTER)
     _p(
         doc,
-        "Where · How · What · Why — features, architecture, and keyword packs for swift retrieval",
+        "Where · How · What · Why — features, metrics, data sources, and empty-result teaching scripts",
         size=11, color=MUTED, space_after=4, align=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _p(
@@ -132,8 +132,9 @@ def build():
 
     _callout(
         doc,
-        "Primary markdown (diagrams render in GitHub / Cursor)",
-        "Full mermaid architecture diagrams live in docs/VIGILAI_APPLICATION_HANDBOOK.md. "
+        "Primary markdown (diagrams + §19 empty-result scripts)",
+        "Full mermaid architecture diagrams, metrics explanations, data-source cheat sheet, "
+        "and “when you don’t see expected output” live in docs/VIGILAI_APPLICATION_HANDBOOK.md. "
         "This Word file is the shareable handout for stakeholders who prefer .docx.",
         TIP,
     )
@@ -215,11 +216,13 @@ def build():
         [
             "Open the live app → Login (admin or analyst).",
             "Confirm project in the header (General Pharmacovigilance by default).",
-            "Data Sources → Load PV demo pack if Remine/DDI/Pregnancy look empty.",
-            "Safety Signals → Detect → type warfarin or semaglutide → open a row.",
-            "Read the plain-English briefing, then gates / DMA / remine.",
-            "Lenses → Remine lab → filter Needs review → Run remine.",
-            "Optional: Evidence Explorer graph for the same product–event.",
+            "Data Sources → Load PV demo pack if Remine / DDI / Register look thin.",
+            "Safety Signals → Detect → type warfarin or paracetamol → open a row.",
+            "Read Conclusions first, then the label line, then PrOACT, then DMA.",
+            "Safety Signals → Register → advance one lifecycle action (Looking into it).",
+            "Dashboard → Inspection & COU → overdue SLAs + Not validated for boundaries.",
+            "Lenses → Risk → REM: try paracetamol + Hepatic injury (ranked) and optionally pacemaker (empty gates).",
+            "Optional: Lenses → Remine lab → Needs review → Run remine on warfarin / haemorrhage.",
         ],
         1,
     ):
@@ -231,9 +234,9 @@ def build():
         doc,
         ["Hub", "Route", "Purpose"],
         [
-            ["Dashboard", "/dashboard", "Corpus metrics · Ops KPIs"],
-            ["Safety Signals", "/signals", "Detect · Workflow · Alert inbox"],
-            ["Analytic Lenses", "/lenses", "Remine · Risk · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS"],
+            ["Dashboard", "/dashboard", "Corpus · Ops KPIs · Inspection & COU"],
+            ["Safety Signals", "/signals", "Detect · Register · Workflow · Alerts"],
+            ["Analytic Lenses", "/lenses", "Predictive · Remine · REM Risk · DDI · Pregnancy · SMQ · Class · Vaccine · Geo · vs FAERS"],
             ["Evidence Explorer", "/graph", "Drug↔AE graph · Story · Glossary"],
             ["Projects", "/projects", "Workspaces + keywords for Pathfinder"],
             ["Source Discovery", "/source-queue", "Pathfinder · Manual forum URL"],
@@ -247,18 +250,20 @@ def build():
     _h(doc, "7. How to use each feature (step by step)")
     _p(
         doc,
-        "Full click-by-click recipes for every hub live in the markdown handbook §7 "
-        "(Dashboard, Detect, Signal Detail, Workflow, Alerts, Remine, Risk, DDI, Pregnancy, "
-        "SMQ, Class, Vaccine, Geo, vs FAERS, Graph, Projects/keywords, Pathfinder, Sources, "
-        "Forge, Users, plus a 10-minute hero script). Summary of the operating pattern:",
+        "Full click-by-click recipes live in the markdown handbook §7 "
+        "(Dashboard, Detect, Register, Signal Detail, Workflow, Alerts, Remine, REM Risk, "
+        "Predictive intel, DDI, Pregnancy, SMQ, Class, Vaccine, Geo, vs FAERS, Graph, "
+        "Projects/keywords, Pathfinder, Sources, Forge, Users). Summary:",
     )
     for line in [
-        "Detect: search product → open row → read briefing first.",
+        "Detect: search product → open row → read Conclusions + label first.",
+        "Register: GVP IX queue — plain lifecycle buttons (Inbox → Looking into it → …).",
+        "Detail: Conclusions · PrOACT · Inspection · Triangulation · Causality · always-on PGx.",
+        "REM ranking: paracetamol + Hepatic injury shows strata; pacemaker often correctly empty.",
         "Remine lab: filter Needs review → Run remine → judge threshold crossing, not raw PRR rise.",
-        "Lenses (DDI/Pregnancy/SMQ/…): open tab → follow Open signal / Find in Detect.",
-        "Projects: pick a keyword pack → Create → header switcher → Pathfinder → Fill/Fetch.",
-        "Sources: Load PV demo pack once when Remine/DDI/Pregnancy look empty.",
-        "Exports: SAR / E2B / CIOMS from Signal Detail — demo templates only.",
+        "Inspection & COU: SLA overdue + hard Not validated for boundaries (not a backlog).",
+        "Sources: Load PV demo pack once when Remine/DDI/REM look thin.",
+        "Exports: SAR / PBRER / E2B / CIOMS — demo templates only.",
     ]:
         _p(doc, "• " + line, space_after=2)
 
@@ -268,13 +273,18 @@ def build():
         ["Feature", "What / Why"],
         [
             ["Detect + jump search", "Ranked product→event table; type to jump (no scrolling)"],
-            ["Signal briefing", "Plain-English so-what for non-technical readers"],
+            ["Conclusions / briefing", "Plain-English verdict from PRR, n, calibration"],
+            ["Label filter", "Novel vs in-label vs boxed; Weber gate on launch noise"],
+            ["Register", "GVP IX tracking queue + SAR/PBRER exports"],
             ["4-gate AE", "Product · symptom · negative sentiment · non-negated"],
-            ["Remine lab", "Corpus-wide competition-bias screen; read-only; searchable"],
-            ["Risk populations", "Predict high-risk age/sex/comorbidity segments"],
+            ["Remine lab", "Corpus-wide competition-bias screen; read-only"],
+            ["REM ranking", "Subpopulation Risk Elevation Multiplier (gates REM≥1.5, χ²≥4)"],
+            ["PGx", "Always-on CPIC/PharmGKB screen (actionable or clean)"],
+            ["PrOACT / BRAT", "Benefit vs severe AE balance + eight PrOACT-URL dimensions"],
+            ["Inspection / COU", "SLA overdue + Context of Use credibility scorecard"],
+            ["Lot / longitudinal", "Shown only when lot cues or biologic/ATMP/late-signal"],
             ["DDI / Pregnancy", "Polypharmacy co-mentions · teratogen / congenital cohort"],
             ["SMQ / Class / Vaccine / Geo / vs FAERS", "Syndrome, ATC class, AESI, clusters, FDA divergence"],
-            ["SAR / E2B / CIOMS", "Demo export templates — not validated submissions"],
             ["Project keywords", "Intent vocabulary for Pathfinder + literature narrowing"],
         ],
     )
@@ -290,9 +300,26 @@ def build():
             ["EB05 / IC025", "Bayesian lower bounds (MGPS / BCPNN flavored)"],
             ["SDR", "Composite signal of disproportionate reporting"],
             ["STRONG", "PRR≥2, χ²≥4, count≥3"],
+            ["REM", "P(AE|Drug∩Subpop) / P(AE|Drug∩General); keep if REM≥1.5 & χ²≥4"],
             ["Remine outcomes", "unmasked · co_reported · vanished · attenuated · amplified · stable"],
+            ["NNT / NNH", "Illustrative benefit / report-derived harm proxy in PrOACT"],
         ],
     )
+
+    _h(doc, "9b. When output looks empty (not always a bug)")
+    _p(
+        doc,
+        "Full teaching scripts: markdown handbook §19. Short version for demos:",
+    )
+    for line in [
+        "REM empty + n_exposed shown: gates held (tiny n / high baseline) — try paracetamol → Hepatic injury.",
+        "Lot / longitudinal missing: correctly not relevant (no lot cues / not biologic-ATMP).",
+        "PGx “no Level-A match”: clean screen (e.g. apixaban → haemorrhage).",
+        "Triangulation INSUFFICIENT: social loud, regulatory thin — teaching point.",
+        "Red error / endless spinner / 404 on /api/inspection: deploy or wake API — real failure.",
+        "Detect Novel chip ≠ PrOACT — open Signal Detail for the PrOACT-URL / BRAT badge.",
+    ]:
+        _p(doc, "• " + line, space_after=2)
 
     # --- 9 ---
     _h(doc, "10. Project keywords — why they matter")
@@ -337,14 +364,16 @@ def build():
         ["You want…", "Search / say", "Go to"],
         [
             ["Main signal table", "Detect, SDR, PRR", "/signals"],
-            ["Plain-English briefing", "briefing", "Signal Detail"],
+            ["GVP Register", "Register, PBRER", "/signals?tab=register"],
+            ["Conclusions / PrOACT", "Conclusions, PrOACT", "Signal Detail"],
+            ["Label novel vs in-label", "label filter, Novel", "Signal Detail hero"],
+            ["PGx", "CPIC, PharmGKB", "Signal Detail"],
+            ["Inspection / COU", "SLA, credibility", "/dashboard?tab=governance"],
+            ["REM ranking", "REM, risk populations", "/lenses?tab=risk"],
             ["Competition bias", "Remine, masking", "/lenses?tab=remine"],
-            ["High-risk segments", "risk populations", "/lenses?tab=risk"],
-            ["Drug interactions", "DDI", "/lenses?tab=ddi"],
-            ["Pregnancy", "pregnancy, congenital", "/lenses?tab=pregnancy"],
+            ["Empty REM explanation", "§19 empty result", "Handbook §19"],
             ["Demo data", "PV demo pack", "/sources"],
-            ["Narrow Pathfinder", "keywords, project", "/projects"],
-            ["Export ICSR", "E2B, CIOMS, SAR", "Signal Detail"],
+            ["Export ICSR", "E2B, CIOMS, SAR, PBRER", "Detail / Register"],
         ],
     )
 
@@ -353,13 +382,14 @@ def build():
     _p(
         doc,
         "Prototype; synthetic data is fictional; openFDA = US FAERS/MAUDE (plus other open feeds "
-        "as wired); MedDRA coding is an open surrogate (not licensed MedDRA); E2B/CIOMS/SAR are "
-        "demo templates (not validated submissions); not for clinical use.",
+        "as wired); MedDRA coding is an open surrogate (not licensed MedDRA); E2B/CIOMS/SAR/PBRER "
+        "are demo templates; PGx and PrOACT NNT/NNH are teaching surrogates; COU “Not validated for” "
+        "items are permanent scope boundaries; not for clinical use.",
     )
 
     _p(
         doc,
-        "Full diagrams & continuous updates: docs/VIGILAI_APPLICATION_HANDBOOK.md",
+        "Full diagrams, metrics, data-source cheat sheet & empty-result scripts: docs/VIGILAI_APPLICATION_HANDBOOK.md",
         size=9, color=MUTED, space_after=0,
     )
 
