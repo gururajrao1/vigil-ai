@@ -325,10 +325,10 @@ def build():
     _h(doc, "10. Project keywords — why they matter")
     _p(
         doc,
-        "On Projects → Create workspace, comma-separated keywords are stored on the project. "
-        "They are the intent vocabulary VigilAI uses for swift retrieval: Pathfinder builds "
-        "“patient forums discussing {keywords}…” and literature crawls narrow the same way. "
-        "Use 3–8 terms mixing product/class, event, and community language. After saving, "
+        "Three layers: (A) Projects → keywords drive Pathfinder + literature retrieval; "
+        "(B) the same product/event strings type as-is into Detect, Remine, Risk, Graph; "
+        "(C) ontology resolves brand↔generic↔chemical on Signal Detail / API. "
+        "Use 3–8 project terms mixing product/class, event, and community language. After saving, "
         "activate the project → Source Discovery → Run Pathfinder → Approve → Fetch.",
     )
 
