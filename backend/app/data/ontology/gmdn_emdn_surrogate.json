@@ -1,0 +1,134 @@
+{
+  "ontology_version": "2026.08-surrogate.1",
+  "is_surrogate": true,
+  "note": "GMDN codes mirror the surrogate already in app/nlp/devices.py; EMDN codes, EU MDR risk classes, and SaMD flags are authored surrogates.",
+  "devices": {
+    "insulin pump": {
+      "gmdn_code": "GMDN-47017", "gmdn_term": "Insulin infusion pump, external",
+      "fda_product_code": "LZG", "emdn_code": "EMDN-Z12040101", "emdn_term": "Portable insulin infusion pumps",
+      "fda_class": "II", "eu_mdr_class": "IIb", "is_samd": false, "implantable": false
+    },
+    "continuous glucose monitor": {
+      "gmdn_code": "GMDN-56663", "gmdn_term": "Continuous glucose monitoring system",
+      "fda_product_code": "QBJ", "emdn_code": "EMDN-Z12050201", "emdn_term": "Continuous interstitial glucose monitoring systems",
+      "fda_class": "II", "eu_mdr_class": "IIb", "is_samd": false, "implantable": false
+    },
+    "blood glucose meter": {
+      "gmdn_code": "GMDN-35271", "gmdn_term": "Blood glucose meter, portable",
+      "fda_product_code": "NBW", "emdn_code": "EMDN-W0105", "emdn_term": "In vitro diagnostic glucose measuring instruments",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": false, "implantable": false
+    },
+    "pacemaker": {
+      "gmdn_code": "GMDN-35141", "gmdn_term": "Implantable cardiac pacemaker, dual-chamber",
+      "fda_product_code": "DXY", "emdn_code": "EMDN-J0101", "emdn_term": "Implantable cardiac pacemakers",
+      "fda_class": "III", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "implantable cardioverter defibrillator": {
+      "gmdn_code": "GMDN-35304", "gmdn_term": "Implantable cardioverter defibrillator",
+      "fda_product_code": "LWS", "emdn_code": "EMDN-J0102", "emdn_term": "Implantable cardioverter defibrillators",
+      "fda_class": "III", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "hip implant": {
+      "gmdn_code": "GMDN-41768", "gmdn_term": "Hip joint prosthesis, total",
+      "fda_product_code": "JDI", "emdn_code": "EMDN-P090101", "emdn_term": "Total hip joint prostheses",
+      "fda_class": "III", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "knee implant": {
+      "gmdn_code": "GMDN-38504", "gmdn_term": "Knee joint prosthesis, total",
+      "fda_product_code": "JWH", "emdn_code": "EMDN-P090201", "emdn_term": "Total knee joint prostheses",
+      "fda_class": "II", "eu_mdr_class": "IIb", "is_samd": false, "implantable": true
+    },
+    "coronary stent": {
+      "gmdn_code": "GMDN-35928", "gmdn_term": "Coronary artery stent, drug-eluting",
+      "fda_product_code": "NIQ", "emdn_code": "EMDN-C0104", "emdn_term": "Coronary vascular stents",
+      "fda_class": "III", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "infusion pump": {
+      "gmdn_code": "GMDN-13217", "gmdn_term": "Infusion pump, volumetric, general-purpose",
+      "fda_product_code": "FRN", "emdn_code": "EMDN-Z12040201", "emdn_term": "Volumetric infusion pumps",
+      "fda_class": "II", "eu_mdr_class": "IIb", "is_samd": false, "implantable": false
+    },
+    "ventilator": {
+      "gmdn_code": "GMDN-34832", "gmdn_term": "Ventilator, intensive care",
+      "fda_product_code": "CBK", "emdn_code": "EMDN-Z1101", "emdn_term": "Lung ventilators",
+      "fda_class": "II", "eu_mdr_class": "IIb", "is_samd": false, "implantable": false
+    },
+    "cpap machine": {
+      "gmdn_code": "GMDN-45816", "gmdn_term": "Continuous positive airway pressure unit, home-use",
+      "fda_product_code": "BZD", "emdn_code": "EMDN-Z110301", "emdn_term": "CPAP and bilevel positive airway pressure units",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": false, "implantable": false
+    },
+    "surgical mesh": {
+      "gmdn_code": "GMDN-43843", "gmdn_term": "Surgical mesh, non-absorbable",
+      "fda_product_code": "FTL", "emdn_code": "EMDN-H0301", "emdn_term": "Surgical meshes and patches",
+      "fda_class": "II", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "breast implant": {
+      "gmdn_code": "GMDN-35211", "gmdn_term": "Breast implant, silicone-gel-filled",
+      "fda_product_code": "FTR", "emdn_code": "EMDN-P1201", "emdn_term": "Breast prostheses, implantable",
+      "fda_class": "III", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "intrauterine device": {
+      "gmdn_code": "GMDN-33645", "gmdn_term": "Intrauterine contraceptive device, hormone-releasing",
+      "fda_product_code": "HMB", "emdn_code": "EMDN-G0401", "emdn_term": "Intrauterine contraceptive devices",
+      "fda_class": "II", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "catheter": {
+      "gmdn_code": "GMDN-47569", "gmdn_term": "Catheter, indwelling, general-purpose",
+      "fda_product_code": "OZP", "emdn_code": "EMDN-C0203", "emdn_term": "Vascular and urinary catheters",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": false, "implantable": false
+    },
+    "dialysis machine": {
+      "gmdn_code": "GMDN-11218", "gmdn_term": "Haemodialysis system",
+      "fda_product_code": "FKR", "emdn_code": "EMDN-R0101", "emdn_term": "Haemodialysis equipment",
+      "fda_class": "II", "eu_mdr_class": "IIb", "is_samd": false, "implantable": false
+    },
+    "cochlear implant": {
+      "gmdn_code": "GMDN-36067", "gmdn_term": "Cochlear implant system",
+      "fda_product_code": "MCM", "emdn_code": "EMDN-J0401", "emdn_term": "Cochlear implants",
+      "fda_class": "III", "eu_mdr_class": "III", "is_samd": false, "implantable": true
+    },
+    "insulin pen": {
+      "gmdn_code": "GMDN-45604", "gmdn_term": "Insulin injection pen, reusable",
+      "fda_product_code": "NSD", "emdn_code": "EMDN-Z1206", "emdn_term": "Injection pens and accessories",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": false, "implantable": false
+    },
+    "endoscope": {
+      "gmdn_code": "GMDN-35259", "gmdn_term": "Flexible video endoscope",
+      "fda_product_code": "NGB", "emdn_code": "EMDN-K0101", "emdn_term": "Flexible endoscopes",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": false, "implantable": false
+    }
+  },
+  "software_as_medical_device": {
+    "closed-loop algorithm": {
+      "gmdn_code": "GMDN-64432", "gmdn_term": "Automated insulin dosing application software",
+      "fda_product_code": "QFG", "emdn_code": "EMDN-Z1299", "emdn_term": "Medical device software, therapy management",
+      "fda_class": "II", "eu_mdr_class": "IIb", "is_samd": true, "implantable": false,
+      "aliases": ["closed loop algorithm", "hybrid closed loop", "automated insulin dosing", "aid algorithm"]
+    },
+    "glucose prediction algorithm": {
+      "gmdn_code": "GMDN-64431", "gmdn_term": "Glucose trend prediction application software",
+      "fda_product_code": "QDL", "emdn_code": "EMDN-Z1298", "emdn_term": "Medical device software, monitoring",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": true, "implantable": false,
+      "aliases": ["glucose prediction app", "predictive low glucose suspend", "plgs"]
+    },
+    "clinical decision support software": {
+      "gmdn_code": "GMDN-63000", "gmdn_term": "Clinical decision support application software",
+      "fda_product_code": "QKQ", "emdn_code": "EMDN-Z1297", "emdn_term": "Medical device software, decision support",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": true, "implantable": false,
+      "aliases": ["cdss", "decision support software", "clinical decision support"]
+    },
+    "radiology ai software": {
+      "gmdn_code": "GMDN-65001", "gmdn_term": "Radiological image analysis application software, AI-based",
+      "fda_product_code": "QIH", "emdn_code": "EMDN-Z1296", "emdn_term": "Medical device software, image analysis",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": true, "implantable": false,
+      "aliases": ["radiology ai", "ai triage software", "ai diagnostic software", "imaging ai"]
+    },
+    "mobile medical app": {
+      "gmdn_code": "GMDN-64990", "gmdn_term": "Mobile medical application software",
+      "fda_product_code": "PZT", "emdn_code": "EMDN-Z1295", "emdn_term": "Medical device software, mobile application",
+      "fda_class": "II", "eu_mdr_class": "IIa", "is_samd": true, "implantable": false,
+      "aliases": ["health app", "medical app", "smartphone medical app"]
+    }
+  }
+}

@@ -18,7 +18,7 @@ VigilAI uses **three related vocabularies**. Do not mix them up:
 |-------|---------|--------------------------------|
 | **A. Project keywords** | Enhanced **data retrieval** — Pathfinder finds forums; literature crawls narrow PubMed-style queries | **Projects → keywords** (comma-separated), then activate project + Run Pathfinder |
 | **B. Search / jump strings** | Find what’s **already in the corpus** | Detect search, Remine search, ⌘K / Ctrl+K, Risk product/AE boxes, Graph filters |
-| **C. Ontology terms** | Same product under many names (brand ↔ generic ↔ chemical) | Type a brand or INN on Signal Detail (auto panel) or Predictive intel / API `ontology/resolve` |
+| **C. Ontology terms** | Same product under many names **and** full coding (MedDRA 5-tier, ATC/ChEBI, GMDN/EMDN) | Signal Detail ontology panels · **Lenses → Ontology** playground · API `ontology/resolve` + `ontology/engine/*` |
 
 Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the **Projects → keywords** field (layer A). Demo product names in layer B work as typed.
 
@@ -44,6 +44,8 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Pregnancy / teratogen            | `pregnancy`, `congenital`                 | `/lenses?tab=pregnancy`                      |
 | Syndrome pools                   | `SMQ`                                     | `/lenses?tab=smq`                            |
 | ATC class read-across            | `class effects`                           | `/lenses?tab=class`                          |
+| MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/lenses?tab=ontology` + Signal Detail       |
+| Organ-class (SOC) disproportion  | `SOC alert`, `organ class`                | `/lenses?tab=ontology`                       |
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
 | Social vs FDA                    | `FAERS`, `divergence`                     | `/lenses?tab=divergence`                     |
@@ -68,6 +70,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | REM ranking with ≥1 stratum       | Risk tab: `paracetamol` + `Hepatic injury` → **Rank strata**      |
 | REM empty (teaching “gates held”) | Risk tab: `pacemaker` + `device-related adverse event`            |
 | PrOACT balance                    | Any Signal Detail near top (badge **PrOACT-URL / BRAT**)          |
+| Ontology playground               | `/lenses?tab=ontology` → map `racing heart` / `Ozempic` / `pacemaker` |
 | Inspection + COU                  | `/dashboard?tab=governance`                                       |
 
 
@@ -746,6 +749,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Remine lab**             | Screens remine-eligible pairs; case-level unmask; outcomes unmasked / co_reported / vanished / attenuated / amplified / stable | Competition bias (Pariente / Maignen / ENCePP Ch.11) | `/lenses?tab=remine`     |
 | **Risk populations / REM** | REM ranking + logistic segments by age/sex/comorbidity/region                                                                  | Proactive risk mitigation before severe harm         | `/lenses?tab=risk`       |
 | **Predictive intel**       | Feature matrix, 4-gate playground, OMOP, privacy hygiene, BioIE                                                                | Phase 1–2 ClairLabs-aligned spine                    | `/lenses?tab=intel`      |
+| **Ontology**               | MedDRA LLT→SOC tree, ATC/ChEBI/SMILES card, GMDN/EMDN/SaMD badge, SOC-level disproportionality + alerts                         | Terminology identity + organ-class signal strengthening | `/lenses?tab=ontology` · Signal Detail |
 | **DDI**                    | Co-mention pairs vs chance + clinical risk flags                                                                               | Polypharmacy AE patterns                             | `/lenses?tab=ddi`        |
 | **Pregnancy**              | Exposure + congenital / perinatal events                                                                                       | Special-population PV                                | `/lenses?tab=pregnancy`  |
 | **SMQ**                    | Pool PTs into syndrome signals                                                                                                 | Catch fragmented reporting                           | `/lenses?tab=smq`        |
@@ -779,6 +783,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | Feature             | What                                  | Where                        |
 | ------------------- | ------------------------------------- | ---------------------------- |
 | Knowledge graph     | Drug ↔ AE force graph + inspector     | `/graph`                     |
+| Ontology hetero KG  | Typed edges (ATC, ChEBI, PT→SOC, GMDN) | API `ontology/engine/knowledge-graph` |
 | Story mode          | Guided A-vs-B narrative               | `/graph?tab=story`           |
 | Glossary            | Patient slang → PT                    | `/graph` glossary tab        |
 | Casefile trajectory | Snapshots over time                   | Signal Detail                |
@@ -1068,6 +1073,45 @@ Terminology backbone follows Gómez-Pérez et al., *Ontologies in Medicinal Chem
 
 A large gap between the best single name and the pooled count means the safety picture is fragmented across naming and should be reviewed as one concept.
 
+### 10.3 Ontology mapping engine — full terminology identity
+
+§10.2 answers "is this the same product?". The **ontology mapping engine** answers the wider coding question: *given any verbatim span, what is its identity in every terminology a PV or device-vigilance reviewer works in?*
+
+| Verbatim kind | What you get back |
+| ------------- | ----------------- |
+| Event ("racing heart") | LLT → PT → HLT → HLGT → SOC, plus surrogate CUI / SNOMED-CT / OAE identifiers and optional ICD-11 |
+| Drug ("Ozempic") | Preferred ingredient, RxNorm-style ID, ATC L1–L5 ladder with labels, ChEBI ID + SMILES + formula, structural neighbours by Tanimoto |
+| Device ("pacemaker", "hybrid closed loop") | GMDN + EMDN codes, FDA product code, FDA class and EU MDR class, implantable and SaMD flags, IMDRF failure-mode code |
+
+**Where the data comes from.** Versioned JSON artifacts in `backend/app/data/ontology/` (`meddra_hierarchy_surrogate`, `atc_tree_surrogate`, `chebi_smiles_surrogate`, `gmdn_emdn_surrogate`, `umls_cui_surrogate`, plus `MANIFEST.json`). The PT/SOC layer is the same surrogate already used for stored signal coding, so the hierarchy can never disagree with what Detect saved. Every response carries `audit.ontology_version`, `audit.is_surrogate: true`, the raw verbatim, and the surrogate disclaimer. Identifiers use explicit prefixes (`CUI-SUR-`, `MEDDRA_SUR:`, `SNOMED_SUR:`, `OAE_SUR:`, `RXNORM:VIG-`) so nothing can be mistaken for a licensed code.
+
+**Where to find it in the app**
+
+| Surface | What it shows |
+| ------- | ------------- |
+| **Signal Detail → Ontology engine** card | Device taxonomy badge (device signals), chemical identity card with the ATC ladder and SMILES (drug signals), and the MedDRA hierarchy tree for the event |
+| **Lenses → Ontology** | Organ-class (SOC) disproportionality table + alerts, and a terminology playground where you can type any verbatim and see how it codes |
+| **API** | `GET /api/ontology/engine/map` · `meddra-chain` · `hierarchy` · `drug-chemical` · `device` · `disproportionality` · `knowledge-graph` · `status` |
+| **FastMCP** | `map_verbatim_to_full_ontology(verbatim_term, entity_type, failure_mode)` in `app.mcp.risk_server` — returns the same JSON for external AI assistants |
+
+**SOC-level disproportionality.** `analytics/ontological_disproportionality.py` runs the existing PRR / ROR / χ² / EBGM / IC helpers twice: once keyed on the Preferred Term, once with member PTs pooled into their System Organ Class. A `soc_alerts` entry means the organ class cleared SDR gates while no individual PT did — a diffuse class pattern that is easy to dismiss as sparse noise at PT level. It is an overlay for review, not a replacement for the Detect signal table and never auto-escalates.
+
+**Typed knowledge graph.** `graph/knowledge_graph.py` builds a NetworkX heterogeneous graph whose nodes carry an ontology namespace (drug, ATC, ChEBI, MedDRA PT, SOC, device, IMDRF) and whose edges carry a relation: `HAS_ATC_CLASS`, `BELONGS_TO`, `HAS_CHEMICAL_STRUCTURE`, `CAUSES_EVENT`, `MAPPED_TO`. PyTorch Geometric export is attempted only if `torch_geometric` happens to be installed. The older co-occurrence graph in `analytics/knowledge_graph.py` is unchanged and still powers the existing force-directed view.
+
+**If the output looks empty or thin — it is usually data, not a fault**
+
+| What you see | Why | What to do |
+| ------------ | --- | ---------- |
+| Event shows "unmatched", no PT | The verbatim is outside the ~58 demo chains. The engine deliberately refuses to invent a Preferred Term | Use the playground with a closer clinical wording, or extend `meddra_hierarchy_surrogate.json` |
+| Chemical card missing / no SMILES | The ingredient is not in the curated ChEBI demo subset, or it is a biologic (semaglutide, insulin, adalimumab have no small-molecule SMILES) | Expected — structural similarity does not apply to macromolecules |
+| "Structural neighbours" empty | Fewer than two molecules in the ATC cohort have SMILES above the 0.15 similarity floor | Not an error; the subset is a teaching slice, not all of ChEBI |
+| No SOC alerts | Every disproportionate pattern is already visible at PT level, which is the healthy case | Read the PT table in Detect as usual |
+| SOC table empty | No AE-coded signals in the active workspace | Run Ingest → Detect, or load a demo pack |
+| Device badge missing | The product is coded as a drug, or the device name is outside the 19 canonical categories + 5 SaMD categories | Check `product_type` on the signal, or extend `gmdn_emdn_surrogate.json` |
+| Tanimoto method says `smiles_ngram_surrogate` | RDKit is not installed, so the engine used the deterministic SMILES n-gram fallback | Fine for ranking demos; install RDKit for true ECFP4 fingerprints |
+
+**Not bundled:** licensed MedDRA ASCII, the full UMLS Metathesaurus, SNOMED-CT distributions, and commercial GMDN/EMDN dumps. Everything above is an authored open surrogate, not for regulatory submission.
+
 ---
 
 
@@ -1163,7 +1207,9 @@ These look up **what is already ingested**. Same strings often appear in project
 
 **Say:** "Keywords find *more* data. Search finds *existing* data. Ontology makes *different names* count as the same product."
 
-**Not bundled:** licensed MedDRA, live UMLS, SNOMED-CT as a full distribution — VigilAI uses open surrogates (see §10.2).
+**Layer C+ — full ontology mapping engine.** Where the product ontology pools names, the mapping engine (§10.3) codes them. Type any verbatim into **Lenses → Ontology → Terminology playground**, or call `GET /api/ontology/engine/map?verbatim=…&entity_type=auto`, to get the MedDRA 5-tier chain, the ATC ladder with ChEBI/SMILES, or the GMDN/EMDN device taxonomy — whichever applies. The same coded terms (Preferred Term, SOC, ATC code, GMDN code) can be pasted back into Detect / Remine search as-is, which is the fastest way to pull every post that shares a class or organ system rather than a spelling.
+
+**Not bundled:** licensed MedDRA, live UMLS, SNOMED-CT as a full distribution — VigilAI uses open surrogates (see §10.2, §10.3).
 
 ### 11.4 One pack, three uses (example)
 
@@ -1454,10 +1500,12 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 | **CRS / ICANS**     | Cytokine release syndrome / immune effector cell–associated neurotoxicity                                 |
 | **DMA**             | Disproportionality analysis methods                                                                       |
 | **EBGM / EB05**     | Empirical Bayes geometric mean; 5% lower bound                                                            |
+| **EMDN**            | European Medical Device Nomenclature (surrogate codes in VigilAI)                                         |
 | **GMDN**            | Global Medical Device Nomenclature                                                                        |
 | **GVP**             | Good Pharmacovigilance Practices (EU)                                                                     |
 | **ICSR**            | Individual Case Safety Report                                                                             |
 | **IMDRF**           | International Medical Device Regulators Forum terms                                                       |
+| **LLT**             | Lowest Level Term (MedDRA patient-language synonym tier)                                                  |
 | **MAUDE**           | FDA device adverse event database                                                                         |
 | **MaxSPRT**         | Maximised sequential probability ratio test (repeated-look control)                                       |
 | **MedDRA PT/SOC**   | Preferred Term / System Organ Class                                                                       |
@@ -1468,6 +1516,7 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 | **PrOACT-URL**      | Problem, Objectives, Alternatives, Consequences, Tradeoffs, Uncertainty, Risk tolerance, Linked decisions |
 | **REM**             | Risk Elevation Multiplier (stratum vs general exposed cohort)                                             |
 | **Remine**          | Recompute DMA after removing competitor (masker) cases                                                    |
+| **SaMD**            | Software as a Medical Device                                                                              |
 | **SDR**             | Signal of Disproportionate Reporting                                                                      |
 | **SJL**             | Signal Justification Log (inspection-style audit export)                                                  |
 | **SMQ**             | Standardised MedDRA Query (syndrome pool)                                                                 |
@@ -1566,15 +1615,31 @@ Current builds SQL-paginate Register and table UIs. If Register spins for minute
 
 Healthy portfolio or all signals still inside SLA. Contrast with the `n_overdue` tile on Dashboard governance when teaching inspection risk.
 
-### 19.10 Quick recovery checklist
+### 19.10 Ontology engine looks empty
+
+
+| What you see | Usually means | What to try |
+| ------------ | ------------- | ----------- |
+| Event “unmatched”, no PT | Verbatim outside the ~58 demo MedDRA chains | Playground: `racing heart`, `nausea`, `myocarditis` |
+| Chemical card missing / no SMILES | Ingredient not in ChEBI demo subset, or biologic/macromolecule | `isotretinoin`, `ibuprofen`, `warfarin` (small molecules) |
+| Structural neighbours empty | Too few SMILES neighbours above the similarity floor | Expected on thin subsets — not a crash |
+| No SOC alerts | Every disproportion is already visible at PT level | Healthy outcome; still use the SOC table |
+| SOC / PT tables empty | No AE-coded signals in the active workspace | Ingest → Detect, or Load PV demo pack |
+| Device badge missing | Product coded as drug, or outside GMDN/EMDN surrogate set | Open a pacemaker / CGM / insulin-pump signal |
+
+Full table and API list: [§10.3](#103-ontology-mapping-engine--full-terminology-identity).
+
+### 19.11 Quick recovery checklist
 
 1. Hard-refresh the browser (Ctrl+Shift+R).
 2. Confirm API health: [https://vigil-ai-api.onrender.com/api/health](https://vigil-ai-api.onrender.com/api/health)
 3. **Data Sources → Load PV demo pack**.
 4. Clear Detect filters; retry a known pair from the keyword index.
 5. For REM: use the paracetamol / hepatic injury teaching pair.
-6. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
+6. For ontology: **Lenses → Ontology** and map `racing heart` / `Ozempic` / `pacemaker`.
+7. If panels say “API not on this backend yet”, wait for Render/Vercel to finish deploying the commit that added `/api/ontology/engine/*`.
+8. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
 
 ---
 
-*Document version aligned with GVP Modules 1–4, Signal Register, REM ranking, Signal conclusions, Inspection/COU frontiers, PGx always-on card, PrOACT visibility, lot/longitudinal relevance gating, and empty-result teaching scripts (§19). For slide-ready bullets see* `README.md`*; for deploy steps see* `DEPLOY_FREE.md`*.*
+*Document version aligned with GVP Modules 1–4, Signal Register, REM ranking, Signal conclusions, Inspection/COU frontiers, PGx always-on card, PrOACT visibility, lot/longitudinal relevance gating, the ontology mapping engine (§10.3 / Lenses → Ontology), and empty-result teaching scripts (§19). For slide-ready bullets see* `README.md`*; for deploy steps see* `DEPLOY_FREE.md`*.*

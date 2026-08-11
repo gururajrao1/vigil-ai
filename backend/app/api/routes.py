@@ -1008,6 +1008,106 @@ def ontology_compare(product: str, online: bool = False, db: Session = Depends(g
     )
 
 
+# --------------------- enterprise ontology mapping engine ------------------- #
+@router.get("/ontology/engine/map")
+def ontology_engine_map(
+    verbatim: str,
+    entity_type: str = "auto",
+    failure_mode: str = "",
+    online: bool = False,
+):
+    """Full ontology identity for one verbatim (event, drug, or device)."""
+    from ..nlp.ontology_engine import map_verbatim_to_full_ontology
+
+    mapped = map_verbatim_to_full_ontology(
+        verbatim, entity_type, online=online, failure_mode=failure_mode
+    )
+    return mapped.model_dump()
+
+
+@router.get("/ontology/engine/meddra-chain")
+def ontology_engine_meddra_chain(term: str, online: bool = False):
+    """LLT → PT → HLT → HLGT → SOC chain for an event verbatim."""
+    from ..nlp.ontology_engine import meddra_mapper
+
+    chain = meddra_mapper.map_event(term, online=online)
+    return {**chain.model_dump(), "tiers": chain.tiers()}
+
+
+@router.get("/ontology/engine/hierarchy")
+def ontology_engine_hierarchy(soc_code: str = ""):
+    """Nested SOC → HLGT → HLT → PT tree for the hierarchy playground."""
+    from ..nlp.ontology_engine import meddra_mapper
+    from ..nlp.ontology_engine.models import ONTOLOGY_VERSION, SURROGATE_DISCLAIMER
+
+    return {
+        "tree": meddra_mapper.hierarchy_snapshot(soc_code or None),
+        "ontology_version": ONTOLOGY_VERSION,
+        "disclaimer": SURROGATE_DISCLAIMER,
+    }
+
+
+@router.get("/ontology/engine/drug-chemical")
+def ontology_engine_drug_chemical(term: str, online: bool = False):
+    """Ingredient → ATC L1–L5 → ChEBI ID + SMILES (+ structural neighbours)."""
+    from ..nlp.ontology_engine import drug_chemical_mapper
+
+    return drug_chemical_mapper.map_drug(term, online=online).model_dump()
+
+
+@router.get("/ontology/engine/device")
+def ontology_engine_device(term: str, failure_mode: str = ""):
+    """GMDN + EMDN + FDA/MDR risk class + SaMD flag + IMDRF failure mode."""
+    from ..nlp.ontology_engine import device_mapper
+
+    return device_mapper.map_device(term, failure_mode).model_dump()
+
+
+@router.get("/ontology/engine/disproportionality")
+def ontology_engine_disproportionality(
+    product: str = "",
+    min_count: int = 1,
+    top_n: int = 100,
+    db: Session = Depends(get_db),
+):
+    """PT-level and SOC-level disproportionality plus organ-class alerts."""
+    from ..analytics.ontological_disproportionality import (
+        compute_ontological_disproportionality,
+    )
+    from ..projects.scope import current_project_id
+
+    return compute_ontological_disproportionality(
+        db,
+        project_id=current_project_id(),
+        product=product or None,
+        min_count=min_count,
+        top_n=top_n,
+    )
+
+
+@router.get("/ontology/engine/knowledge-graph")
+def ontology_engine_knowledge_graph(
+    product: str = "",
+    limit: int = 300,
+    db: Session = Depends(get_db),
+):
+    """Heterogeneous ontology graph (typed nodes + relations) over signals."""
+    from ..graph.knowledge_graph import build_ontology_graph
+    from ..projects.scope import current_project_id
+
+    return build_ontology_graph(
+        db, project_id=current_project_id(), product=product or None, limit=limit
+    )
+
+
+@router.get("/ontology/engine/status")
+def ontology_engine_status():
+    """Which surrogate dictionaries loaded, their versions, and coverage counts."""
+    from ..nlp.ontology_engine import engine_status
+
+    return engine_status()
+
+
 @router.post("/normalize/label-novelty")
 def normalize_label_novelty(db: Session = Depends(get_db)):
     """Recompute FDA-label novelty tiers (in_label / novel / boxed) for existing signals."""

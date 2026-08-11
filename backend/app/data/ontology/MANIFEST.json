@@ -1,0 +1,47 @@
+{
+  "artifact": "VigilAI enterprise ontology surrogate pack",
+  "ontology_version": "2026.08-surrogate.1",
+  "is_surrogate": true,
+  "files": {
+    "meddra_hierarchy_surrogate.json": {
+      "models": "MedDRA 5-tier hierarchy (LLT -> PT -> HLT -> HLGT -> SOC)",
+      "version": "2026.08-surrogate.1",
+      "licensed_original": "MedDRA (MSSO) - licensed, NOT redistributed",
+      "content": "Authored open chains over the PT/SOC surrogate already in app/nlp/meddra.py"
+    },
+    "atc_tree_surrogate.json": {
+      "models": "WHO ATC levels 1-5",
+      "version": "2026.08-surrogate.1",
+      "licensed_original": "WHO Collaborating Centre ATC/DDD Index",
+      "content": "Level labels for the ATC codes present in app/nlp/lexicons.py DRUG_ATC"
+    },
+    "chebi_smiles_surrogate.json": {
+      "models": "ChEBI chemical entity + SMILES",
+      "version": "2026.08-surrogate.1",
+      "licensed_original": "ChEBI (EBI) is open (CC-BY); this is a curated demo subset only",
+      "content": "ChEBI IDs + SMILES for common demo ingredients"
+    },
+    "gmdn_emdn_surrogate.json": {
+      "models": "GMDN + EU EMDN device nomenclature + risk class + SaMD flag",
+      "version": "2026.08-surrogate.1",
+      "licensed_original": "GMDN Agency terms and EMDN publications - NOT redistributed",
+      "content": "Authored parallel codes for the device canonicals in app/nlp/devices.py"
+    },
+    "umls_cui_surrogate.json": {
+      "models": "UMLS Metathesaurus-style concept unique identifiers",
+      "version": "2026.08-surrogate.1",
+      "licensed_original": "UMLS Metathesaurus (NLM licence) - NOT redistributed",
+      "content": "Curated anchor concepts; all other CUIs are minted deterministically at runtime"
+    }
+  },
+  "identifier_prefixes": {
+    "CUI-SUR-": "Surrogate concept unique identifier (not an NLM UMLS CUI)",
+    "MEDDRA_SUR:": "Surrogate MedDRA-style term identifier (not an MSSO code)",
+    "SNOMED_SUR:": "Surrogate SNOMED-CT-style identifier (not an SCTID)",
+    "OAE_SUR:": "Surrogate Ontology of Adverse Events identifier",
+    "RXNORM:VIG-": "Surrogate RxNorm-style ingredient identifier (real RxCUIs only arrive via the optional keyless RxNorm API)",
+    "GMDN-": "Surrogate GMDN-style device term code",
+    "EMDN-": "Surrogate EMDN-style device category code"
+  },
+  "disclaimer": "Open surrogate terminology for an offline-first prototype. Not licensed MedDRA, SNOMED-CT, UMLS, GMDN, or EMDN distribution. Not validated for regulatory submission or clinical use."
+}

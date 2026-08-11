@@ -1,0 +1,413 @@
+{
+  "ontology_version": "2026.08-surrogate.1",
+  "is_surrogate": true,
+  "note": "SOC codes/labels are identical to app/nlp/meddra.py so hierarchy roll-up agrees with stored signal coding.",
+  "chains": [
+    {
+      "pt": "Palpitations",
+      "llts": ["racing heart", "heart racing", "heart pounding", "fluttering heart", "palpitations"],
+      "hlt": "Cardiac signs and symptoms NEC",
+      "hlgt": "Cardiac disorder signs and symptoms",
+      "soc_code": "CARD"
+    },
+    {
+      "pt": "Tachycardia",
+      "llts": ["tachycardia", "fast heart rate", "rapid heartbeat", "high heart rate"],
+      "hlt": "Rate and rhythm disorders NEC",
+      "hlgt": "Cardiac arrhythmias",
+      "soc_code": "CARD"
+    },
+    {
+      "pt": "Bradycardia",
+      "llts": ["bradycardia", "slow heart rate", "low heart rate"],
+      "hlt": "Rate and rhythm disorders NEC",
+      "hlgt": "Cardiac arrhythmias",
+      "soc_code": "CARD"
+    },
+    {
+      "pt": "Arrhythmia",
+      "llts": ["arrhythmia", "irregular heartbeat", "skipped beats"],
+      "hlt": "Rate and rhythm disorders NEC",
+      "hlgt": "Cardiac arrhythmias",
+      "soc_code": "CARD"
+    },
+    {
+      "pt": "Chest pain",
+      "llts": ["chest pain", "chest tightness", "pain in chest"],
+      "hlt": "Cardiac signs and symptoms NEC",
+      "hlgt": "Cardiac disorder signs and symptoms",
+      "soc_code": "CARD"
+    },
+    {
+      "pt": "Myocarditis",
+      "llts": ["myocarditis", "heart inflammation", "inflamed heart muscle"],
+      "hlt": "Noninfectious myocarditis",
+      "hlgt": "Myocardial disorders",
+      "soc_code": "CARD"
+    },
+    {
+      "pt": "Pericarditis",
+      "llts": ["pericarditis"],
+      "hlt": "Pericardial disorders NEC",
+      "hlgt": "Pericardial disorders",
+      "soc_code": "CARD"
+    },
+    {
+      "pt": "Headache",
+      "llts": ["headache", "head pain", "head ache", "pounding head"],
+      "hlt": "Headaches NEC",
+      "hlgt": "Headaches",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Migraine",
+      "llts": ["migraine", "migraine attack", "migraines"],
+      "hlt": "Migraine headaches",
+      "hlgt": "Headaches",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Dizziness",
+      "llts": ["dizziness", "dizzy", "lightheaded", "light-headed", "woozy"],
+      "hlt": "Neurological signs and symptoms NEC",
+      "hlgt": "Neurological disorders NEC",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Syncope",
+      "llts": ["syncope", "fainting", "passed out", "blackout", "fainted"],
+      "hlt": "Loss of consciousness NEC",
+      "hlgt": "Neurological disorders NEC",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Seizure",
+      "llts": ["seizure", "seizures", "fit", "convulsions"],
+      "hlt": "Seizures and seizure disorders NEC",
+      "hlgt": "Seizures (incl subtypes)",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Somnolence",
+      "llts": ["somnolence", "drowsiness", "sleepiness", "very sleepy"],
+      "hlt": "Disturbances in consciousness NEC",
+      "hlgt": "Neurological disorders NEC",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Tremor",
+      "llts": ["tremor", "tremors", "shaking hands", "the shakes"],
+      "hlt": "Tremor (excl congenital)",
+      "hlgt": "Movement disorders (incl parkinsonism)",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Paraesthesia",
+      "llts": ["paraesthesia", "paresthesia", "tingling", "pins and needles"],
+      "hlt": "Paraesthesias and dysaesthesias",
+      "hlgt": "Neurological disorders NEC",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Guillain-Barre syndrome",
+      "llts": ["guillain-barre syndrome", "guillain barre syndrome", "gbs"],
+      "hlt": "Acute polyneuropathies",
+      "hlgt": "Peripheral neuropathies",
+      "soc_code": "NERV"
+    },
+    {
+      "pt": "Nausea",
+      "llts": ["nausea", "feeling sick", "queasy", "nauseous"],
+      "hlt": "Nausea and vomiting symptoms",
+      "hlgt": "Gastrointestinal signs and symptoms",
+      "soc_code": "GI"
+    },
+    {
+      "pt": "Vomiting",
+      "llts": ["vomiting", "throwing up", "puking", "being sick"],
+      "hlt": "Nausea and vomiting symptoms",
+      "hlgt": "Gastrointestinal signs and symptoms",
+      "soc_code": "GI"
+    },
+    {
+      "pt": "Diarrhoea",
+      "llts": ["diarrhoea", "diarrhea", "loose stools", "the runs"],
+      "hlt": "Diarrhoea (excl infective)",
+      "hlgt": "Gastrointestinal motility and defaecation conditions",
+      "soc_code": "GI"
+    },
+    {
+      "pt": "Constipation",
+      "llts": ["constipation", "cannot pass stool"],
+      "hlt": "Constipation",
+      "hlgt": "Gastrointestinal motility and defaecation conditions",
+      "soc_code": "GI"
+    },
+    {
+      "pt": "Abdominal pain",
+      "llts": ["abdominal pain", "stomach pain", "stomach ache", "tummy pain", "cramps"],
+      "hlt": "Abdominal pains",
+      "hlgt": "Gastrointestinal signs and symptoms",
+      "soc_code": "GI"
+    },
+    {
+      "pt": "Dyspepsia",
+      "llts": ["dyspepsia", "heartburn", "indigestion"],
+      "hlt": "Dyspeptic signs and symptoms",
+      "hlgt": "Gastrointestinal signs and symptoms",
+      "soc_code": "GI"
+    },
+    {
+      "pt": "Rash",
+      "llts": ["rash", "skin rash", "breakout", "red spots"],
+      "hlt": "Rashes, eruptions and exanthems NEC",
+      "hlgt": "Epidermal and dermal conditions",
+      "soc_code": "SKIN"
+    },
+    {
+      "pt": "Pruritus",
+      "llts": ["pruritus", "itching", "itchy skin", "itchiness"],
+      "hlt": "Pruritus NEC",
+      "hlgt": "Epidermal and dermal conditions",
+      "soc_code": "SKIN"
+    },
+    {
+      "pt": "Urticaria",
+      "llts": ["urticaria", "hives", "welts", "nettle rash"],
+      "hlt": "Urticarias",
+      "hlgt": "Angioedema and urticaria",
+      "soc_code": "SKIN"
+    },
+    {
+      "pt": "Alopecia",
+      "llts": ["alopecia", "hair loss", "hair falling out", "losing hair"],
+      "hlt": "Alopecias",
+      "hlgt": "Appendage conditions",
+      "soc_code": "SKIN"
+    },
+    {
+      "pt": "Photosensitivity reaction",
+      "llts": ["photosensitivity", "photosensitivity reaction", "sun sensitivity", "burns in the sun"],
+      "hlt": "Photosensitivity conditions",
+      "hlgt": "Epidermal and dermal conditions",
+      "soc_code": "SKIN"
+    },
+    {
+      "pt": "Anxiety",
+      "llts": ["anxiety", "anxious", "nervousness", "on edge"],
+      "hlt": "Anxiety symptoms",
+      "hlgt": "Anxiety disorders and symptoms",
+      "soc_code": "PSYCH"
+    },
+    {
+      "pt": "Depression",
+      "llts": ["depression", "depressed", "low mood", "depressed mood"],
+      "hlt": "Depressive disorders",
+      "hlgt": "Depressed mood disorders and disturbances",
+      "soc_code": "PSYCH"
+    },
+    {
+      "pt": "Suicidal ideation",
+      "llts": ["suicidal ideation", "suicidal thoughts", "thoughts of self harm"],
+      "hlt": "Suicidal and self-injurious behaviours NEC",
+      "hlgt": "Suicidal and self-injurious behaviours",
+      "soc_code": "PSYCH"
+    },
+    {
+      "pt": "Insomnia",
+      "llts": ["insomnia", "cannot sleep", "can't sleep", "sleeplessness"],
+      "hlt": "Disturbances in initiating and maintaining sleep",
+      "hlgt": "Sleep disorders and disturbances",
+      "soc_code": "PSYCH"
+    },
+    {
+      "pt": "Hallucination",
+      "llts": ["hallucination", "hallucinations", "hearing voices", "seeing things"],
+      "hlt": "Hallucinations NEC",
+      "hlgt": "Schizophrenia and other psychotic disorders",
+      "soc_code": "PSYCH"
+    },
+    {
+      "pt": "Dyspnoea",
+      "llts": ["dyspnoea", "dyspnea", "shortness of breath", "breathlessness", "cannot breathe"],
+      "hlt": "Breathing abnormalities",
+      "hlgt": "Respiratory disorders NEC",
+      "soc_code": "RESP"
+    },
+    {
+      "pt": "Cough",
+      "llts": ["cough", "coughing", "dry cough"],
+      "hlt": "Coughing and associated symptoms",
+      "hlgt": "Respiratory disorders NEC",
+      "soc_code": "RESP"
+    },
+    {
+      "pt": "Myalgia",
+      "llts": ["myalgia", "muscle pain", "muscle aches", "aching muscles"],
+      "hlt": "Muscle pains",
+      "hlgt": "Muscle disorders",
+      "soc_code": "MUSC"
+    },
+    {
+      "pt": "Arthralgia",
+      "llts": ["arthralgia", "joint pain", "achy joints", "sore joints"],
+      "hlt": "Joint related signs and symptoms",
+      "hlgt": "Joint disorders",
+      "soc_code": "MUSC"
+    },
+    {
+      "pt": "Muscular weakness",
+      "llts": ["muscular weakness", "muscle weakness", "weak muscles"],
+      "hlt": "Muscle weakness conditions",
+      "hlgt": "Muscle disorders",
+      "soc_code": "MUSC"
+    },
+    {
+      "pt": "Hepatic injury",
+      "llts": ["hepatic injury", "liver damage", "liver injury", "dili", "drug-induced liver injury"],
+      "hlt": "Hepatocellular damage and hepatitis NEC",
+      "hlgt": "Hepatic and hepatobiliary disorders",
+      "soc_code": "HEPB"
+    },
+    {
+      "pt": "Jaundice",
+      "llts": ["jaundice", "yellow skin", "yellow eyes"],
+      "hlt": "Cholestasis and jaundice",
+      "hlgt": "Hepatic and hepatobiliary disorders",
+      "soc_code": "HEPB"
+    },
+    {
+      "pt": "Renal impairment",
+      "llts": ["renal impairment", "kidney damage", "kidney problems"],
+      "hlt": "Renal failure and impairment",
+      "hlgt": "Renal disorders (excl nephropathies)",
+      "soc_code": "RENAL"
+    },
+    {
+      "pt": "Anaphylactic reaction",
+      "llts": ["anaphylactic reaction", "anaphylaxis", "severe allergic reaction"],
+      "hlt": "Anaphylactic and anaphylactoid responses",
+      "hlgt": "Allergic conditions",
+      "soc_code": "IMMUN"
+    },
+    {
+      "pt": "Angioedema",
+      "llts": ["angioedema", "swollen lips", "swollen face", "swollen tongue"],
+      "hlt": "Angioedemas",
+      "hlgt": "Angioedema and urticaria",
+      "soc_code": "IMMUN"
+    },
+    {
+      "pt": "Hypersensitivity",
+      "llts": ["hypersensitivity", "allergic reaction", "allergy", "allergies"],
+      "hlt": "Allergic conditions NEC",
+      "hlgt": "Allergic conditions",
+      "soc_code": "IMMUN"
+    },
+    {
+      "pt": "Fatigue",
+      "llts": ["fatigue", "tiredness", "exhaustion", "worn out", "no energy"],
+      "hlt": "Asthenic conditions",
+      "hlgt": "General system disorders NEC",
+      "soc_code": "GEN"
+    },
+    {
+      "pt": "Pyrexia",
+      "llts": ["pyrexia", "fever", "high temperature", "temperature"],
+      "hlt": "Febrile disorders",
+      "hlgt": "Body temperature conditions",
+      "soc_code": "GEN"
+    },
+    {
+      "pt": "Oedema",
+      "llts": ["oedema", "edema", "swelling", "puffiness"],
+      "hlt": "Oedema NEC",
+      "hlgt": "General system disorders NEC",
+      "soc_code": "GEN"
+    },
+    {
+      "pt": "Adverse drug reaction",
+      "llts": ["adverse drug reaction", "side effect", "side effects", "adr", "adverse reaction"],
+      "hlt": "Therapeutic and nontherapeutic effects NEC",
+      "hlgt": "General system disorders NEC",
+      "soc_code": "GEN"
+    },
+    {
+      "pt": "Thrombocytopenia",
+      "llts": ["thrombocytopenia", "low platelets", "low platelet count"],
+      "hlt": "Thrombocytopenias",
+      "hlgt": "Platelet disorders",
+      "soc_code": "BLOOD"
+    },
+    {
+      "pt": "Haemorrhage",
+      "llts": ["haemorrhage", "hemorrhage", "bleeding", "bleed"],
+      "hlt": "Haemorrhages NEC",
+      "hlgt": "Haemorrhage terms (excl laboratory terms)",
+      "soc_code": "BLOOD"
+    },
+    {
+      "pt": "Hypertension",
+      "llts": ["hypertension", "high blood pressure", "raised bp"],
+      "hlt": "Vascular hypertensive disorders NEC",
+      "hlgt": "Vascular hypertensive disorders",
+      "soc_code": "VASC"
+    },
+    {
+      "pt": "Hypotension",
+      "llts": ["hypotension", "low blood pressure", "bp dropped"],
+      "hlt": "Vascular hypotensive disorders",
+      "hlgt": "Decreased and nonspecific blood pressure disorders and shock",
+      "soc_code": "VASC"
+    },
+    {
+      "pt": "Thrombosis with thrombocytopenia",
+      "llts": ["thrombosis with thrombocytopenia", "tts", "clots with low platelets"],
+      "hlt": "Thrombotic and embolic events NEC",
+      "hlgt": "Embolism and thrombosis",
+      "soc_code": "VASC"
+    },
+    {
+      "pt": "Congenital anomaly",
+      "llts": ["congenital anomaly", "birth defect", "birth defects", "congenital malformation"],
+      "hlt": "Congenital anomalies NEC",
+      "hlgt": "Congenital disorders NEC",
+      "soc_code": "CONG"
+    },
+    {
+      "pt": "Abortion spontaneous",
+      "llts": ["abortion spontaneous", "miscarriage", "spontaneous abortion"],
+      "hlt": "Abortions spontaneous",
+      "hlgt": "Pregnancy, labour and delivery complications",
+      "soc_code": "PREG"
+    },
+    {
+      "pt": "Vision blurred",
+      "llts": ["vision blurred", "blurred vision", "blurry vision"],
+      "hlt": "Visual disorders NEC",
+      "hlgt": "Ocular sensory and visual disorders",
+      "soc_code": "EYE"
+    },
+    {
+      "pt": "Tinnitus",
+      "llts": ["tinnitus", "ringing in ears", "ear ringing"],
+      "hlt": "Inner ear signs and symptoms",
+      "hlgt": "Inner ear and VIIIth cranial nerve disorders",
+      "soc_code": "EAR"
+    },
+    {
+      "pt": "Weight increased",
+      "llts": ["weight increased", "weight gain", "gained weight"],
+      "hlt": "Appetite and general nutritional disorders NEC",
+      "hlgt": "Appetite and general nutritional disorders",
+      "soc_code": "METAB"
+    },
+    {
+      "pt": "Decreased appetite",
+      "llts": ["decreased appetite", "loss of appetite", "no appetite"],
+      "hlt": "Appetite disorders",
+      "hlgt": "Appetite and general nutritional disorders",
+      "soc_code": "METAB"
+    }
+  ]
+}

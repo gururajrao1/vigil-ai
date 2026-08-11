@@ -265,6 +265,32 @@ export const api = {
     req(`/api/ontology/expand?term=${encodeURIComponent(term)}&online=${online}`),
   ontologyCompare: (product, { online = false } = {}) =>
     req(`/api/ontology/compare?product=${encodeURIComponent(product)}&online=${online}`),
+  ontologyEngineMap: (verbatim, { entityType = 'auto', failureMode = '', online = false } = {}) =>
+    req(
+      `/api/ontology/engine/map?verbatim=${encodeURIComponent(verbatim)}`
+      + `&entity_type=${entityType}&failure_mode=${encodeURIComponent(failureMode)}&online=${online}`,
+    ),
+  ontologyEngineMeddraChain: (term, { online = false } = {}) =>
+    req(`/api/ontology/engine/meddra-chain?term=${encodeURIComponent(term)}&online=${online}`),
+  ontologyEngineHierarchy: ({ socCode = '' } = {}) =>
+    req(`/api/ontology/engine/hierarchy?soc_code=${encodeURIComponent(socCode)}`),
+  ontologyEngineDrugChemical: (term, { online = false } = {}) =>
+    req(`/api/ontology/engine/drug-chemical?term=${encodeURIComponent(term)}&online=${online}`),
+  ontologyEngineDevice: (term, { failureMode = '' } = {}) =>
+    req(
+      `/api/ontology/engine/device?term=${encodeURIComponent(term)}`
+      + `&failure_mode=${encodeURIComponent(failureMode)}`,
+    ),
+  ontologyEngineDisproportionality: ({ product = '', minCount = 1, topN = 100 } = {}) =>
+    req(
+      `/api/ontology/engine/disproportionality?product=${encodeURIComponent(product)}`
+      + `&min_count=${minCount}&top_n=${topN}`,
+    ),
+  ontologyEngineKnowledgeGraph: ({ product = '', limit = 300 } = {}) =>
+    req(
+      `/api/ontology/engine/knowledge-graph?product=${encodeURIComponent(product)}&limit=${limit}`,
+    ),
+  ontologyEngineStatus: () => req('/api/ontology/engine/status'),
   featureStoreMatrix: ({ productId, targetAe, includeExplainability = false } = {}) => {
     const q = new URLSearchParams();
     if (productId) q.set('product_id', productId);

@@ -17,6 +17,9 @@ import {
   buildPanelConclusions,
 } from '../lib/signalConclusions';
 import PGxBiomarkerBadge from '../hubs/PGxBiomarkerBadge';
+import OntologyHierarchyTree from '../hubs/OntologyHierarchyTree';
+import ChemicalStructureCard from '../hubs/ChemicalStructureCard';
+import DeviceTaxonomyBadge from '../hubs/DeviceTaxonomyBadge';
 import BenefitRiskBalanceVisualizer from '../hubs/BenefitRiskBalanceVisualizer';
 import InspectionReadinessPanel from '../hubs/InspectionReadinessPanel';
 
@@ -2351,6 +2354,21 @@ export default function SignalDetail() {
       )}
 
       {ontology && <OntologyPanel data={ontology} />}
+
+      <Card className="p-4">
+        <CardHeader
+          title="Ontology engine — coded identity of this signal"
+          subtitle="Event hierarchy, chemical identity, and device taxonomy resolved from the offline surrogate dictionaries"
+          right={<Badge value="open surrogate" className="bg-slate-700/40 text-slate-300 border-slate-600/40 text-[10px]" />}
+        />
+        <div className="mt-3 space-y-4">
+          {isDevice && (
+            <DeviceTaxonomyBadge term={sig.drug} failureMode={sig.imdrf_term || sig.symptom} />
+          )}
+          {!isDevice && <ChemicalStructureCard term={sig.drug} embedded />}
+          <OntologyHierarchyTree term={md.pt || sig.symptom} embedded />
+        </div>
+      </Card>
 
       {/* supporting posts with explainability */}
       <Card id="signal-supporting-posts" className="p-4">

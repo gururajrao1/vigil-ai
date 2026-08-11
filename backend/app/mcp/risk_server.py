@@ -97,6 +97,22 @@ def evaluate_narrative_causality_impl(
     )
 
 
+def map_verbatim_to_full_ontology_impl(
+    verbatim_term: str,
+    entity_type: str = "auto",
+    failure_mode: str = "",
+) -> dict:
+    """Offline ontology normalization for one verbatim span."""
+    from ..nlp.ontology_engine import map_verbatim_to_full_ontology
+
+    return map_verbatim_to_full_ontology(
+        verbatim_term,
+        entity_type,
+        online=False,
+        failure_mode=failure_mode,
+    ).model_dump()
+
+
 def _build_mcp():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -238,6 +254,34 @@ def _build_mcp():
             _fn(drug_id, primary_ae_pt, offline_only=True),
             ensure_ascii=False,
         )
+
+    @mcp.tool()
+    async def map_verbatim_to_full_ontology(
+        verbatim_term: str,
+        entity_type: str = "auto",
+        failure_mode: str = "",
+    ) -> str:
+        """Normalize a verbatim clinical term across the full ontology stack.
+
+        Events resolve to LLT -> PT -> HLT -> HLGT -> SOC with surrogate CUI /
+        SNOMED / OAE crosswalks; drugs to ingredient, RxNorm-style id, ATC L1-L5,
+        ChEBI ID and SMILES; devices to GMDN, EMDN, FDA/EU MDR risk class, SaMD
+        flag, and IMDRF failure mode. Fully offline.
+
+        Args:
+            verbatim_term: Raw span as reported (e.g. 'racing heart', 'Ozempic').
+            entity_type: auto | event | drug | device.
+            failure_mode: Optional device malfunction text for IMDRF coding.
+
+        Returns:
+            FullOntologyMap JSON with codes, per-tier detail, and the audit stamp.
+        """
+        out = map_verbatim_to_full_ontology_impl(
+            verbatim_term=verbatim_term,
+            entity_type=entity_type,
+            failure_mode=failure_mode,
+        )
+        return json.dumps(out, ensure_ascii=False)
 
     @mcp.tool()
     async def get_inspection_lead_time_metrics() -> str:

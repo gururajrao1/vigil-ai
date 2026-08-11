@@ -1,0 +1,29 @@
+{
+  "ontology_version": "2026.08-surrogate.1",
+  "is_surrogate": true,
+  "note": "Curated anchor concepts only. Any concept absent here gets a deterministic CUI-SUR-* minted at runtime by crosswalk.mint_cui, so identifiers stay stable across runs without shipping UMLS content.",
+  "anchors": {
+    "event:Palpitations": {"cui": "CUI-SUR-0030252", "snomed": "SNOMED_SUR:80313002", "oae": "OAE_SUR:0000363"},
+    "event:Tachycardia": {"cui": "CUI-SUR-0039231", "snomed": "SNOMED_SUR:3424008", "oae": "OAE_SUR:0000442"},
+    "event:Headache": {"cui": "CUI-SUR-0018681", "snomed": "SNOMED_SUR:25064002", "oae": "OAE_SUR:0000217"},
+    "event:Nausea": {"cui": "CUI-SUR-0027497", "snomed": "SNOMED_SUR:422587007", "oae": "OAE_SUR:0000320"},
+    "event:Vomiting": {"cui": "CUI-SUR-0042963", "snomed": "SNOMED_SUR:422400008", "oae": "OAE_SUR:0000497"},
+    "event:Rash": {"cui": "CUI-SUR-0015230", "snomed": "SNOMED_SUR:271807003", "oae": "OAE_SUR:0000391"},
+    "event:Anaphylactic reaction": {"cui": "CUI-SUR-0002792", "snomed": "SNOMED_SUR:39579001", "oae": "OAE_SUR:0000032"},
+    "event:Hepatic injury": {"cui": "CUI-SUR-0160390", "snomed": "SNOMED_SUR:197354009", "oae": "OAE_SUR:0000239"},
+    "event:Myocarditis": {"cui": "CUI-SUR-0027059", "snomed": "SNOMED_SUR:50920009", "oae": "OAE_SUR:0000312"},
+    "event:Thrombocytopenia": {"cui": "CUI-SUR-0040034", "snomed": "SNOMED_SUR:302215000", "oae": "OAE_SUR:0000459"},
+    "event:Suicidal ideation": {"cui": "CUI-SUR-0424000", "snomed": "SNOMED_SUR:6471006", "oae": "OAE_SUR:0000437"},
+    "event:Congenital anomaly": {"cui": "CUI-SUR-0000768", "snomed": "SNOMED_SUR:276654001", "oae": "OAE_SUR:0000109"},
+    "drug:paracetamol": {"cui": "CUI-SUR-0000970", "rxnorm": "RXNORM:VIG-161", "atc": "N02BE01"},
+    "drug:ibuprofen": {"cui": "CUI-SUR-0020740", "rxnorm": "RXNORM:VIG-5640", "atc": "M01AE01"},
+    "drug:warfarin": {"cui": "CUI-SUR-0043031", "rxnorm": "RXNORM:VIG-11289", "atc": "B01AA03"},
+    "drug:metformin": {"cui": "CUI-SUR-0025598", "rxnorm": "RXNORM:VIG-6809", "atc": "A10BA02"},
+    "drug:isotretinoin": {"cui": "CUI-SUR-0022265", "rxnorm": "RXNORM:VIG-6064", "atc": "D10BA01"},
+    "drug:semaglutide": {"cui": "CUI-SUR-4517574", "rxnorm": "RXNORM:VIG-1991302", "atc": "A10BJ06"},
+    "device:pacemaker": {"cui": "CUI-SUR-0030163", "gmdn": "GMDN-35141", "emdn": "EMDN-J0101"},
+    "device:insulin pump": {"cui": "CUI-SUR-0021600", "gmdn": "GMDN-47017", "emdn": "EMDN-Z12040101"},
+    "device:continuous glucose monitor": {"cui": "CUI-SUR-3899391", "gmdn": "GMDN-56663", "emdn": "EMDN-Z12050201"},
+    "device:coronary stent": {"cui": "CUI-SUR-0038257", "gmdn": "GMDN-35928", "emdn": "EMDN-C0104"}
+  }
+}
