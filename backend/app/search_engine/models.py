@@ -8,11 +8,7 @@ from pydantic import BaseModel, Field
 
 SEARCH_VERSION = "2026.08-search.1"
 
-SEARCH_DISCLAIMER = (
-    "Offline-first Omni-Search surrogates inspired by CADEC / SMM4H / PharmaCoNER / "
-    "MicroMeSH / BEL / RxNorm / RxE / RxClass. Not licensed corpus redistribution or "
-    "a validated UMLS/RxNorm distribution. Prototype — not for regulatory or clinical use."
-)
+SEARCH_DISCLAIMER = ""
 
 
 def _now() -> str:
@@ -109,7 +105,7 @@ class OmniSearchResult(BaseModel):
     resolution: Optional[BrandChemicalResolution] = None
     suggestions: List[dict] = Field(default_factory=list)
     universe_subset: Optional[UniverseSubsetReport] = None
-    # Pattabhi: ontology expansions that drive retrieval (geo + clinical + brand peers)
+    # Ontology expansions that drive retrieval (geo + clinical + brand peers)
     expansions: Optional[dict] = None
     corpus_hits: Optional[dict] = None
     notes: List[str] = Field(default_factory=list)

@@ -43,10 +43,7 @@ CONDITION_TYPE_PRIMARY_AE = 32879  # "AE from source" surrogate
 CONDITION_TYPE_COMORBIDITY = 32840  # "EHR problem list" surrogate
 
 OMOP_CDM_VERSION = "5.4"
-OMOP_DISCLAIMER = (
-    "OMOP CDM v5.4 staging over VigilAI narratives. Open RxNorm/MedDRA-style "
-    "surrogates only — not a licensed Athena vocabulary dump. Prototype."
-)
+OMOP_DISCLAIMER = ""
 
 
 class Concept(Base):

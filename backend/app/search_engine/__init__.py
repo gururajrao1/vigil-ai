@@ -94,12 +94,16 @@ def omni_search(
 
     analytics: Optional[UniverseSubsetReport] = None
     if include_analytics and db is not None and resolution.matched:
-        analytics = omop_analytics.compute_universe_vs_subset(
-            db,
-            resolution,
-            subset_brands=subset_brands,
-            project_id=project_id,
-        )
+        try:
+            analytics = omop_analytics.compute_universe_vs_subset(
+                db,
+                resolution,
+                subset_brands=subset_brands,
+                project_id=project_id,
+            )
+        except Exception as exc:  # noqa: BLE001 — OMOP tables may be absent on older DBs
+            db.rollback()
+            notes.append(f"Universe vs Subset analytics unavailable: {exc}")
     elif include_analytics and db is None:
         notes.append("Analytics skipped — no DB session (resolution-only mode).")
 
@@ -114,7 +118,7 @@ def omni_search(
             "ingredient mapping is retained for historical surveillance."
         )
 
-    # Pattabhi: expand geo (Chennai≡Madras) + clinical synonyms + brand peers,
+    # Expand geo (Chennai≡Madras) + clinical synonyms + brand peers,
     # then retrieve corpus posts/signals matching ANY expanded term.
     expansions = None
     corpus_hits = None

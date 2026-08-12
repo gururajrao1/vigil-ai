@@ -166,6 +166,6 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
       { id: 'recompute', label: 'Recompute pairs', kind: 'recompute', payload: {} },
     ],
     disclaimer:
-      'Prototype. Synthetic data may be fictional. openFDA = US FAERS/MAUDE only. MedDRA coding is an open surrogate. Comparative cells are local reference surrogates — never live VigiBase/Sentinel. Not for clinical use.',
+      'Prototype. Synthetic data may be fictional. openFDA = US FAERS/MAUDE only. MedDRA coding is an open surrogate. Comparative cells are local reference surrogates — never live VigiBase/Sentinel.',
   };
 }

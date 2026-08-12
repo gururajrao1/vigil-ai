@@ -93,7 +93,7 @@ export default function CausalityAssessmentPanel({ causality, whoUmc, whoFactors
 
       <p className="mt-3 text-[10px] text-slate-500 leading-relaxed">
         {causality?.disclaimer
-          || 'AI-assisted draft — QPPV/Medical Reviewer validation required. Not for clinical use.'}
+          || 'AI-assisted draft — QPPV/Medical Reviewer validation required.'}
       </p>
     </Card>
   );

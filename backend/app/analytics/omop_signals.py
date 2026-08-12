@@ -97,11 +97,14 @@ def _normalize_rxcui_query(rxcui: str, db: Session) -> Tuple[str, Optional[objec
             canonical = f"RXNORM:{concept.rxcui}" if not str(concept.rxcui).upper().startswith("RX") else str(concept.rxcui)
 
     # CONCEPT vocabulary matches
-    for c in find_drug_concepts_for_rxcui(db, raw):
-        keys.add((c.concept_code or "").lower())
-        keys.add((c.concept_name or "").lower())
-        if c.concept_id:
-            keys.add(str(c.concept_id))
+    try:
+        for c in find_drug_concepts_for_rxcui(db, raw):
+            keys.add((c.concept_code or "").lower())
+            keys.add((c.concept_name or "").lower())
+            if c.concept_id:
+                keys.add(str(c.concept_id))
+    except Exception:
+        db.rollback()
 
     return canonical, resolution if resolution.matched else None, sorted(k for k in keys if k)
 
@@ -116,55 +119,60 @@ def _omop_pairs_for_keys(
     if not keys:
         return [], 0, 0, []
 
-    concepts = (
-        db.query(Concept)
-        .filter(Concept.domain_id == "Drug")
-        .all()
-    )
-    matched_concept_ids = [
-        c.concept_id
-        for c in concepts
-        if (c.concept_code or "").lower() in keys or (c.concept_name or "").lower() in keys
-    ]
+    try:
+        concepts = (
+            db.query(Concept)
+            .filter(Concept.domain_id == "Drug")
+            .all()
+        )
+        matched_concept_ids = [
+            c.concept_id
+            for c in concepts
+            if (c.concept_code or "").lower() in keys or (c.concept_name or "").lower() in keys
+        ]
 
-    dq = db.query(DrugExposure)
-    if project_id is not None:
-        dq = dq.filter(DrugExposure.project_id == project_id)
-    exposures: List[DrugExposure] = []
-    for row in dq.all():
-        concept = (row.drug_concept_id or "").strip().lower()
-        source = (row.drug_source_value or "").strip().lower()
-        cid_int = row.drug_concept_id_int
-        if cid_int and cid_int in matched_concept_ids:
-            exposures.append(row)
-        elif concept in keys or source in keys:
-            exposures.append(row)
-        elif any(k and (k in concept or k in source) for k in keys):
-            exposures.append(row)
+        dq = db.query(DrugExposure)
+        if project_id is not None:
+            dq = dq.filter(DrugExposure.project_id == project_id)
+        exposures: List[DrugExposure] = []
+        for row in dq.all():
+            concept = (row.drug_concept_id or "").strip().lower()
+            source = (row.drug_source_value or "").strip().lower()
+            cid_int = row.drug_concept_id_int
+            if cid_int and cid_int in matched_concept_ids:
+                exposures.append(row)
+            elif concept in keys or source in keys:
+                exposures.append(row)
+            elif any(k and (k in concept or k in source) for k in keys):
+                exposures.append(row)
 
-    if not exposures:
-        return [], 0, 0, matched_concept_ids
+        if not exposures:
+            return [], 0, 0, matched_concept_ids
 
-    person_ids = {e.person_id for e in exposures}
-    cq = db.query(ConditionOccurrence).filter(
-        ConditionOccurrence.person_id.in_(person_ids),
-        ConditionOccurrence.condition_type_concept_id == CONDITION_TYPE_PRIMARY_AE,
-    )
-    if project_id is not None:
-        cq = cq.filter(ConditionOccurrence.project_id == project_id)
+        person_ids = {e.person_id for e in exposures}
+        cq = db.query(ConditionOccurrence).filter(
+            ConditionOccurrence.person_id.in_(person_ids),
+            ConditionOccurrence.condition_type_concept_id == CONDITION_TYPE_PRIMARY_AE,
+        )
+        if project_id is not None:
+            cq = cq.filter(ConditionOccurrence.project_id == project_id)
 
-    # Map person → drug surface for pair labelling
-    person_drug: Dict[int, str] = {}
-    for e in exposures:
-        person_drug[e.person_id] = (e.drug_source_value or e.drug_concept_id or "drug").strip()
+        # Map person → drug surface for pair labelling
+        person_drug: Dict[int, str] = {}
+        for e in exposures:
+            person_drug[e.person_id] = (e.drug_source_value or e.drug_concept_id or "drug").strip()
 
-    pairs: List[Tuple[str, str]] = []
-    for cond in cq.all():
-        drug = person_drug.get(cond.person_id) or "drug"
-        event = (cond.condition_source_value or cond.condition_concept_id or "").strip()
-        if event:
-            pairs.append((drug, event))
-    return pairs, len(exposures), len(person_ids), matched_concept_ids
+        pairs: List[Tuple[str, str]] = []
+        for cond in cq.all():
+            drug = person_drug.get(cond.person_id) or "drug"
+            event = (cond.condition_source_value or cond.condition_concept_id or "").strip()
+            if event:
+                pairs.append((drug, event))
+        return pairs, len(exposures), len(person_ids), matched_concept_ids
+    except Exception as exc:
+        logger.debug("OMOP pair join unavailable: %s", exc)
+        db.rollback()
+        return [], 0, 0, []
 
 
 def _signal_fallback_pairs(

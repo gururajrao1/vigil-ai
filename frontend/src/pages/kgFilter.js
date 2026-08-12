@@ -261,7 +261,7 @@ export function filterGraph(kg, { drug = '', symptom = '', condition = '', count
         top_paths: topPaths,
         filters: { drug, symptom, condition, country },
         disclaimer:
-          'Prototype briefing from social-listening extractions; PRR can inflate at small N — not for clinical or regulatory use.',
+          'Prototype briefing from social-listening extractions; PRR can inflate at small N.',
       }
     : kg.story;
 

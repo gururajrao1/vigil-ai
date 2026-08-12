@@ -194,9 +194,6 @@ export default function SignalsView({ embedded = false }) {
               </table>
             </div>
           )}
-          {omopSignals.disclaimer && (
-            <p className="mt-3 text-[11px] text-slate-600">{omopSignals.disclaimer}</p>
-          )}
         </Card>
       )}
 

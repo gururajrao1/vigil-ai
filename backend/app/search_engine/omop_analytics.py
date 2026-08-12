@@ -95,41 +95,45 @@ def _pairs_from_omop(
     if not concept_keys:
         return []
 
-    dq = db.query(OmopDrugExposure)
-    if project_id is not None:
-        dq = dq.filter(OmopDrugExposure.project_id == project_id)
-    exposures = []
-    for row in dq.all():
-        concept = (row.drug_concept_id or "").strip().lower()
-        source = (row.drug_source_value or "").strip().lower()
-        if concept in concept_keys or source in concept_keys:
-            exposures.append(row)
-        else:
-            # ATC prefix / preferred generic substring match
-            if any(k and (k in concept or k in source) for k in concept_keys):
+    try:
+        dq = db.query(OmopDrugExposure)
+        if project_id is not None:
+            dq = dq.filter(OmopDrugExposure.project_id == project_id)
+        exposures = []
+        for row in dq.all():
+            concept = (row.drug_concept_id or "").strip().lower()
+            source = (row.drug_source_value or "").strip().lower()
+            if concept in concept_keys or source in concept_keys:
                 exposures.append(row)
-    if not exposures:
+            else:
+                # ATC prefix / preferred generic substring match
+                if any(k and (k in concept or k in source) for k in concept_keys):
+                    exposures.append(row)
+        if not exposures:
+            return []
+
+        person_ids = {e.person_id for e in exposures}
+        cq = db.query(OmopConditionOccurrence).filter(
+            OmopConditionOccurrence.person_id.in_(person_ids),
+            OmopConditionOccurrence.condition_type_concept_id == CONDITION_TYPE_PRIMARY_AE,
+        )
+        if project_id is not None:
+            cq = cq.filter(OmopConditionOccurrence.project_id == project_id)
+        conditions_by_person: Dict[int, List[str]] = {}
+        for cond in cq.all():
+            pt = (cond.condition_concept_id or cond.condition_source_value or "").strip()
+            if pt:
+                conditions_by_person.setdefault(cond.person_id, []).append(pt)
+
+        pairs: List[Tuple[str, str]] = []
+        for exp in exposures:
+            label = (exp.drug_source_value or exp.drug_concept_id or "drug").strip().lower()
+            for pt in conditions_by_person.get(exp.person_id, []):
+                pairs.append((label, pt))
+        return pairs
+    except Exception:
+        db.rollback()
         return []
-
-    person_ids = {e.person_id for e in exposures}
-    cq = db.query(OmopConditionOccurrence).filter(
-        OmopConditionOccurrence.person_id.in_(person_ids),
-        OmopConditionOccurrence.condition_type_concept_id == CONDITION_TYPE_PRIMARY_AE,
-    )
-    if project_id is not None:
-        cq = cq.filter(OmopConditionOccurrence.project_id == project_id)
-    conditions_by_person: Dict[int, List[str]] = {}
-    for cond in cq.all():
-        pt = (cond.condition_concept_id or cond.condition_source_value or "").strip()
-        if pt:
-            conditions_by_person.setdefault(cond.person_id, []).append(pt)
-
-    pairs: List[Tuple[str, str]] = []
-    for exp in exposures:
-        label = (exp.drug_source_value or exp.drug_concept_id or "drug").strip().lower()
-        for pt in conditions_by_person.get(exp.person_id, []):
-            pairs.append((label, pt))
-    return pairs
 
 
 def _to_rows(stats: List[dict], scope: str) -> List[UniverseSubsetRow]:

@@ -16,7 +16,7 @@ export default function Spatial({ embedded = false }) {
   useEffect(() => { api.spatial().then(setData).catch(() => setData({ clusters: [] })); }, [tick]);
 
   useEffect(() => {
-    // Teach the Pattabhi geo pattern without pretending country names are cities.
+    // Geo alias expansion demo — country hotspots stay country-level.
     api.normalizationExpand('Chennai')
       .then(setAliasDemo)
       .catch(() => setAliasDemo(null));

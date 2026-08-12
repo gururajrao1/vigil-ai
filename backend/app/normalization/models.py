@@ -8,13 +8,7 @@ from pydantic import BaseModel, Field
 
 MCN_VERSION = "2026.08-mcn.1"
 
-MCN_DISCLAIMER = (
-    "Offline-first MCN surrogates inspired by SapBERT self-alignment, MedNorm / "
-    "BERGAMOT cross-terminology, FAISS k-NN, GeoNames municipal aliases, and "
-    "Mantra GSC / CADEC colloquial styles. Not licensed UMLS Metathesaurus, "
-    "MedDRA, SNOMED-CT, or GeoNames bulk redistribution. Prototype — not for "
-    "regulatory or clinical use."
-)
+MCN_DISCLAIMER = ""
 
 
 def _now() -> str:

@@ -66,7 +66,7 @@ export default function MCN({ embedded = false }) {
 
       <Card className="p-4 border-amber-700/25">
         <CardHeader
-          title="Why this exists (Pattabhi / RWD meet)"
+          title="Why search expansion matters"
           subtitle="Ontology is useful when it changes what you retrieve and how you count — not when it only shows a badge."
         />
         <ul className="mt-3 space-y-2 text-sm text-slate-300 list-disc pl-5">

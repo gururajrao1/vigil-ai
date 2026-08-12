@@ -71,7 +71,7 @@ export default function OmniSearch({ embedded = false }) {
       <Card className="p-4">
         <CardHeader
           title="Unified search gateway"
-          subtitle="Pattabhi pattern: Janumet → chemicals + peer brands (Universe vs Subset); Chennai → also Madras; diabetic → Diabetes mellitus cohort N."
+          subtitle="Janumet → chemicals + peer brands (Universe vs Subset); Chennai → also Madras; diabetic → Diabetes mellitus cohort N."
         />
         <div className="mt-3">
           <OmniSearchGateway onResolved={(term) => run(term)} busy={busy} />
@@ -297,9 +297,6 @@ export default function OmniSearch({ embedded = false }) {
         />
       )}
 
-      {result?.audit?.disclaimer && (
-        <p className="text-[11px] text-slate-600">{result.audit.disclaimer}</p>
-      )}
     </div>
   );
 }

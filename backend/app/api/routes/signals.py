@@ -24,6 +24,9 @@ async def get_omop_signals_by_rxcui(
     PRR/ROR disproportionality rows (Pydantic v2). Offline-first: falls back to
     the VigilAI Signal table when OMOP staging is empty.
     """
+    from ...database import init_db
+
+    init_db()
     term = (rxcui or "").strip()
     if not term:
         raise HTTPException(status_code=422, detail="rxcui is required")

@@ -1118,9 +1118,11 @@ def search_omni(
     db: Session = Depends(get_db),
 ):
     """Unified search: extract → BEL → RxE/RxNorm → ATC → Universe vs Subset."""
+    from ...database import init_db
     from ...projects.scope import current_project_id
     from ...search_engine import omni_search
 
+    init_db()
     brands = [b.strip() for b in subset.split(",") if b.strip()] or None
     return omni_search(
         q,

@@ -1051,7 +1051,7 @@ Long-term ClairLabs-aligned stack now has a working Phase 1–2 spine:
 
 **UI:** **Lenses → Predictive intel** (`/lenses?tab=intel`) — feature matrix, 4-gate playground, OMOP sync/stats, privacy hygiene preview, BioIE eval. Feature matrix defaults `include_explainability=false` for speed. Main ingest (`pipeline.ingest_posts`) always applies hygiene + HMAC author hash + 30-day content-hash dedupe.
 
-FastMCP tool: `get_normalized_feature_matrix` (same payload as the feature-store route). Offline-first; not for clinical use.
+FastMCP tool: `get_normalized_feature_matrix` (same payload as the feature-store route). Offline-first teaching surrogate.
 
 ### 10.2 Product ontology — brand ↔ generic ↔ chemical
 
@@ -1148,10 +1148,11 @@ Module 1 of the search stack. **Safety Signals → Detect** (`/signals`) runs Om
 | Universe reports = 0 | No AE-coded exposures for that chemical in the workspace | Ingest / Load PV demo / `POST /api/omop/sync` |
 | Subset empty but Universe filled | No selected brand reports (or brand not in corpus under that surface) | Tick other subset brands; search Detect for the brand |
 | Discontinued badge (Accutane) | Historical RxE status — ingredients still resolve | Expected for surveillance of legacy names |
+| HTTP 500 on Omni (with analytics) | Older DB missing OMOP staging tables / join error | Redeploy API (init_db + soft-fail analytics); retry; notes may say analytics unavailable |
 
 ### 10.5 Deep Medical Concept Normalization (MCN)
 
-Module 2 of the search / normalization stack. **Not a static city dictionary** — Pattabhi’s RWD meet framing: ontology is useful when it changes **what you retrieve** and **how you count**.
+Module 2 of the search / normalization stack. **Not a static city dictionary** — ontology is useful when it changes **what you retrieve** and **how you count**.
 
 **Terminology → MCN** (`/terminology?tab=mcn`) and **Safety Signals → Detect** Omni-Search share the same expansion:
 
@@ -1493,7 +1494,7 @@ Slower / key-gated: YouTube, X/Twitter, Reddit direct / Pullpush.
 | Audit trail         | Role actions logged                      | Prototype integrity            |
 
 
-Always show the disclaimer (§16) in customer-facing demos.
+Keep §17 scope boundaries in mind for customer-facing demos (UI no longer repeats a clinical-use footer).
 
 ---
 
@@ -1564,14 +1565,16 @@ Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgre
 
 ## 17. Disclaimers
 
-- Prototype for demonstration and architecture review.  
+Scope boundaries for demos and architecture review (UI footers no longer repeat a “not for clinical use” strip):
+
+- Prototype for demonstration and architecture review — not a substitute for a validated PV system.  
 - Synthetic / demo data is **fictional**.  
 - openFDA coverage is **US FAERS / MAUDE** (plus other open feeds as wired).  
 - MedDRA coding is an **open surrogate**, not a licensed MedDRA distribution.  
 - E2B / CIOMS / SAR / PBRER / SJL are **demo templates**, not validated submission artifacts.  
 - PGx, PrOACT NNT/NNH, and COU credibility are **teaching surrogates** — not clinical decision support or SaMD clearance.  
-- **Not for clinical use** and not a substitute for a validated PV system.  
-- COU **Not validated for** items (autonomous ICSR filing, autonomous benefit–risk determination, patient-level PGx prescribing, replacing QPPV) are **permanent scope boundaries**, not a backlog.
+- COU **Not validated for** items (autonomous ICSR filing, autonomous benefit–risk determination, patient-level PGx prescribing, replacing QPPV) are **permanent scope boundaries**, not a backlog.  
+- Product UI copy avoids personal names; account usernames on **Admin → Users** are the exception.
 
 ---
 
@@ -1728,7 +1731,8 @@ Full table and API list: [§10.3](#103-ontology-mapping-engine--full-terminology
 | No ingredients resolved | Outside RxE / brand surrogate | `Janumet`, `Eliquis`, `Coumadin` |
 | Universe reports = 0 | Thin corpus for that chemical | Load PV demo pack · sync OMOP |
 | Comparative table empty | Subset brands not present as report surfaces | Tick alternate brands; check Detect for brand spelling |
-| Tab missing in Lenses | Frontend deploy behind API | Hard-refresh; confirm Vercel prod deploy |
+| HTTP 500 (analytics on) | OMOP join / missing staging on API host | Push latest API; soft-fail returns 200 with a notes line |
+| Tab missing in Lenses | Omni lives on Detect only | Use **Safety Signals → Detect**; hard-refresh Vercel |
 
 Details: [§10.4](#104-omni-search--brand--chemical--universe-vs-subset).
 
