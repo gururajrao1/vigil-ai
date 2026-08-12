@@ -18,9 +18,14 @@ DATA_ROOT = Path(__file__).resolve().parents[1] / "data"
 
 
 def _stable_concept_id(*parts: str) -> int:
-    """Deterministic positive int in a VigilAI surrogate range (2e9+)."""
+    """Deterministic positive concept_id that fits signed 32-bit *and* BIGINT.
+
+    Historical formula ``2e9 + (h % 700e6)`` reached ~2.7e9 and overflowed
+    PostgreSQL INTEGER (max 2_147_483_647) — see NumericValueOutOfRange on
+    Janumet seed. Range here: 1_100_000_000 .. 2_099_999_999.
+    """
     digest = hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()
-    return 2_000_000_000 + (int(digest[:8], 16) % 700_000_000)
+    return 1_100_000_000 + (int(digest[:8], 16) % 1_000_000_000)
 
 
 def upsert_concept(
@@ -44,6 +49,27 @@ def upsert_concept(
     if existing:
         if concept_name and existing.concept_name != concept_name:
             existing.concept_name = concept_name[:255]
+        # Migrate pre-BIGINT hash overflows (e.g. 2535557769 for Janumet)
+        if int(existing.concept_id) > 2_147_483_647:
+            new_id = _stable_concept_id(vocabulary_id, code)
+            if db.get(Concept, new_id) is None:
+                payload = {
+                    "concept_name": existing.concept_name,
+                    "domain_id": existing.domain_id,
+                    "vocabulary_id": existing.vocabulary_id,
+                    "concept_class_id": existing.concept_class_id,
+                    "standard_concept": existing.standard_concept,
+                    "concept_code": existing.concept_code,
+                    "valid_start_date": existing.valid_start_date,
+                    "valid_end_date": existing.valid_end_date,
+                    "invalid_reason": existing.invalid_reason,
+                }
+                db.delete(existing)
+                db.flush()
+                row = Concept(concept_id=new_id, **payload)
+                db.add(row)
+                db.flush()
+                return row
         return existing
     row = Concept(
         concept_id=_stable_concept_id(vocabulary_id, code),

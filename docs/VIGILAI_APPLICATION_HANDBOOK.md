@@ -47,6 +47,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Brand → chemical Omni-Search     | `Omni-Search`, `Janumet`, `RxE`, `Universe` | `/signals` (Detect)                          |
 | Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/terminology?tab=mcn`                       |
 | OMOP SPA / signals by RxCUI      | `OMOP`, `RxCUI`, `/api/v1/signals`        | `/signals` (Detect)                          |
+| FAERS / SIDER ETL → OMOP         | `ETL`, `FAERS`, `SIDER`, `trigger_dataset_sync` | `GET /api/etl/sync/{faers\|sider\|athena_vocab}` |
 | MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/terminology?tab=ontology` + Signal Detail  |
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
@@ -757,6 +758,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Omni-Search**            | Brand→chemical + OMOP AE table via shared clinical context                                                                    | International brand harmonisation + Detect filters       | `/signals` Detect |
 | **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/terminology?tab=mcn` |
 | **OMOP SPA**               | CDM v5.4 CONCEPT/PERSON/DRUG_EXPOSURE/CONDITION_OCCURRENCE + shared clinical context from Omni-Search                          | One RxCUI drives Detect PRR/ROR without page reload      | `/signals` Detect · `GET /api/v1/signals/{rxcui}` |
+| **ETL pipeline**           | Streaming FAERS → OMOP; SIDER in-label baseline (`is_expected_baseline`); Athena-vocab surrogate seed; MCN F1 gate            | Fill staging + filter known label AEs + validate MCN     | `GET /api/etl/sync/*` · FastMCP `trigger_dataset_sync` |
 | **DDI**                    | Co-mention pairs vs chance + clinical risk flags                                                                               | Polypharmacy AE patterns                             | `/lenses?tab=ddi`        |
 | **Pregnancy**              | Exposure + congenital / perinatal events                                                                                       | Special-population PV                                | `/lenses?tab=pregnancy`  |
 | **SMQ**                    | Pool PTs into syndrome signals                                                                                                 | Catch fragmented reporting                           | `/lenses?tab=smq`        |
@@ -1201,9 +1203,31 @@ Shared clinical state + OMOP CDM v5.4 query path so Omni-Search and Detect stay 
 
 | If you see… | Why | What to do |
 | ----------- | --- | ---------- |
-| `source=signal_fallback` | OMOP staging thin | `POST /api/omop/sync` after demo pack |
-| No concepts | Seed not run | Sync OMOP or `POST /api/v1/omop/concepts/seed` |
+| `source=signal_fallback` | OMOP staging thin | `POST /api/omop/sync` after demo pack · or `GET /api/etl/sync/faers` |
+| No concepts | Seed not run | Sync OMOP / `GET /api/etl/sync/athena_vocab` |
+| `Concept seed deferred (NumericValueOutOfRange)` | Legacy INTEGER `concept_id` on Postgres | Redeploy API (BIGINT migrate) or run `backend/app/db/init_db.sql` |
 | Context empty on Register tab | Context is SPA-wide but Register does not bind it yet | Use Detect tab |
+
+### 10.7 Automated ETL — FAERS / SIDER / Athena vocab + MCN benchmark
+
+Offline-first ingestion into OMOP CDM v5.4 staging (`backend/app/etl_pipeline/`).
+
+| Dataset | What it does | API / MCP |
+| ------- | ------------ | --------- |
+| **faers** | Streams openFDA `drug/event` JSON in page batches → `person` / `drug_exposure` / `condition_occurrence` (fixture fallback) | `GET /api/etl/sync/faers?force_fixture=true` |
+| **sider** | SIDER 4.1-style TSV → `omop_drug_condition_baseline` with `is_expected_baseline=TRUE` | `GET /api/etl/sync/sider` |
+| **athena_vocab** | Re-seeds CONCEPT from RxE + MCN surrogates (BIGINT-safe IDs) | `GET /api/etl/sync/athena_vocab` |
+| **MCN gate** | Mantra/CADEC gold strict+relaxed F1; colloquial CADEC/SMM4H reported separately | `GET /api/etl/mcn-benchmark` (gate F1 > 0.85) |
+
+**Schema patch:** `concept_id` (and related OMOP concept FKs) are **BIGINT** — see `backend/app/db/init_db.sql` and `migrate_schema()`. Surrogate hashes stay ≤ 2_099_999_999 so they also fit signed INT32.
+
+**FastMCP:** `trigger_dataset_sync(dataset_name)` with `faers` \| `sider` \| `athena_vocab`.
+
+| If you see… | Why | What to do |
+| ----------- | --- | ---------- |
+| FAERS `mode=fixture` | Live openFDA unreachable | Expected offline; fixtures still populate OMOP |
+| SIDER baselines=0 | TSV missing | First sync writes `data/etl/sider_4_1_meddra_all_se_surrogate.tsv` |
+| Benchmark `pass_gate=false` | MCN catalog drift | Re-check Mantra/CADEC sample vs linker |
 
 ---
 
@@ -1758,8 +1782,18 @@ Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 6. For ontology: **Terminology → Ontology** and map `racing heart` / `Ozempic` / `pacemaker`.
 7. For Omni-Search: **Safety Signals → Detect** with `Janumet` / `ozmpic`.
 8. For MCN: **Terminology → MCN** with `hard to stay awake` + `Madras`.
-9. If panels say “API not on this backend yet”, wait for Render **and** run `vercel --prod` from `frontend/` (Git push alone may not rebuild Vercel).
-10. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
+9. For OMOP concept overflow: redeploy API (BIGINT) or `GET /api/etl/sync/athena_vocab`.
+10. If panels say “API not on this backend yet”, wait for Render **and** run `vercel --prod` from `frontend/` (Git push alone may not rebuild Vercel).
+11. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
+
+### 19.14 ETL / concept_id overflow / MCN gate
+
+| What you see | Usually means | What to try |
+| ------------ | ------------- | ----------- |
+| Yellow notes with NumericValueOutOfRange | Postgres INTEGER overflow on concept_id | Redeploy API (BIGINT migrate + reseed) |
+| Detect OMOP table empty after sync | Thin staging | `GET /api/etl/sync/faers?force_fixture=true` then retry Janumet |
+| SIDER filter empty | Baseline not loaded | `GET /api/etl/sync/sider` |
+| MCN F1 gate fail | Catalog/gold mismatch | `GET /api/etl/mcn-benchmark` · check Mantra/CADEC sample |
 
 ---
 

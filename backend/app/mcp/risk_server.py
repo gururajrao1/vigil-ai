@@ -349,6 +349,31 @@ def _build_mcp():
         return json.dumps(out, ensure_ascii=False)
 
     @mcp.tool()
+    async def trigger_dataset_sync(
+        dataset_name: str,
+        limit: int = 200,
+        force_fixture: bool = False,
+    ) -> str:
+        """Pull open-source PV data into the local OMOP PostgreSQL staging tables.
+
+        Args:
+            dataset_name: One of 'faers', 'sider', or 'athena_vocab'.
+            limit: Max FAERS events to stream (batched to avoid OOM).
+            force_fixture: Prefer offline fixtures over live openFDA.
+
+        Returns:
+            JSON with ok/mode/row counts (or error).
+        """
+        from ..etl_pipeline import trigger_dataset_sync as _sync
+
+        out = _sync(
+            dataset_name,
+            limit=limit,
+            force_fixture=force_fixture,
+        )
+        return json.dumps(out, ensure_ascii=False)
+
+    @mcp.tool()
     async def get_inspection_lead_time_metrics() -> str:
         """Return SLA compliance metrics, pending reviews, and overdue escalation alerts."""
         from ..database import SessionLocal

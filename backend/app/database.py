@@ -96,6 +96,7 @@ def migrate_schema() -> None:
 
         if not _is_sqlite:
             _widen_postgres_varchars(conn)
+            _widen_omop_concept_ids_to_bigint(conn)
             _ensure_alerts_signal_cascade(conn)
 
 
@@ -114,6 +115,40 @@ def _widen_postgres_varchars(conn) -> None:
             logger.info("migrate_schema: widened %s.%s to TEXT", table, col)
         except Exception as exc:
             logger.debug("migrate_schema widen skip %s.%s: %s", table, col, exc)
+
+
+def _widen_omop_concept_ids_to_bigint(conn) -> None:
+    """Promote OMOP concept_id columns to BIGINT (RxE / Athena overflow fix).
+
+    Mirrors ``backend/app/db/init_db.sql``. Idempotent on Postgres.
+    """
+    alters = (
+        ("omop_concept", "concept_id"),
+        ("omop_person", "gender_concept_id"),
+        ("omop_person", "race_concept_id"),
+        ("omop_person", "ethnicity_concept_id"),
+        ("omop_person", "gender_source_concept_id"),
+        ("omop_person", "race_source_concept_id"),
+        ("omop_person", "ethnicity_source_concept_id"),
+        ("omop_drug_exposure", "drug_concept_id_int"),
+        ("omop_drug_exposure", "drug_type_concept_id"),
+        ("omop_drug_exposure", "route_concept_id"),
+        ("omop_drug_exposure", "drug_source_concept_id"),
+        ("omop_condition_occurrence", "condition_concept_id_int"),
+        ("omop_condition_occurrence", "condition_type_concept_id"),
+        ("omop_condition_occurrence", "condition_status_concept_id"),
+        ("omop_condition_occurrence", "condition_source_concept_id"),
+        ("omop_drug_condition_baseline", "drug_concept_id"),
+        ("omop_drug_condition_baseline", "condition_concept_id"),
+    )
+    for table, col in alters:
+        try:
+            conn.execute(
+                text(f"ALTER TABLE {table} ALTER COLUMN {col} TYPE BIGINT")
+            )
+            logger.info("migrate_schema: %s.%s → BIGINT", table, col)
+        except Exception as exc:
+            logger.debug("migrate_schema BIGINT skip %s.%s: %s", table, col, exc)
 
 
 def _ensure_alerts_signal_cascade(conn) -> None:

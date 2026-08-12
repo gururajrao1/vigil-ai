@@ -226,7 +226,13 @@ def get_signals_for_rxcui(
                     f"({seeded.get('drug_concepts')} drug, {seeded.get('condition_concepts')} condition)."
                 )
             except Exception as exc:
-                notes.append(f"Concept seed deferred: {exc}")
+                # Never dump raw SQL / params into the Detect UI.
+                notes.append(
+                    f"Concept seed deferred ({type(exc).__name__}). "
+                    "OMOP concept_id columns may need BIGINT migration — "
+                    "redeploy API or run backend/app/db/init_db.sql."
+                )
+                logger.warning("Concept seed deferred: %s", exc)
                 db.rollback()
 
     canonical, resolution, key_list = _normalize_rxcui_query(rxcui, db)
