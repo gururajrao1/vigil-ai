@@ -39,6 +39,8 @@ const CMD_ITEMS = [
   { label: 'Safety Signals · alert inbox', icon: '🔔', path: '/signals?tab=alerts' },
   { label: 'Analytic Lenses', icon: '◈', path: '/lenses' },
   { label: 'Lenses · Predictive intel', icon: '◈', path: '/lenses?tab=intel' },
+  { label: 'Lenses · Omni-Search', icon: '🔎', path: '/lenses?tab=omni' },
+  { label: 'Lenses · Ontology', icon: '◈', path: '/lenses?tab=ontology' },
   { label: 'Lenses · SMQ', icon: '◈', path: '/lenses?tab=smq' },
   { label: 'Lenses · class effects', icon: '⚗', path: '/lenses?tab=class' },
   { label: 'Lenses · Remine lab', icon: '◎', path: '/lenses?tab=remine' },

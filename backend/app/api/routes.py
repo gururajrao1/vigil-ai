@@ -1108,6 +1108,76 @@ def ontology_engine_status():
     return engine_status()
 
 
+# --------------------- Omni-Search / brand-to-chemical gateway -------------- #
+@router.get("/search/omni")
+def search_omni(
+    q: str,
+    online: bool = False,
+    subset: str = "",
+    include_analytics: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Unified search: extract → BEL → RxE/RxNorm → ATC → Universe vs Subset."""
+    from ..projects.scope import current_project_id
+    from ..search_engine import omni_search
+
+    brands = [b.strip() for b in subset.split(",") if b.strip()] or None
+    return omni_search(
+        q,
+        db=db,
+        online=online,
+        subset_brands=brands,
+        project_id=current_project_id(),
+        include_analytics=include_analytics,
+    ).model_dump()
+
+
+@router.get("/search/resolve-brand")
+def search_resolve_brand(term: str, online: bool = False):
+    """Brand / noisy drug → UMLS CUI, ingredient RxCUIs, ATC classes."""
+    from ..search_engine import resolve_brand_to_chemical
+
+    return resolve_brand_to_chemical(term, online=online).model_dump()
+
+
+@router.get("/search/autocomplete")
+def search_autocomplete(q: str, kind: str = "drug", limit: int = 8):
+    """Fuzzy MicroMeSH-style autocomplete for the Omni-Search dropdown."""
+    from ..search_engine import autocomplete
+
+    return {"query": q, "suggestions": autocomplete(q, kind=kind, limit=limit)}
+
+
+@router.get("/search/universe-subset")
+def search_universe_subset(
+    term: str,
+    subset: str = "",
+    online: bool = False,
+    top_n: int = 40,
+    db: Session = Depends(get_db),
+):
+    """Universe (generic ingredient) vs Subset (brand) disproportionality."""
+    from ..projects.scope import current_project_id
+    from ..search_engine import omop_analytics, resolve_brand_to_chemical
+
+    resolution = resolve_brand_to_chemical(term, online=online)
+    brands = [b.strip() for b in subset.split(",") if b.strip()] or None
+    return omop_analytics.compute_universe_vs_subset(
+        db,
+        resolution,
+        subset_brands=brands,
+        project_id=current_project_id(),
+        top_n=top_n,
+    ).model_dump()
+
+
+@router.get("/search/status")
+def search_engine_status():
+    from ..search_engine import engine_status
+
+    return engine_status()
+
+
 @router.post("/normalize/label-novelty")
 def normalize_label_novelty(db: Session = Depends(get_db)):
     """Recompute FDA-label novelty tiers (in_label / novel / boxed) for existing signals."""

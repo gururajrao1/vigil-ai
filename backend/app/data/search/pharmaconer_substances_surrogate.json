@@ -1,0 +1,36 @@
+{
+  "version": "2026.08-search.1",
+  "is_surrogate": true,
+  "note": "PharmaCoNER-inspired pharmacological substance / protein / chemical surface forms for NER over noisy text.",
+  "substances": {
+    "paracetamol": {"kind": "chemical", "generic": "paracetamol"},
+    "acetaminophen": {"kind": "chemical", "generic": "paracetamol"},
+    "ibuprofen": {"kind": "chemical", "generic": "ibuprofen"},
+    "aspirin": {"kind": "chemical", "generic": "aspirin"},
+    "warfarin": {"kind": "chemical", "generic": "warfarin"},
+    "metformin": {"kind": "chemical", "generic": "metformin"},
+    "sitagliptin": {"kind": "chemical", "generic": "sitagliptin"},
+    "semaglutide": {"kind": "chemical", "generic": "semaglutide"},
+    "isotretinoin": {"kind": "chemical", "generic": "isotretinoin"},
+    "sertraline": {"kind": "chemical", "generic": "sertraline"},
+    "fluoxetine": {"kind": "chemical", "generic": "fluoxetine"},
+    "atorvastatin": {"kind": "chemical", "generic": "atorvastatin"},
+    "apixaban": {"kind": "chemical", "generic": "apixaban"},
+    "rivaroxaban": {"kind": "chemical", "generic": "rivaroxaban"},
+    "clopidogrel": {"kind": "chemical", "generic": "clopidogrel"},
+    "methotrexate": {"kind": "chemical", "generic": "methotrexate"},
+    "omeprazole": {"kind": "chemical", "generic": "omeprazole"},
+    "esomeprazole": {"kind": "chemical", "generic": "esomeprazole"},
+    "salbutamol": {"kind": "chemical", "generic": "salbutamol"},
+    "insulin": {"kind": "protein", "generic": "insulin"},
+    "adalimumab": {"kind": "protein", "generic": "adalimumab"},
+    "tnf": {"kind": "protein", "generic": "adalimumab"},
+    "glp-1": {"kind": "protein", "generic": "semaglutide"},
+    "glp1": {"kind": "protein", "generic": "semaglutide"}
+  },
+  "combo_brands": {
+    "janumet": ["sitagliptin", "metformin"],
+    "combiflam": ["ibuprofen", "paracetamol"],
+    "augmentin": ["amoxicillin", "clavulanate"]
+  }
+}

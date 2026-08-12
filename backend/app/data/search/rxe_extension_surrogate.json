@@ -1,0 +1,186 @@
+{
+  "version": "2026.08-search.1",
+  "is_surrogate": true,
+  "note": "RxNorm Extension (RxE)-style international / historical / discontinued brand → ingredient(s) + surrogate RxCUI. Has_Ingredient-style expansion for combos.",
+  "brands": {
+    "janumet": {
+      "brand_rxcui": "RXE:VIG-806423",
+      "ingredients": [
+        {"generic": "sitagliptin", "rxcui": "RXNORM:VIG-593411", "rela": "Has_Ingredient"},
+        {"generic": "metformin", "rxcui": "RXNORM:VIG-6809", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["MSD", "Merck"],
+      "status": "active",
+      "regions": ["US", "EU", "IN", "AU"]
+    },
+    "januvia": {
+      "brand_rxcui": "RXE:VIG-665038",
+      "ingredients": [
+        {"generic": "sitagliptin", "rxcui": "RXNORM:VIG-593411", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["MSD", "Merck"],
+      "status": "active",
+      "regions": ["US", "EU", "IN"]
+    },
+    "glucophage": {
+      "brand_rxcui": "RXE:VIG-861007",
+      "ingredients": [
+        {"generic": "metformin", "rxcui": "RXNORM:VIG-6809", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Merck"],
+      "status": "active",
+      "regions": ["US", "EU", "IN"]
+    },
+    "ozempic": {
+      "brand_rxcui": "RXE:VIG-1991306",
+      "ingredients": [
+        {"generic": "semaglutide", "rxcui": "RXNORM:VIG-1991302", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Novo Nordisk"],
+      "status": "active",
+      "regions": ["US", "EU", "AU"]
+    },
+    "wegovy": {
+      "brand_rxcui": "RXE:VIG-2557500",
+      "ingredients": [
+        {"generic": "semaglutide", "rxcui": "RXNORM:VIG-1991302", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Novo Nordisk"],
+      "status": "active",
+      "regions": ["US", "EU"]
+    },
+    "rybelsus": {
+      "brand_rxcui": "RXE:VIG-2200659",
+      "ingredients": [
+        {"generic": "semaglutide", "rxcui": "RXNORM:VIG-1991302", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Novo Nordisk"],
+      "status": "active",
+      "regions": ["US", "EU"]
+    },
+    "accutane": {
+      "brand_rxcui": "RXE:VIG-197113",
+      "ingredients": [
+        {"generic": "isotretinoin", "rxcui": "RXNORM:VIG-6064", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Roche"],
+      "status": "discontinued",
+      "regions": ["US", "EU"]
+    },
+    "roaccutane": {
+      "brand_rxcui": "RXE:VIG-197113-EU",
+      "ingredients": [
+        {"generic": "isotretinoin", "rxcui": "RXNORM:VIG-6064", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Roche"],
+      "status": "active",
+      "regions": ["EU", "AU", "IN"]
+    },
+    "coumadin": {
+      "brand_rxcui": "RXE:VIG-855302",
+      "ingredients": [
+        {"generic": "warfarin", "rxcui": "RXNORM:VIG-11289", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Bristol-Myers Squibb"],
+      "status": "discontinued",
+      "regions": ["US"]
+    },
+    "lipitor": {
+      "brand_rxcui": "RXE:VIG-153165",
+      "ingredients": [
+        {"generic": "atorvastatin", "rxcui": "RXNORM:VIG-83367", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Pfizer"],
+      "status": "active",
+      "regions": ["US", "EU", "IN"]
+    },
+    "eliquis": {
+      "brand_rxcui": "RXE:VIG-1364430",
+      "ingredients": [
+        {"generic": "apixaban", "rxcui": "RXNORM:VIG-1364435", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Bristol-Myers Squibb", "Pfizer"],
+      "status": "active",
+      "regions": ["US", "EU"]
+    },
+    "xarelto": {
+      "brand_rxcui": "RXE:VIG-1114195",
+      "ingredients": [
+        {"generic": "rivaroxaban", "rxcui": "RXNORM:VIG-1114198", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Janssen", "Bayer"],
+      "status": "active",
+      "regions": ["US", "EU"]
+    },
+    "plavix": {
+      "brand_rxcui": "RXE:VIG-213469",
+      "ingredients": [
+        {"generic": "clopidogrel", "rxcui": "RXNORM:VIG-32968", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Sanofi", "Bristol-Myers Squibb"],
+      "status": "active",
+      "regions": ["US", "EU", "IN"]
+    },
+    "prozac": {
+      "brand_rxcui": "RXE:VIG-227227",
+      "ingredients": [
+        {"generic": "fluoxetine", "rxcui": "RXNORM:VIG-4493", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Eli Lilly"],
+      "status": "active",
+      "regions": ["US", "EU"]
+    },
+    "zoloft": {
+      "brand_rxcui": "RXE:VIG-206239",
+      "ingredients": [
+        {"generic": "sertraline", "rxcui": "RXNORM:VIG-36437", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Pfizer"],
+      "status": "active",
+      "regions": ["US", "EU"]
+    },
+    "dolo": {
+      "brand_rxcui": "RXE:VIG-IN-PAR",
+      "ingredients": [
+        {"generic": "paracetamol", "rxcui": "RXNORM:VIG-161", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Micro Labs"],
+      "status": "active",
+      "regions": ["IN"]
+    },
+    "crocin": {
+      "brand_rxcui": "RXE:VIG-IN-PAR2",
+      "ingredients": [
+        {"generic": "paracetamol", "rxcui": "RXNORM:VIG-161", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["GSK"],
+      "status": "active",
+      "regions": ["IN"]
+    },
+    "combiflam": {
+      "brand_rxcui": "RXE:VIG-IN-COMB",
+      "ingredients": [
+        {"generic": "ibuprofen", "rxcui": "RXNORM:VIG-5640", "rela": "Has_Ingredient"},
+        {"generic": "paracetamol", "rxcui": "RXNORM:VIG-161", "rela": "Has_Ingredient"}
+      ],
+      "manufacturer_hints": ["Sanofi"],
+      "status": "active",
+      "regions": ["IN"]
+    }
+  },
+  "ingredient_brand_index": {
+    "semaglutide": ["ozempic", "wegovy", "rybelsus"],
+    "sitagliptin": ["januvia", "janumet"],
+    "metformin": ["glucophage", "janumet", "glycomet"],
+    "warfarin": ["coumadin"],
+    "isotretinoin": ["accutane", "roaccutane"],
+    "atorvastatin": ["lipitor"],
+    "apixaban": ["eliquis"],
+    "rivaroxaban": ["xarelto"],
+    "clopidogrel": ["plavix"],
+    "fluoxetine": ["prozac"],
+    "sertraline": ["zoloft"],
+    "paracetamol": ["dolo", "crocin", "tylenol", "panadol"],
+    "ibuprofen": ["advil", "motrin", "combiflam"]
+  }
+}

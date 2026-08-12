@@ -113,6 +113,13 @@ def map_verbatim_to_full_ontology_impl(
     ).model_dump()
 
 
+def resolve_brand_to_chemical_impl(query_term: str) -> dict:
+    """Offline brand → chemical / RxCUI / ATC resolution for FastMCP agents."""
+    from ..search_engine import resolve_brand_to_chemical
+
+    return resolve_brand_to_chemical(query_term, online=False).model_dump()
+
+
 def _build_mcp():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -254,6 +261,24 @@ def _build_mcp():
             _fn(drug_id, primary_ae_pt, offline_only=True),
             ensure_ascii=False,
         )
+
+    @mcp.tool()
+    async def resolve_brand_to_chemical(query_term: str) -> str:
+        """Resolve a noisy brand/drug name to chemical ingredients and ATC class.
+
+        Uses offline RxNorm Extension (RxE) surrogates plus curated brand maps.
+        Returns UMLS-style CUI, brand RxCUI, Has_Ingredient generic RxCUIs,
+        ATC classes, manufacturer hints, and related subset brands for
+        Universe vs Subset analytics.
+
+        Args:
+            query_term: Brand, typo, INN, or international name (e.g. 'Janumet').
+
+        Returns:
+            BrandChemicalResolution JSON.
+        """
+        out = resolve_brand_to_chemical_impl(query_term)
+        return json.dumps(out, ensure_ascii=False)
 
     @mcp.tool()
     async def map_verbatim_to_full_ontology(

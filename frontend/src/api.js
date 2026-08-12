@@ -291,6 +291,21 @@ export const api = {
       `/api/ontology/engine/knowledge-graph?product=${encodeURIComponent(product)}&limit=${limit}`,
     ),
   ontologyEngineStatus: () => req('/api/ontology/engine/status'),
+  searchOmni: (q, { online = false, subset = '', includeAnalytics = true } = {}) =>
+    req(
+      `/api/search/omni?q=${encodeURIComponent(q)}&online=${online}`
+      + `&subset=${encodeURIComponent(subset)}&include_analytics=${includeAnalytics}`,
+    ),
+  searchResolveBrand: (term, { online = false } = {}) =>
+    req(`/api/search/resolve-brand?term=${encodeURIComponent(term)}&online=${online}`),
+  searchAutocomplete: (q, { kind = 'drug', limit = 8 } = {}) =>
+    req(`/api/search/autocomplete?q=${encodeURIComponent(q)}&kind=${kind}&limit=${limit}`),
+  searchUniverseSubset: (term, { subset = '', online = false, topN = 40 } = {}) =>
+    req(
+      `/api/search/universe-subset?term=${encodeURIComponent(term)}`
+      + `&subset=${encodeURIComponent(subset)}&online=${online}&top_n=${topN}`,
+    ),
+  searchStatus: () => req('/api/search/status'),
   featureStoreMatrix: ({ productId, targetAe, includeExplainability = false } = {}) => {
     const q = new URLSearchParams();
     if (productId) q.set('product_id', productId);

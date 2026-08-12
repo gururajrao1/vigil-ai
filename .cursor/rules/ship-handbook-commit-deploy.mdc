@@ -1,0 +1,22 @@
+---
+description: After any new VigilAI feature is integrated, update the handbook, commit, and deploy both Render (API) and Vercel (frontend). Use whenever shipping modules, APIs, hubs, or MCP tools.
+alwaysApply: true
+---
+
+# Ship checklist — handbook + commit + deploy
+
+Whenever a **new feature is added or integrated** into VigilAI (backend module, API route, React hub/page, FastMCP tool, analytics overlay):
+
+1. **Handbook** — update `docs/VIGILAI_APPLICATION_HANDBOOK.md` in the same change set:
+   - Quick keyword index row (Ctrl+F terms + URL)
+   - Feature catalog (§8) what / why / where
+   - Dedicated how-to section (what it does, where to find it, datasets/metrics, empty-result teaching table)
+   - §19 empty-output guidance when the UI can look blank without being broken
+   - Glossary terms if new PV/device vocabulary appears
+2. **Commit** — only when the user asks to commit; include handbook + feature code together; exclude secrets, `.neon`, Office lock files (`~$…`), and unrelated CRLF-only noise.
+3. **Deploy both sides**:
+   - `git push origin main` → Render API auto-deploy
+   - From `frontend/`: `npx vercel --prod` (Git push alone often does **not** refresh Vercel)
+4. **Verify** — `/api/health`, the new API route, and that https://vigil-ai-eight.vercel.app serves the new UI strings (hard-refresh).
+
+Do not treat “pushed to main” as frontend-live until the Vercel production alias is updated.

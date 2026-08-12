@@ -1,0 +1,22 @@
+{
+  "artifact": "VigilAI Omni-Search / brand-to-chemical surrogate pack",
+  "version": "2026.08-search.1",
+  "is_surrogate": true,
+  "research_grounding": {
+    "CADEC": "CSIRO Adverse Drug Event Corpus — colloquial forum ADE spans; used here as curated surface→PT patterns (not redistributed CADEC files)",
+    "SMM4H": "Social Media Mining for Health — slang / emoji / typo calibration lexicon",
+    "PharmaCoNER": "Pharmacological NER — substance span patterns for noisy clinical/social text",
+    "MicroMeSH": "Historical synonym / abbreviation fuzzy keys for Biomedical Entity Linking",
+    "BEL": "Biomedical Entity Linking to UMLS-style CUIs (surrogate CUI-SUR-* / curated anchors)",
+    "RxNorm": "NIH RxNorm REST (keyless, optional online) for Brand→Ingredient",
+    "RxE": "RxNorm Extension-style international / discontinued brand→ingredient table (offline)",
+    "RxClass": "RxClass / ATC linkage via local ATC tree + optional RxClass API"
+  },
+  "files": [
+    "micromesh_synonyms_surrogate.json",
+    "cadec_smm4h_colloquial_surrogate.json",
+    "pharmaconer_substances_surrogate.json",
+    "rxe_extension_surrogate.json"
+  ],
+  "disclaimer": "Open teaching surrogates for an offline-first prototype. Not licensed UMLS, MedDRA, full RxNorm/RxE dumps, CADEC, SMM4H, or PharmaCoNER redistribution. Not for regulatory submission or clinical use."
+}
