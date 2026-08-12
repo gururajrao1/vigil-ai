@@ -114,6 +114,28 @@ def omni_search(
             "ingredient mapping is retained for historical surveillance."
         )
 
+    # Pattabhi: expand geo (Chennai≡Madras) + clinical synonyms + brand peers,
+    # then retrieve corpus posts/signals matching ANY expanded term.
+    expansions = None
+    corpus_hits = None
+    try:
+        from ..normalization import expand_query, search_corpus_with_expansion
+
+        expansions = expand_query(q, online=online)
+        for reason in expansions.get("why") or []:
+            notes.append(reason)
+        if db is not None:
+            corpus_hits = search_corpus_with_expansion(
+                db, q, project_id=project_id, online=online
+            )
+            if corpus_hits.get("n_posts") == 0 and corpus_hits.get("n_signals") == 0:
+                notes.append(
+                    "No corpus hits for expanded terms yet — load the PV demo pack "
+                    "or ingest narratives that mention these aliases."
+                )
+    except Exception as exc:  # noqa: BLE001 — never break Omni-Search on MCN
+        notes.append(f"Expansion overlay unavailable: {exc}")
+
     return OmniSearchResult(
         query=q,
         extracted=spans,
@@ -121,6 +143,8 @@ def omni_search(
         resolution=resolution,
         suggestions=suggestions,
         universe_subset=analytics,
+        expansions=expansions,
+        corpus_hits=corpus_hits,
         notes=notes,
         audit=audit,
     )

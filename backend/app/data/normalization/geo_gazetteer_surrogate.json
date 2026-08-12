@@ -1,37 +1,675 @@
 {
-  "version": "2026.08-mcn.1",
+  "version": "2026.08-mcn.2",
   "is_surrogate": true,
-  "note": "GeoNames-inspired municipal alias gazetteer. Coordinates are approximate city centroids for demo only.",
+  "note": "GeoNames-inspired municipal + historical aliases for SEARCH EXPANSION (Chennai≡Madras). Not a static city picker — used to expand Omni-Search / Detect corpus retrieval.",
   "places": [
-    {"canonical": "Chennai", "country": "IN", "admin1": "Tamil Nadu", "lat": 13.0827, "lon": 80.2707, "geonames_id": "GEO-SUR-1264527",
-     "aliases": ["madras", "chennai", "chennai city", "madras city"]},
-    {"canonical": "Bengaluru", "country": "IN", "admin1": "Karnataka", "lat": 12.9716, "lon": 77.5946, "geonames_id": "GEO-SUR-1277333",
-     "aliases": ["bangalore", "bengaluru", "bengalooru", "bangaluru"]},
-    {"canonical": "Mumbai", "country": "IN", "admin1": "Maharashtra", "lat": 19.0760, "lon": 72.8777, "geonames_id": "GEO-SUR-1275339",
-     "aliases": ["bombay", "mumbai", "bombay city"]},
-    {"canonical": "Kolkata", "country": "IN", "admin1": "West Bengal", "lat": 22.5726, "lon": 88.3639, "geonames_id": "GEO-SUR-1275004",
-     "aliases": ["calcutta", "kolkata", "calcuta"]},
-    {"canonical": "New Delhi", "country": "IN", "admin1": "Delhi", "lat": 28.6139, "lon": 77.2090, "geonames_id": "GEO-SUR-1261481",
-     "aliases": ["delhi", "new delhi", "newdelhi"]},
-    {"canonical": "Hyderabad", "country": "IN", "admin1": "Telangana", "lat": 17.3850, "lon": 78.4867, "geonames_id": "GEO-SUR-1269843",
-     "aliases": ["hyderabad", "hyd"]},
-    {"canonical": "Pune", "country": "IN", "admin1": "Maharashtra", "lat": 18.5204, "lon": 73.8567, "geonames_id": "GEO-SUR-1259229",
-     "aliases": ["pune", "poona"]},
-    {"canonical": "Thiruvananthapuram", "country": "IN", "admin1": "Kerala", "lat": 8.5241, "lon": 76.9366, "geonames_id": "GEO-SUR-1254163",
-     "aliases": ["trivandrum", "thiruvananthapuram", "tvm"]},
-    {"canonical": "Varanasi", "country": "IN", "admin1": "Uttar Pradesh", "lat": 25.3176, "lon": 82.9739, "geonames_id": "GEO-SUR-1253405",
-     "aliases": ["benaras", "banaras", "varanasi", "kashi"]},
-    {"canonical": "Mysuru", "country": "IN", "admin1": "Karnataka", "lat": 12.2958, "lon": 76.6394, "geonames_id": "GEO-SUR-1262327",
-     "aliases": ["mysore", "mysuru"]},
-    {"canonical": "London", "country": "GB", "admin1": "England", "lat": 51.5074, "lon": -0.1278, "geonames_id": "GEO-SUR-2643743",
-     "aliases": ["london", "greater london"]},
-    {"canonical": "New York", "country": "US", "admin1": "New York", "lat": 40.7128, "lon": -74.0060, "geonames_id": "GEO-SUR-5128581",
-     "aliases": ["new york", "nyc", "new york city", "ny"]},
-    {"canonical": "Beijing", "country": "CN", "admin1": "Beijing", "lat": 39.9042, "lon": 116.4074, "geonames_id": "GEO-SUR-1816670",
-     "aliases": ["beijing", "peking", "peiping"]},
-    {"canonical": "Ho Chi Minh City", "country": "VN", "admin1": "Ho Chi Minh", "lat": 10.8231, "lon": 106.6297, "geonames_id": "GEO-SUR-1566083",
-     "aliases": ["saigon", "ho chi minh city", "hcmc", "ho chi minh"]},
-    {"canonical": "Istanbul", "country": "TR", "admin1": "Istanbul", "lat": 41.0082, "lon": 28.9784, "geonames_id": "GEO-SUR-745044",
-     "aliases": ["istanbul", "constantinople", "byzantium"]}
+    {
+      "canonical": "Chennai",
+      "country": "IN",
+      "admin1": "Tamil Nadu",
+      "lat": 13.0827,
+      "lon": 80.2707,
+      "geonames_id": "GEO-SUR-1264527",
+      "aliases": [
+        "madras",
+        "chennai",
+        "chennai city",
+        "madras city"
+      ]
+    },
+    {
+      "canonical": "Bengaluru",
+      "country": "IN",
+      "admin1": "Karnataka",
+      "lat": 12.9716,
+      "lon": 77.5946,
+      "geonames_id": "GEO-SUR-1277333",
+      "aliases": [
+        "bangalore",
+        "bengaluru",
+        "bengalooru",
+        "bangaluru"
+      ]
+    },
+    {
+      "canonical": "Mumbai",
+      "country": "IN",
+      "admin1": "Maharashtra",
+      "lat": 19.076,
+      "lon": 72.8777,
+      "geonames_id": "GEO-SUR-1275339",
+      "aliases": [
+        "bombay",
+        "mumbai",
+        "bombay city"
+      ]
+    },
+    {
+      "canonical": "Kolkata",
+      "country": "IN",
+      "admin1": "West Bengal",
+      "lat": 22.5726,
+      "lon": 88.3639,
+      "geonames_id": "GEO-SUR-1275004",
+      "aliases": [
+        "calcutta",
+        "kolkata",
+        "calcuta"
+      ]
+    },
+    {
+      "canonical": "New Delhi",
+      "country": "IN",
+      "admin1": "Delhi",
+      "lat": 28.6139,
+      "lon": 77.209,
+      "geonames_id": "GEO-SUR-1261481",
+      "aliases": [
+        "delhi",
+        "new delhi",
+        "newdelhi"
+      ]
+    },
+    {
+      "canonical": "Hyderabad",
+      "country": "IN",
+      "admin1": "Telangana",
+      "lat": 17.385,
+      "lon": 78.4867,
+      "geonames_id": "GEO-SUR-1269843",
+      "aliases": [
+        "hyderabad",
+        "hyd"
+      ]
+    },
+    {
+      "canonical": "Pune",
+      "country": "IN",
+      "admin1": "Maharashtra",
+      "lat": 18.5204,
+      "lon": 73.8567,
+      "geonames_id": "GEO-SUR-1259229",
+      "aliases": [
+        "pune",
+        "poona"
+      ]
+    },
+    {
+      "canonical": "Thiruvananthapuram",
+      "country": "IN",
+      "admin1": "Kerala",
+      "lat": 8.5241,
+      "lon": 76.9366,
+      "geonames_id": "GEO-SUR-1254163",
+      "aliases": [
+        "trivandrum",
+        "thiruvananthapuram",
+        "tvm"
+      ]
+    },
+    {
+      "canonical": "Varanasi",
+      "country": "IN",
+      "admin1": "Uttar Pradesh",
+      "lat": 25.3176,
+      "lon": 82.9739,
+      "geonames_id": "GEO-SUR-1253405",
+      "aliases": [
+        "benaras",
+        "banaras",
+        "varanasi",
+        "kashi"
+      ]
+    },
+    {
+      "canonical": "Mysuru",
+      "country": "IN",
+      "admin1": "Karnataka",
+      "lat": 12.2958,
+      "lon": 76.6394,
+      "geonames_id": "GEO-SUR-1262327",
+      "aliases": [
+        "mysore",
+        "mysuru"
+      ]
+    },
+    {
+      "canonical": "Ahmedabad",
+      "country": "IN",
+      "admin1": "Gujarat",
+      "lat": 23.0225,
+      "lon": 72.5714,
+      "geonames_id": "GEO-SUR-1279233",
+      "aliases": [
+        "ahmedabad",
+        "amdavad"
+      ]
+    },
+    {
+      "canonical": "Kochi",
+      "country": "IN",
+      "admin1": "Kerala",
+      "lat": 9.9312,
+      "lon": 76.2673,
+      "geonames_id": "GEO-SUR-1273874",
+      "aliases": [
+        "kochi",
+        "cochin"
+      ]
+    },
+    {
+      "canonical": "Kanpur",
+      "country": "IN",
+      "admin1": "Uttar Pradesh",
+      "lat": 26.4499,
+      "lon": 80.3319,
+      "geonames_id": "GEO-SUR-1267995",
+      "aliases": [
+        "kanpur",
+        "cawnpore"
+      ]
+    },
+    {
+      "canonical": "Vadodara",
+      "country": "IN",
+      "admin1": "Gujarat",
+      "lat": 22.3072,
+      "lon": 73.1812,
+      "geonames_id": "GEO-SUR-1253573",
+      "aliases": [
+        "vadodara",
+        "baroda"
+      ]
+    },
+    {
+      "canonical": "London",
+      "country": "GB",
+      "admin1": "England",
+      "lat": 51.5074,
+      "lon": -0.1278,
+      "geonames_id": "GEO-SUR-2643743",
+      "aliases": [
+        "london",
+        "greater london"
+      ]
+    },
+    {
+      "canonical": "New York",
+      "country": "US",
+      "admin1": "New York",
+      "lat": 40.7128,
+      "lon": -74.006,
+      "geonames_id": "GEO-SUR-5128581",
+      "aliases": [
+        "new york",
+        "nyc",
+        "new york city",
+        "ny"
+      ]
+    },
+    {
+      "canonical": "Beijing",
+      "country": "CN",
+      "admin1": "Beijing",
+      "lat": 39.9042,
+      "lon": 116.4074,
+      "geonames_id": "GEO-SUR-1816670",
+      "aliases": [
+        "beijing",
+        "peking",
+        "peiping"
+      ]
+    },
+    {
+      "canonical": "Ho Chi Minh City",
+      "country": "VN",
+      "admin1": "Ho Chi Minh",
+      "lat": 10.8231,
+      "lon": 106.6297,
+      "geonames_id": "GEO-SUR-1566083",
+      "aliases": [
+        "saigon",
+        "ho chi minh city",
+        "hcmc",
+        "ho chi minh"
+      ]
+    },
+    {
+      "canonical": "Istanbul",
+      "country": "TR",
+      "admin1": "Istanbul",
+      "lat": 41.0082,
+      "lon": 28.9784,
+      "geonames_id": "GEO-SUR-745044",
+      "aliases": [
+        "istanbul",
+        "constantinople",
+        "byzantium"
+      ]
+    },
+    {
+      "canonical": "Tokyo",
+      "country": "JP",
+      "admin1": "Tokyo",
+      "lat": 35.6762,
+      "lon": 139.6503,
+      "geonames_id": "GEO-SUR-1850147",
+      "aliases": [
+        "tokyo",
+        "edo"
+      ]
+    },
+    {
+      "canonical": "Seoul",
+      "country": "KR",
+      "admin1": "Seoul",
+      "lat": 37.5665,
+      "lon": 126.978,
+      "geonames_id": "GEO-SUR-1835848",
+      "aliases": [
+        "seoul",
+        "seoul city"
+      ]
+    },
+    {
+      "canonical": "Shanghai",
+      "country": "CN",
+      "admin1": "Shanghai",
+      "lat": 31.2304,
+      "lon": 121.4737,
+      "geonames_id": "GEO-SUR-1796236",
+      "aliases": [
+        "shanghai"
+      ]
+    },
+    {
+      "canonical": "Guangzhou",
+      "country": "CN",
+      "admin1": "Guangdong",
+      "lat": 23.1291,
+      "lon": 113.2644,
+      "geonames_id": "GEO-SUR-1809858",
+      "aliases": [
+        "guangzhou",
+        "canton"
+      ]
+    },
+    {
+      "canonical": "Hong Kong",
+      "country": "HK",
+      "admin1": "Hong Kong",
+      "lat": 22.3193,
+      "lon": 114.1694,
+      "geonames_id": "GEO-SUR-1819729",
+      "aliases": [
+        "hong kong",
+        "hk",
+        "xianggang"
+      ]
+    },
+    {
+      "canonical": "Singapore",
+      "country": "SG",
+      "admin1": "Singapore",
+      "lat": 1.3521,
+      "lon": 103.8198,
+      "geonames_id": "GEO-SUR-1880252",
+      "aliases": [
+        "singapore",
+        "sg"
+      ]
+    },
+    {
+      "canonical": "Sydney",
+      "country": "AU",
+      "admin1": "New South Wales",
+      "lat": -33.8688,
+      "lon": 151.2093,
+      "geonames_id": "GEO-SUR-2147714",
+      "aliases": [
+        "sydney"
+      ]
+    },
+    {
+      "canonical": "Melbourne",
+      "country": "AU",
+      "admin1": "Victoria",
+      "lat": -37.8136,
+      "lon": 144.9631,
+      "geonames_id": "GEO-SUR-2158177",
+      "aliases": [
+        "melbourne"
+      ]
+    },
+    {
+      "canonical": "Toronto",
+      "country": "CA",
+      "admin1": "Ontario",
+      "lat": 43.6532,
+      "lon": -79.3832,
+      "geonames_id": "GEO-SUR-6167865",
+      "aliases": [
+        "toronto"
+      ]
+    },
+    {
+      "canonical": "Paris",
+      "country": "FR",
+      "admin1": "Ile-de-France",
+      "lat": 48.8566,
+      "lon": 2.3522,
+      "geonames_id": "GEO-SUR-2988507",
+      "aliases": [
+        "paris"
+      ]
+    },
+    {
+      "canonical": "Berlin",
+      "country": "DE",
+      "admin1": "Berlin",
+      "lat": 52.52,
+      "lon": 13.405,
+      "geonames_id": "GEO-SUR-2950159",
+      "aliases": [
+        "berlin"
+      ]
+    },
+    {
+      "canonical": "Moscow",
+      "country": "RU",
+      "admin1": "Moscow",
+      "lat": 55.7558,
+      "lon": 37.6173,
+      "geonames_id": "GEO-SUR-524901",
+      "aliases": [
+        "moscow",
+        "moskva"
+      ]
+    },
+    {
+      "canonical": "Cairo",
+      "country": "EG",
+      "admin1": "Cairo",
+      "lat": 30.0444,
+      "lon": 31.2357,
+      "geonames_id": "GEO-SUR-360630",
+      "aliases": [
+        "cairo",
+        "al qahirah"
+      ]
+    },
+    {
+      "canonical": "Lagos",
+      "country": "NG",
+      "admin1": "Lagos",
+      "lat": 6.5244,
+      "lon": 3.3792,
+      "geonames_id": "GEO-SUR-2332459",
+      "aliases": [
+        "lagos"
+      ]
+    },
+    {
+      "canonical": "Nairobi",
+      "country": "KE",
+      "admin1": "Nairobi",
+      "lat": -1.2921,
+      "lon": 36.8219,
+      "geonames_id": "GEO-SUR-184745",
+      "aliases": [
+        "nairobi"
+      ]
+    },
+    {
+      "canonical": "Dubai",
+      "country": "AE",
+      "admin1": "Dubai",
+      "lat": 25.2048,
+      "lon": 55.2708,
+      "geonames_id": "GEO-SUR-292223",
+      "aliases": [
+        "dubai"
+      ]
+    },
+    {
+      "canonical": "Riyadh",
+      "country": "SA",
+      "admin1": "Riyadh",
+      "lat": 24.7136,
+      "lon": 46.6753,
+      "geonames_id": "GEO-SUR-108410",
+      "aliases": [
+        "riyadh"
+      ]
+    },
+    {
+      "canonical": "Sao Paulo",
+      "country": "BR",
+      "admin1": "Sao Paulo",
+      "lat": -23.5505,
+      "lon": -46.6333,
+      "geonames_id": "GEO-SUR-3448439",
+      "aliases": [
+        "sao paulo",
+        "são paulo",
+        "saopaulo"
+      ]
+    },
+    {
+      "canonical": "Mexico City",
+      "country": "MX",
+      "admin1": "CDMX",
+      "lat": 19.4326,
+      "lon": -99.1332,
+      "geonames_id": "GEO-SUR-3530597",
+      "aliases": [
+        "mexico city",
+        "ciudad de mexico",
+        "cdmx"
+      ]
+    },
+    {
+      "canonical": "Los Angeles",
+      "country": "US",
+      "admin1": "California",
+      "lat": 34.0522,
+      "lon": -118.2437,
+      "geonames_id": "GEO-SUR-5368361",
+      "aliases": [
+        "los angeles",
+        "la",
+        "l.a."
+      ]
+    },
+    {
+      "canonical": "Chicago",
+      "country": "US",
+      "admin1": "Illinois",
+      "lat": 41.8781,
+      "lon": -87.6298,
+      "geonames_id": "GEO-SUR-4887398",
+      "aliases": [
+        "chicago"
+      ]
+    },
+    {
+      "canonical": "San Francisco",
+      "country": "US",
+      "admin1": "California",
+      "lat": 37.7749,
+      "lon": -122.4194,
+      "geonames_id": "GEO-SUR-5391959",
+      "aliases": [
+        "san francisco",
+        "sf",
+        "bay area"
+      ]
+    },
+    {
+      "canonical": "Boston",
+      "country": "US",
+      "admin1": "Massachusetts",
+      "lat": 42.3601,
+      "lon": -71.0589,
+      "geonames_id": "GEO-SUR-4930956",
+      "aliases": [
+        "boston"
+      ]
+    },
+    {
+      "canonical": "Washington",
+      "country": "US",
+      "admin1": "District of Columbia",
+      "lat": 38.9072,
+      "lon": -77.0369,
+      "geonames_id": "GEO-SUR-4140963",
+      "aliases": [
+        "washington",
+        "washington dc",
+        "dc",
+        "d.c."
+      ]
+    },
+    {
+      "canonical": "Manchester",
+      "country": "GB",
+      "admin1": "England",
+      "lat": 53.4808,
+      "lon": -2.2426,
+      "geonames_id": "GEO-SUR-2643123",
+      "aliases": [
+        "manchester"
+      ]
+    },
+    {
+      "canonical": "Birmingham",
+      "country": "GB",
+      "admin1": "England",
+      "lat": 52.4862,
+      "lon": -1.8904,
+      "geonames_id": "GEO-SUR-2655603",
+      "aliases": [
+        "birmingham"
+      ]
+    },
+    {
+      "canonical": "Kyiv",
+      "country": "UA",
+      "admin1": "Kyiv",
+      "lat": 50.4501,
+      "lon": 30.5234,
+      "geonames_id": "GEO-SUR-703448",
+      "aliases": [
+        "kyiv",
+        "kiev"
+      ]
+    },
+    {
+      "canonical": "Yangon",
+      "country": "MM",
+      "admin1": "Yangon",
+      "lat": 16.8409,
+      "lon": 96.1735,
+      "geonames_id": "GEO-SUR-1298824",
+      "aliases": [
+        "yangon",
+        "rangoon"
+      ]
+    },
+    {
+      "canonical": "St Petersburg",
+      "country": "RU",
+      "admin1": "Saint Petersburg",
+      "lat": 59.9311,
+      "lon": 30.3609,
+      "geonames_id": "GEO-SUR-498817",
+      "aliases": [
+        "st petersburg",
+        "saint petersburg",
+        "leningrad",
+        "petersburg"
+      ]
+    },
+    {
+      "canonical": "Jakarta",
+      "country": "ID",
+      "admin1": "Jakarta",
+      "lat": -6.2088,
+      "lon": 106.8456,
+      "geonames_id": "GEO-SUR-1642911",
+      "aliases": [
+        "jakarta",
+        "batavia"
+      ]
+    },
+    {
+      "canonical": "Bangkok",
+      "country": "TH",
+      "admin1": "Bangkok",
+      "lat": 13.7563,
+      "lon": 100.5018,
+      "geonames_id": "GEO-SUR-1609350",
+      "aliases": [
+        "bangkok",
+        "krung thep"
+      ]
+    },
+    {
+      "canonical": "Karachi",
+      "country": "PK",
+      "admin1": "Sindh",
+      "lat": 24.8607,
+      "lon": 67.0011,
+      "geonames_id": "GEO-SUR-1174872",
+      "aliases": [
+        "karachi"
+      ]
+    },
+    {
+      "canonical": "Lahore",
+      "country": "PK",
+      "admin1": "Punjab",
+      "lat": 31.5204,
+      "lon": 74.3587,
+      "geonames_id": "GEO-SUR-1172451",
+      "aliases": [
+        "lahore"
+      ]
+    },
+    {
+      "canonical": "Dhaka",
+      "country": "BD",
+      "admin1": "Dhaka",
+      "lat": 23.8103,
+      "lon": 90.4125,
+      "geonames_id": "GEO-SUR-1185241",
+      "aliases": [
+        "dhaka",
+        "dacca"
+      ]
+    },
+    {
+      "canonical": "Colombo",
+      "country": "LK",
+      "admin1": "Western",
+      "lat": 6.9271,
+      "lon": 79.8612,
+      "geonames_id": "GEO-SUR-1248991",
+      "aliases": [
+        "colombo"
+      ]
+    },
+    {
+      "canonical": "Tehran",
+      "country": "IR",
+      "admin1": "Tehran",
+      "lat": 35.6892,
+      "lon": 51.389,
+      "geonames_id": "GEO-SUR-112931",
+      "aliases": [
+        "tehran",
+        "teheran"
+      ]
+    }
   ]
 }

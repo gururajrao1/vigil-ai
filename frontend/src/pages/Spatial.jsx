@@ -1,48 +1,30 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
 import { Badge, Card, CardHeader, Spinner } from '../components/ui';
 import GeographicResolutionTag from '../modules/normalization/GeographicResolutionTag';
 
 // Spatial (geographic) cluster detection — a Kulldorff-style Poisson scan statistic.
-// A signal whose reports concentrate in one country/region beyond its expected share
-// of the corpus geography is an early indicator of a bad batch, a counterfeit /
-// substandard product in a market, or a regional practice issue. No map library —
-// a ranked bar of per-area relative risks keeps it offline and light.
+// City aliases (MCN) are for SEARCH expansion, not for renaming country hotspots.
 export default function Spatial({ embedded = false }) {
   const { tick } = useRefresh();
   const nav = useNavigate();
   const [data, setData] = useState(null);
-  const [geoByArea, setGeoByArea] = useState({});
+  const [aliasDemo, setAliasDemo] = useState(null);
 
   useEffect(() => { api.spatial().then(setData).catch(() => setData({ clusters: [] })); }, [tick]);
 
   useEffect(() => {
-    if (!data?.clusters?.length) return;
-    const areas = new Set();
-    data.clusters.forEach((c) => {
-      if (c.hotspot) areas.add(c.hotspot);
-      (c.by_area || []).forEach((a) => { if (a.area) areas.add(a.area); });
-    });
-    let cancelled = false;
-    Promise.all(
-      [...areas].map((area) =>
-        api.normalizationGeo(area)
-          .then((r) => [area, r])
-          .catch(() => [area, null]),
-      ),
-    ).then((pairs) => {
-      if (cancelled) return;
-      const next = {};
-      pairs.forEach(([area, r]) => { if (r) next[area] = r; });
-      setGeoByArea(next);
-    });
-    return () => { cancelled = true; };
-  }, [data]);
+    // Teach the Pattabhi geo pattern without pretending country names are cities.
+    api.normalizationExpand('Chennai')
+      .then(setAliasDemo)
+      .catch(() => setAliasDemo(null));
+  }, []);
 
   if (!data) return <Spinner label="Scanning geography…" />;
   const clusters = data.clusters || [];
+  const geoMatch = aliasDemo?.geo?.matches?.[0];
 
   return (
     <div className="space-y-5">
@@ -52,15 +34,43 @@ export default function Spatial({ embedded = false }) {
         <p className="text-sm text-slate-400 mt-1">
           A <strong>Kulldorff-style Poisson scan statistic</strong> tests whether a signal's
           reports concentrate in a particular <strong>country or region</strong> beyond the share
-          expected from the corpus-wide geographic distribution of all reports. A hotspot with an
-          elevated <strong>relative risk (RR)</strong> and log-likelihood-ratio (<strong>LLR</strong>)
-          scan score is an early indicator of a <strong>bad batch</strong>, a
-          <strong> counterfeit/substandard product</strong> in a market, or a regional practice issue.
+          expected from the corpus-wide geographic distribution of all reports.
           <span className="text-slate-600"> Geolocation is post-level and coarse.</span>
         </p>
       </div>
 
 )}
+      <Card className="p-4 border-cyan-700/30">
+        <CardHeader
+          title="City aliases ≠ country clusters"
+          subtitle="MCN geo is for Omni-Search / Detect retrieval (Chennai≡Madras). Spatial scan below uses country/region columns."
+        />
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {geoMatch ? (
+            <GeographicResolutionTag resolution={geoMatch.resolution} />
+          ) : (
+            <span className="text-sm text-slate-400">Chennai ↔ Madras</span>
+          )}
+          <span className="text-xs text-slate-400 max-w-xl">
+            {geoMatch?.why
+              || 'Searching Chennai expands to Madras so historical-name narratives are not missed.'}
+          </span>
+          <Link to="/lenses?tab=omni" className="text-xs text-cyan-400 hover:text-cyan-300">
+            Try in Omni-Search →
+          </Link>
+          <Link to="/lenses?tab=mcn" className="text-xs text-cyan-400 hover:text-cyan-300">
+            MCN playground →
+          </Link>
+        </div>
+        {geoMatch?.aliases?.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {geoMatch.aliases.map((a) => (
+              <Badge key={a} value={a} className="bg-emerald-500/10 text-emerald-200 border-emerald-500/30 text-[10px]" />
+            ))}
+          </div>
+        )}
+      </Card>
+
       {clusters.length === 0 && (
         <Card className="p-8 text-center text-slate-500">
           No geographic clusters detected. Load the demo corpus.
@@ -76,17 +86,7 @@ export default function Spatial({ embedded = false }) {
             <Card key={`${c.drug}:${c.event}`} className="p-4 border-emerald-600/30">
               <CardHeader
                 title={<span className="flex items-center gap-2 capitalize">📍 {c.drug} <span className="text-slate-600">→</span> {c.event}</span>}
-                subtitle={
-                  <span className="inline-flex flex-wrap items-center gap-2">
-                    Hotspot:{' '}
-                    <GeographicResolutionTag
-                      resolution={geoByArea[c.hotspot]}
-                      verbatim={c.hotspot}
-                      canonical={geoByArea[c.hotspot]?.canonical || c.hotspot}
-                    />
-                    <span className="text-slate-500">· {c.level}-level concentration</span>
-                  </span>
-                }
+                subtitle={<span>Hotspot: <strong className="text-emerald-300">{c.hotspot}</strong> · {c.level}-level concentration</span>}
                 right={<Badge value={`RR ${c.rr?.toFixed(1)}×`} className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30" />}
               />
               <div className="mt-1 text-[11px] text-slate-500">
@@ -105,14 +105,8 @@ export default function Spatial({ embedded = false }) {
                 <div className="space-y-1.5">
                   {areas.map((a) => (
                     <div key={a.area} className="flex items-center gap-2 text-xs">
-                      <span className="w-36 shrink-0 truncate">
-                        <GeographicResolutionTag
-                          resolution={geoByArea[a.area]}
-                          verbatim={a.area}
-                          canonical={geoByArea[a.area]?.canonical || a.area}
-                          className={a.area === c.hotspot ? '' : 'opacity-90'}
-                        />
-                      </span>
+                      <span className={`w-28 truncate ${a.area === c.hotspot ? 'text-emerald-300 font-medium' : 'text-slate-300'}`}
+                            title={a.area}>{a.area}</span>
                       <div className="flex-1 h-3 rounded bg-slate-800 overflow-hidden">
                         <div className={`h-full ${a.area === c.hotspot ? 'bg-emerald-500/70' : 'bg-slate-600/70'}`}
                              style={{ width: `${Math.max(4, ((a.rr || 0) / maxRr) * 100)}%` }} />

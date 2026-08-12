@@ -109,5 +109,8 @@ class OmniSearchResult(BaseModel):
     resolution: Optional[BrandChemicalResolution] = None
     suggestions: List[dict] = Field(default_factory=list)
     universe_subset: Optional[UniverseSubsetReport] = None
+    # Pattabhi: ontology expansions that drive retrieval (geo + clinical + brand peers)
+    expansions: Optional[dict] = None
+    corpus_hits: Optional[dict] = None
     notes: List[str] = Field(default_factory=list)
     audit: AuditStamp = Field(default_factory=AuditStamp)

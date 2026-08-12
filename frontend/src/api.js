@@ -318,6 +318,10 @@ export const api = {
   normalizationAggregate: (mentions) =>
     req('/api/normalization/aggregate', { method: 'POST', body: JSON.stringify({ mentions }) }),
   normalizationEval: () => req('/api/normalization/eval'),
+  normalizationExpand: (q, { online = false } = {}) =>
+    req(`/api/normalization/expand?q=${encodeURIComponent(q)}&online=${online}`),
+  normalizationCorpus: (q, { online = false } = {}) =>
+    req(`/api/normalization/corpus?q=${encodeURIComponent(q)}&online=${online}`),
   featureStoreMatrix: ({ productId, targetAe, includeExplainability = false } = {}) => {
     const q = new URLSearchParams();
     if (productId) q.set('product_id', productId);

@@ -5,7 +5,8 @@ from typing import List, Optional
 
 from . import catalog
 from .clinical_aggregator import aggregate_clinical_cohorts, diabetes_demo_cohort
-from .geo_normalizer import get_geo_normalizer, normalize_location
+from .corpus_search import search_corpus_with_expansion
+from .geo_normalizer import clear_geo_cache, get_geo_normalizer, normalize_location
 from .models import (
     MCN_VERSION,
     AuditStamp,
@@ -15,6 +16,7 @@ from .models import (
     EvalMetrics,
     MappingTracePayload,
 )
+from .query_expand import expand_clinical_terms, expand_geo_terms, expand_query
 from .sapbert_encoder import get_encoder
 from .umls_linker import get_linker, link_to_umls
 
@@ -172,9 +174,13 @@ __all__ = [
     "engine_status",
     "evaluate_clinical_f1",
     "evaluate_geo_f1",
+    "expand_clinical_terms",
+    "expand_geo_terms",
+    "expand_query",
     "mapping_trace",
     "normalize_clinical_and_geo_entities",
     "normalize_clinical_term",
     "normalize_location",
+    "search_corpus_with_expansion",
     "CohortAggregationResult",
 ]

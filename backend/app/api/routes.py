@@ -1228,6 +1228,29 @@ def normalization_normalize(clinical: str = "", location: str = ""):
     return normalize_clinical_and_geo_entities(clinical, location).model_dump()
 
 
+@router.get("/normalization/expand")
+def normalization_expand(q: str, online: bool = False):
+    """Expand a free-text query: geo aliases + clinical synonyms + brand peers."""
+    from ..normalization import expand_query
+
+    return expand_query(q, online=online)
+
+
+@router.get("/normalization/corpus")
+def normalization_corpus(
+    q: str,
+    online: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Search posts/signals using MCN + geo + brand expansions (the useful path)."""
+    from ..normalization import search_corpus_with_expansion
+    from ..projects.scope import current_project_id
+
+    return search_corpus_with_expansion(
+        db, q, project_id=current_project_id(), online=online
+    )
+
+
 @router.get("/normalization/eval")
 def normalization_eval():
     """Mantra GSC / CADEC-inspired F1 gate (must be > 0.85 for downstream ML)."""
@@ -1425,12 +1448,31 @@ def list_signals(
         term = f"%{symptom.strip()}%"
         qset = qset.filter(or_(Signal.symptom.ilike(term), Signal.meddra_pt.ilike(term)))
     if q and q.strip():
-        term = f"%{q.strip()}%"
-        qset = qset.filter(or_(
-            Signal.drug.ilike(term),
-            Signal.symptom.ilike(term),
-            Signal.meddra_pt.ilike(term),
-        ))
+        # Expand clinical / geo / brand synonyms so Detect search does not miss
+        # Madras when the user typed Chennai, or diabetic when PT is Diabetes mellitus.
+        from sqlalchemy import or_
+
+        terms = {q.strip()}
+        try:
+            from ..normalization import expand_query
+
+            expansion = expand_query(q.strip())
+            for t in (expansion.get("search_terms") or [])[:25]:
+                if t and len(t) >= 2:
+                    terms.add(t)
+            for pt in ((expansion.get("clinical") or {}).get("preferred_pts") or []):
+                terms.add(pt)
+        except Exception:
+            pass
+        clauses = []
+        for t in terms:
+            like = f"%{t}%"
+            clauses.extend([
+                Signal.drug.ilike(like),
+                Signal.symptom.ilike(like),
+                Signal.meddra_pt.ilike(like),
+            ])
+        qset = qset.filter(or_(*clauses))
 
     signals = qset.order_by(Signal.prr.desc(), Signal.post_count.desc()).all()
     to_dict = signal_to_dict if full else signal_list_dict

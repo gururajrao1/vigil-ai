@@ -122,3 +122,30 @@ def test_unmatched_clinical_is_honest():
     link = normalize_clinical_term("banana bread pudding xyz")
     assert not link.matched
     assert link.cui is None
+
+
+def test_expand_chennai_includes_madras():
+    from app.normalization import expand_geo_terms, expand_query
+
+    geo = expand_geo_terms("road accidents in Chennai")
+    assert "Chennai" in geo["canonical_cities"]
+    assert "madras" in geo["search_terms"]
+    assert "chennai" in geo["search_terms"]
+
+    full = expand_query("Janumet diabetes Madras")
+    assert any("madras" == t or "chennai" == t for t in full["search_terms"])
+    assert full["brand"].get("matched") or full["brand_terms"]
+    assert any("diabetes" in t or "diabetic" in t for t in full["search_terms"])
+
+
+def test_expand_bare_bangalore():
+    from app.normalization import expand_geo_terms
+
+    geo = expand_geo_terms("Bangalore")
+    assert geo["canonical_cities"] == ["Bengaluru"]
+    assert "bengaluru" in geo["search_terms"]
+
+
+def test_kyiv_kiev_alias():
+    assert normalize_location("Kiev").canonical == "Kyiv"
+    assert normalize_location("Rangoon").canonical == "Yangon"

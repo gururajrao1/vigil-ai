@@ -54,6 +54,13 @@ def loaded_files() -> List[str]:
     return sorted(p.name for p in DATA_DIR.glob("*.json"))
 
 
+def clear_caches() -> None:
+    load_manifest.cache_clear()
+    load_concept_catalog.cache_clear()
+    load_geo_gazetteer.cache_clear()
+    load_eval_sample.cache_clear()
+
+
 def catalog_counts() -> Dict[str, Any]:
     concepts = load_concept_catalog().get("concepts", [])
     places = load_geo_gazetteer().get("places", [])

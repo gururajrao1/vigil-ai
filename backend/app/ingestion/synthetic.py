@@ -75,6 +75,18 @@ _GEO_INJECT = [
     ("Cifran", "ciprofloxacin", "liver damage", "infection", "North America", "United States", 1),
 ]
 
+# City-alias narratives for MCN search expansion demos (Pattabhi: Chennai≡Madras).
+# Bodies deliberately use HISTORICAL names so searching the modern canonical still hits.
+#   (brand, symptom, condition, region, country, city_alias, count)
+_CITY_ALIAS_INJECT = [
+    ("Glycomet", "diarrhea", "type 2 diabetes", "Asia", "India", "Madras", 4),
+    ("Glycomet", "nausea", "diabetes", "Asia", "India", "Bangalore", 3),
+    ("Dolo 650", "nausea", "fever", "Asia", "India", "Bombay", 3),
+    ("Combiflam", "stomach pain", "body ache", "Asia", "India", "Calcutta", 2),
+    ("Thyronorm", "palpitations", "hypothyroidism", "Asia", "India", "Trivandrum", 2),
+    ("Ozempic", "nausea", "type 2 diabetes", "Asia", "China", "Peking", 2),
+]
+
 # Vaccine pharmacovigilance injection. Vaccine PV is a distinct discipline, so we
 # deterministically seed vaccine -> AESI (Adverse Event of Special Interest) signals
 # so the Brighton-level + SCRI (self-controlled risk interval) surrogates have data.
@@ -422,6 +434,33 @@ def generate_corpus(days: int = 21, seed: int = 42) -> List[dict]:
                 "url": f"https://{_SUBS[platform]}/post/geo{idx}",
                 "author": _hash_author(f"geouser{idx}-{platform}"),
                 "title": f"Experience with {brand}",
+                "body": text,
+                "lang": "en",
+                "posted_at": ts,
+                **_meta(brand, region, country),
+            })
+            idx += 1
+
+    # City-alias inject: historical municipal names in body text so Omni-Search /
+    # MCN expansion (Chennai→Madras, Bengaluru→Bangalore) retrieves real posts.
+    _CITY_TEXT = [
+        "In {city} on {brand} for {cond} — developed terrible {sym}. Anyone else in the city?",
+        "Reporting from {city}: after {brand} I got awful {sym}. Had to stop the medicine.",
+        "{city} patient forum — {brand} gave me {sym} within days of starting for {cond}.",
+    ]
+    for brand, sym, cond, region, country, city, count in _CITY_ALIAS_INJECT:
+        for _ in range(count):
+            day_offset = rng.randint(1, days)
+            day = now - timedelta(days=day_offset)
+            ts = day.replace(hour=rng.randint(0, 23), minute=rng.randint(0, 59))
+            text = rng.choice(_CITY_TEXT).format(brand=brand, sym=sym, cond=cond, city=city)
+            platform = rng.choice(_PLATFORMS)
+            posts.append({
+                "external_id": f"city-{idx}-{int(ts.timestamp())}",
+                "platform": platform,
+                "url": f"https://{_SUBS[platform]}/post/city{idx}",
+                "author": _hash_author(f"cityuser{idx}-{platform}"),
+                "title": f"{brand} reaction noted in {city}",
                 "body": text,
                 "lang": "en",
                 "posted_at": ts,

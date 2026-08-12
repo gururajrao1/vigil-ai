@@ -1150,33 +1150,34 @@ Module 1 of the search stack. **Lenses → Omni-Search** (`/lenses?tab=omni`) ru
 
 ### 10.5 Deep Medical Concept Normalization (MCN)
 
-Module 2 of the search / normalization stack. **Lenses → MCN** (`/lenses?tab=mcn`) runs a five-step offline-first pipeline grounded in SapBERT self-alignment, MedNorm/BERGAMOT cross-terminology, FAISS cosine k-NN, and GeoNames-style municipal aliases:
+Module 2 of the search / normalization stack. **Not a static city dictionary** — Pattabhi’s RWD meet framing: ontology is useful when it changes **what you retrieve** and **how you count**.
 
-1. **SapBERT encoder** — dense vectors for entity spans (`cambridgeltl/SapBERT-from-PubMedBERT-fulltext` when local HF weights exist; else deterministic 64-d char-ngram)  
-2. **UMLS linker** — FAISS `IndexFlatIP` (or numpy cosine) over a surrogate Metathesaurus catalog → top CUI + concept name  
-3. **MedNorm / BERGAMOT dual map** — each CUI carries MedDRA PT (regulatory AE) and SNOMED-CT (EHR) simultaneously  
-4. **Clinical aggregator** — collapse synonym fragments (`diabetic` / `Type 2 diabetic mellitus` / `diabetes`) and **sum patient counts** into one cohort N for disproportionality  
-5. **Geo normalizer** — historical city aliases (`Madras`→`Chennai`, `Bangalore`→`Bengaluru`) with centroid coordinates  
+**Lenses → MCN** (`/lenses?tab=mcn`) and **Omni-Search** (`/lenses?tab=omni`) share the same expansion:
 
-| Surface | What it shows |
-| ------- | ------------- |
-| Concept mapping trace | Verbatim → embedding preview → cosine top-k → MedDRA PT / SNOMED |
-| Geographic resolution tag | Canonical city badge; hover shows verbatim alias (also on **Geo clusters**) |
-| Cohort aggregation card | Demo N=10 diabetes merge for DMA-ready denominators |
-| F1 gate badge | Mantra GSC / CADEC-inspired eval must exceed 0.85 |
+1. **SapBERT encoder** — dense vectors when local HF weights exist; else 64-d char-ngram  
+2. **UMLS linker** — FAISS / cosine → CUI + MedDRA PT + SNOMED-CT  
+3. **Query expansion** — geo aliases (Chennai≡Madras), clinical synonyms (diabetic≡Diabetes mellitus), brand peers (Janumet→chemicals)  
+4. **Corpus retrieval** — OR-search post title/body + signals with the expanded term bag  
+5. **Cohort aggregation** — sum patient counts onto one CUI (2+3+5→N=10) before DMA  
 
-**Data:** `backend/app/data/normalization/` (`umls_concept_catalog_surrogate`, `geo_gazetteer_surrogate`, `mantra_cadec_eval_sample`).  
-**API:** `GET /api/normalization/trace` · `link` · `geo` · `normalize` · `eval` · `status` · `POST /api/normalization/aggregate`  
-**FastMCP:** `normalize_clinical_and_geo_entities(raw_clinical_term, raw_location)`  
+| Use case | What happens |
+| -------- | ------------ |
+| Search `Chennai` | Also matches narratives that say `Madras` (demo pack seeds historical city names in bodies) |
+| Search `diabetic` | Detect / Omni expand to Diabetes mellitus PT + aliases; cohort N collapses fragments |
+| Search `Janumet` | Brand→chemical + Universe vs Subset (Module 1) |
+| Spatial country hotspot | Still country/region Kulldorff — city aliases do **not** rename Nigeria→Chennai; see the teaching strip on Geo clusters |
 
-**Try:** `hard to stay awake`, `racing heart`, `lou gehrig's disease`, location `Madras` / `Bangalore` / `Bombay`.
+**Data:** `backend/app/data/normalization/` (~55 city aliases + UMLS surrogate catalog).  
+**API:** `GET /api/normalization/expand` · `corpus` · `trace` · `eval` · `status`  
+**FastMCP:** `normalize_clinical_and_geo_entities`  
+
+**Try after Load PV demo pack:** Omni-Search `Chennai` or `Bangalore` — corpus hits should show Madras/Bangalore-tagged bodies.
 
 | If you see… | Why | What to do |
 | ----------- | --- | ---------- |
-| Unmatched clinical | Outside the surrogate UMLS catalog surfaces | Try the playground defaults or CADEC-style slang in the eval sample |
-| Encoder badge `ngram` | SapBERT weights not cached locally | Expected offline; set `VIGILAI_ALLOW_EMBED_DOWNLOAD=1` only if you intentionally pull HF weights |
-| F1 gate ✗ | Eval sample or catalog drift | Re-run `GET /api/normalization/eval`; check `tests/test_normalization.py` |
-| Geo tag shows only the raw area | Alias not in the gazetteer (country codes often pass through) | Try city aliases; extend `geo_gazetteer_surrogate.json` for demos |
+| Expansion chips but 0 posts | Workspace lacks city-alias narratives | **Sources → Load PV demo pack**, then search again |
+| Country hotspot badge unchanged | Spatial scan is country-level, not city aliasing | Use Omni-Search / MCN for city synonym retrieval |
+| Encoder badge `ngram` | SapBERT weights not local | Expected offline |
 
 ---
 
@@ -1710,10 +1711,11 @@ Details: [§10.4](#104-omni-search--brand--chemical--universe-vs-subset).
 
 | What you see | Usually means | What to try |
 | ------------ | ------------- | ----------- |
+| Expansion chips but 0 posts | No city-alias narratives in workspace | Load PV demo pack; search `Chennai` / `Bangalore` |
 | Clinical unmatched | Outside surrogate catalog | `hard to stay awake`, `diabetes`, `racing heart` |
-| Geo unmatched | Not a city alias in the gazetteer | `Madras`, `Bangalore`, `Bombay`, `Peking` |
+| Geo unmatched | Not in ~55-city gazetteer | Try Madras, Kiev, Peking, Rangoon, Leningrad |
+| “Country hotspot unchanged” | Spatial scan ≠ city aliasing | Use Omni-Search for city synonym retrieval |
 | Tab missing in Lenses | Frontend deploy behind | Hard-refresh; `vercel --prod` from `frontend/` |
-| F1 gate red | Eval regressions | Check `/api/normalization/eval` after API deploy |
 
 Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 

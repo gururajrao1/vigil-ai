@@ -95,6 +95,11 @@ class GeoNormalizer:
 _GEO: Optional[GeoNormalizer] = None
 
 
+def clear_geo_cache() -> None:
+    global _GEO
+    _GEO = None
+
+
 def get_geo_normalizer() -> GeoNormalizer:
     global _GEO
     if _GEO is None:
@@ -104,3 +109,22 @@ def get_geo_normalizer() -> GeoNormalizer:
 
 def normalize_location(verbatim: str) -> GeoResolution:
     return get_geo_normalizer().normalize(verbatim)
+
+
+def aliases_for_canonical(canonical: str) -> list[str]:
+    """All known aliases for a canonical city (for search expansion)."""
+    geo = get_geo_normalizer()
+    key = (canonical or "").strip().lower()
+    place = geo._alias_index.get(key)
+    if not place:
+        # find by canonical name
+        for p in catalog.load_geo_gazetteer().get("places", []):
+            if (p.get("canonical") or "").lower() == key:
+                place = p
+                break
+    if not place:
+        return []
+    return sorted({
+        *(a.lower() for a in (place.get("aliases") or [])),
+        (place.get("canonical") or "").lower(),
+    } - {""})
