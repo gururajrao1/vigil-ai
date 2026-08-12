@@ -47,6 +47,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/lenses?tab=ontology` + Signal Detail       |
 | Brand → chemical Omni-Search     | `Omni-Search`, `Janumet`, `RxE`, `Universe` | `/lenses?tab=omni`                           |
 | Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/lenses?tab=mcn`                            |
+| OMOP SPA / signals by RxCUI      | `OMOP`, `RxCUI`, `/api/v1/signals`        | `/signals` (Detect)                          |
 | Organ-class (SOC) disproportion  | `SOC alert`, `organ class`                | `/lenses?tab=ontology`                       |
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
@@ -756,6 +757,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Ontology**               | MedDRA LLT→SOC tree, ATC/ChEBI/SMILES card, GMDN/EMDN/SaMD badge, SOC-level disproportionality + alerts                         | Terminology identity + organ-class signal strengthening | `/lenses?tab=ontology` · Signal Detail |
 | **Omni-Search**            | Brand→chemical gateway: fuzzy BEL, RxE Has_Ingredient, ATC explorer, Universe vs Subset DMA                                    | International brand harmonisation + formulation contrast | `/lenses?tab=omni` |
 | **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/lenses?tab=mcn` · Spatial tags |
+| **OMOP SPA**               | CDM v5.4 CONCEPT/PERSON/DRUG_EXPOSURE/CONDITION_OCCURRENCE + shared clinical context from Omni-Search                          | One RxCUI drives Detect PRR/ROR without page reload      | `/signals` Detect · `GET /api/v1/signals/{rxcui}` |
 | **DDI**                    | Co-mention pairs vs chance + clinical risk flags                                                                               | Polypharmacy AE patterns                             | `/lenses?tab=ddi`        |
 | **Pregnancy**              | Exposure + congenital / perinatal events                                                                                       | Special-population PV                                | `/lenses?tab=pregnancy`  |
 | **SMQ**                    | Pool PTs into syndrome signals                                                                                                 | Catch fragmented reporting                           | `/lenses?tab=smq`        |
@@ -1178,6 +1180,30 @@ Module 2 of the search / normalization stack. **Not a static city dictionary** �
 | Expansion chips but 0 posts | Workspace lacks city-alias narratives | **Sources → Load PV demo pack**, then search again |
 | Country hotspot badge unchanged | Spatial scan is country-level, not city aliasing | Use Omni-Search / MCN for city synonym retrieval |
 | Encoder badge `ngram` | SapBERT weights not local | Expected offline |
+
+### 10.6 OMOP-driven unified SPA (Module 3)
+
+Shared clinical state + OMOP CDM v5.4 query path so Omni-Search and Detect stay in sync.
+
+**Where:** **Safety Signals → Detect** (`/signals`) — Omni-Search bar at the top of `SignalsView`; context in `PharmacovigilanceContext` (`activeSearchTerm`, `resolvedRxCUI`, `resolvedMedDRAPT`, `comparisonBrands`).
+
+**Backend**
+
+| Piece | Role |
+| ----- | ---- |
+| `backend/app/db/omop_models.py` | SQLAlchemy CDM v5.4: `concept`, `person`, `drug_exposure`, `condition_occurrence` (`omop_*` tables) |
+| `GET /api/v1/signals/{rxcui}` | Join exposures → conditions via CONCEPT; PRR/ROR (Pydantic v2). Falls back to Signal table if staging empty |
+| `POST /api/omop/sync` | Backfill staging from AE corpus **and** seed CONCEPT from RxE + MCN catalogs |
+
+**Datasets reused:** `rxe_extension_surrogate.json` (Module 1 brands/RxCUIs), `umls_concept_catalog_surrogate.json` (Module 2 MedDRA/CUI), existing `omop_*` staging from Predictive intel.
+
+**Try:** Detect → `Janumet` → OMOP AE table + Detect list filters to the same term without reload. If empty: Load PV demo pack → Sync OMOP.
+
+| If you see… | Why | What to do |
+| ----------- | --- | ---------- |
+| `source=signal_fallback` | OMOP staging thin | `POST /api/omop/sync` after demo pack |
+| No concepts | Seed not run | Sync OMOP or `POST /api/v1/omop/concepts/seed` |
+| Context empty on Register tab | Context is SPA-wide but Register does not bind it yet | Use Detect tab |
 
 ---
 

@@ -1,5 +1,5 @@
 import { HubShell } from '../components/PageTabs';
-import Signals from './Signals';
+import SignalsView from '../views/SignalsView';
 import SignalLifecycle from './SignalLifecycle';
 import Alerts from './Alerts';
 import SignalTrackingRegister from './SignalTrackingRegister';
@@ -16,7 +16,7 @@ export default function SignalWorkbench() {
   return (
     <HubShell
       title="Safety Signals"
-      subtitle="Find pairs · GVP register · Workflow · Alert inbox."
+      subtitle="OMOP Omni-Search · Find pairs · GVP register · Workflow · Alert inbox."
       tabDefs={TABS}
       defaultTab="detect"
     >
@@ -24,7 +24,7 @@ export default function SignalWorkbench() {
         if (tab === 'register') return <SignalTrackingRegister embedded />;
         if (tab === 'lifecycle') return <SignalLifecycle embedded />;
         if (tab === 'alerts') return <Alerts embedded />;
-        return <Signals embedded />;
+        return <SignalsView embedded />;
       }}
     </HubShell>
   );

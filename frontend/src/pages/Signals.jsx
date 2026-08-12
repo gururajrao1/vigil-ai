@@ -19,7 +19,7 @@ const NOVELTY_OPTIONS = [
   { value: 'unknown', label: '? Unknown' },
 ];
 
-export default function Signals({ embedded = false }) {
+export default function Signals({ embedded = false, contextDrug, contextRxcui }) {
   const { tick } = useRefresh();
   const { project } = useProject();
   const nav = useNavigate();
@@ -29,11 +29,11 @@ export default function Signals({ embedded = false }) {
   const [filter, setFilter] = useState(searchParams.get('strength') || 'ALL');
   const [region, setRegion] = useState(searchParams.get('region') || 'Global');
   const [product, setProduct] = useState('ALL');
-  const [drugQ, setDrugQ] = useState(searchParams.get('drug') || '');
+  const [drugQ, setDrugQ] = useState(searchParams.get('drug') || contextDrug || '');
   const [symptomQ, setSymptomQ] = useState(searchParams.get('symptom') || '');
   const [socQ, setSocQ] = useState(searchParams.get('soc') || '');
   // Free-text jump box (drug / vaccine / device / event) — debounced into `q`
-  const initialQ = searchParams.get('q') || searchParams.get('drug') || '';
+  const initialQ = searchParams.get('q') || searchParams.get('drug') || contextDrug || '';
   const [searchDraft, setSearchDraft] = useState(initialQ);
   const [textQ, setTextQ] = useState(initialQ);
   const [eventDraft, setEventDraft] = useState(searchParams.get('symptom') || '');
@@ -93,6 +93,16 @@ export default function Signals({ embedded = false }) {
     if (smqParam) setSmq(smqParam);
     if (classEffect === '1' || classEffect === 'true') setClassEffectOnly(true);
   }, [searchParams]);
+
+  // Module 3 — when Omni-Search context resolves a drug, seed Detect filters without reload
+  useEffect(() => {
+    if (contextDrug) {
+      setDrugQ(contextDrug);
+      setSearchDraft(contextDrug);
+      setTextQ(contextDrug);
+      setPage(1);
+    }
+  }, [contextDrug, contextRxcui]);
 
   // Debounce free-text jump box → API `q` (and clear dedicated drug filter when using q)
   useEffect(() => {

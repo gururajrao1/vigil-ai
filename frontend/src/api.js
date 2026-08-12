@@ -344,6 +344,9 @@ export const api = {
   omopStats: () => req('/api/omop/stats'),
   omopSync: ({ limit = 200, aeOnly = true } = {}) =>
     req(`/api/omop/sync?limit=${limit}&ae_only=${aeOnly}`, { method: 'POST' }),
+  omopSignalsByRxcui: (rxcui) =>
+    req(`/api/v1/signals/${encodeURIComponent(rxcui)}`),
+  omopSeedConcepts: () => req('/api/v1/omop/concepts/seed', { method: 'POST' }),
   privacyHygiene: ({ title = '', body = '', author = '' } = {}) =>
     req('/api/privacy/hygiene', {
       method: 'POST',

@@ -17,6 +17,7 @@ import UsersAdmin from './pages/UsersAdmin';
 import Login from './pages/Login';
 import BiotechHomepagePage from './biotech/BiotechHomepagePage';
 import { ProjectProvider, ProjectSelector } from './projectContext';
+import { PharmacovigilanceProvider } from './context/PharmacovigilanceContext';
 import { hasMinRole, isAdmin, isAnalyst } from './roles';
 
 export const RefreshContext = createContext({
@@ -598,6 +599,7 @@ export default function App() {
         <Navigate to="/login" replace />
       ) : (
       <ProjectProvider>
+      <PharmacovigilanceProvider>
       <RefreshContext.Provider value={{ tick, bump, lastIngest, recordIngest }}>
         {cmdOpen && <CommandPalette onClose={closeCmd} />}
         <div className="app-shell">
@@ -681,6 +683,7 @@ export default function App() {
           </div>
         </div>
       </RefreshContext.Provider>
+      </PharmacovigilanceProvider>
       </ProjectProvider>
       )}
     </AuthContext.Provider>

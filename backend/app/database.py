@@ -163,7 +163,8 @@ def checkpoint_wal() -> None:
 
 def init_db() -> None:
     from . import models  # noqa: F401  (ensure models are registered)
-    from .db.schemas import omop_cdm  # noqa: F401  (OMOP CDM v5.4 staging)
+    from .db import omop_models  # noqa: F401  (OMOP CDM v5.4 Module 3)
+    from .db.schemas import omop_cdm  # noqa: F401  (device exposure + re-exports)
 
     checkpoint_wal()                        # flush any pending WAL data first
     Base.metadata.create_all(bind=engine)  # creates missing tables

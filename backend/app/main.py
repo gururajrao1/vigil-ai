@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .agentic.routes import router as agentic_router
 from .api.auth_routes import router as auth_router
-from .api.routes import router
+from .api.routes import api_v1_router, router
 from .auth import decode_token
 from .biotech_homepage.routes import router as biotech_router
 from .config import settings
@@ -93,6 +93,7 @@ async def _bind_project_context(request: Request, call_next):
 
 
 app.include_router(router)
+app.include_router(api_v1_router)
 app.include_router(auth_router)
 app.include_router(forge_router)
 app.include_router(agentic_router)

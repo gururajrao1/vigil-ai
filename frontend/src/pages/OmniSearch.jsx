@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { Badge, Card, CardHeader } from '../components/ui';
 import OmniSearchGateway from '../modules/search/OmniSearchGateway';
 import UniverseVersusSubsetFilter from '../modules/search/UniverseVersusSubsetFilter';
 import ATCClassExplorer from '../modules/search/ATCClassExplorer';
 import GeographicResolutionTag from '../modules/normalization/GeographicResolutionTag';
+import { usePharmacovigilance } from '../context/PharmacovigilanceContext';
 
 /** Module 1 — Unified Search & Global Brand-to-Chemical Mapping (+ MCN expansions). */
 export default function OmniSearch({ embedded = false }) {
+  const { setFromOmniSearch } = usePharmacovigilance();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [result, setResult] = useState(null);
@@ -26,6 +27,16 @@ export default function OmniSearch({ embedded = false }) {
       if (!subsetList && selected.length === 0) {
         setSelected(brand ? [brand] : brands.slice(0, 2));
       }
+      const rxcui =
+        data?.resolution?.ingredients?.[0]?.rxcui
+        || data?.resolution?.brand_rxcui
+        || null;
+      setFromOmniSearch({
+        term,
+        rxcui,
+        brands: brands,
+        meddraPt: data?.extracted?.find((s) => s.kind === 'event')?.normalized_hint || null,
+      });
     } catch (e) {
       const msg = e.message || String(e);
       setErr(/404|Not Found/i.test(msg)

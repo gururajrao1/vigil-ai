@@ -239,8 +239,19 @@ def sync_omop_from_corpus(
         "drug_exposures": db.query(OmopDrugExposure).count(),
         "device_exposures": db.query(OmopDeviceExposure).count(),
         "condition_occurrences": db.query(OmopConditionOccurrence).count(),
+        "concepts": _seed_concepts(db),
         "disclaimer": (
             "OMOP CDM v5.4 staging over social/ICSR text. Open concept surrogates — "
             "not a validated OMOP warehouse; not for clinical use."
         ),
     }
+
+
+def _seed_concepts(db) -> dict:
+    try:
+        from ..omop_concept_seed import seed_concepts_from_surrogates
+
+        return seed_concepts_from_surrogates(db)
+    except Exception as exc:
+        logger.debug("concept seed skipped: %s", exc)
+        return {"error": str(exc)}
