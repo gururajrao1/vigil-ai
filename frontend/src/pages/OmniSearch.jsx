@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { Badge, Card, CardHeader } from '../components/ui';
 import OmniSearchGateway from '../modules/search/OmniSearchGateway';
