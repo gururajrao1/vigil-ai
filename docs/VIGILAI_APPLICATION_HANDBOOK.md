@@ -44,11 +44,10 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Pregnancy / teratogen            | `pregnancy`, `congenital`                 | `/lenses?tab=pregnancy`                      |
 | Syndrome pools                   | `SMQ`                                     | `/lenses?tab=smq`                            |
 | ATC class read-across            | `class effects`                           | `/lenses?tab=class`                          |
-| MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/lenses?tab=ontology` + Signal Detail       |
-| Brand → chemical Omni-Search     | `Omni-Search`, `Janumet`, `RxE`, `Universe` | `/lenses?tab=omni`                           |
-| Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/lenses?tab=mcn`                            |
+| Brand → chemical Omni-Search     | `Omni-Search`, `Janumet`, `RxE`, `Universe` | `/signals` (Detect)                          |
+| Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/terminology?tab=mcn`                       |
 | OMOP SPA / signals by RxCUI      | `OMOP`, `RxCUI`, `/api/v1/signals`        | `/signals` (Detect)                          |
-| Organ-class (SOC) disproportion  | `SOC alert`, `organ class`                | `/lenses?tab=ontology`                       |
+| MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/terminology?tab=ontology` + Signal Detail  |
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
 | Social vs FDA                    | `FAERS`, `divergence`                     | `/lenses?tab=divergence`                     |
@@ -73,9 +72,9 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | REM ranking with ≥1 stratum       | Risk tab: `paracetamol` + `Hepatic injury` → **Rank strata**      |
 | REM empty (teaching “gates held”) | Risk tab: `pacemaker` + `device-related adverse event`            |
 | PrOACT balance                    | Any Signal Detail near top (badge **PrOACT-URL / BRAT**)          |
-| Ontology playground               | `/lenses?tab=ontology` → map `racing heart` / `Ozempic` / `pacemaker` |
-| Omni-Search brand→chemical        | `/lenses?tab=omni` → `Janumet` / `ozmpic` / `Coumadin` |
-| MCN slang → MedDRA + geo alias    | `/lenses?tab=mcn` → `hard to stay awake` + `Madras` |
+| Ontology playground               | `/terminology?tab=ontology` → map `racing heart` / `Ozempic` / `pacemaker` |
+| Omni-Search brand→chemical        | `/signals` (Detect) → `Janumet` / `ozmpic` / `Coumadin` |
+| MCN slang → MedDRA + geo alias    | `/terminology?tab=mcn` → `hard to stay awake` + `Madras` |
 | Inspection + COU                  | `/dashboard?tab=governance`                                       |
 
 
@@ -754,9 +753,9 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Remine lab**             | Screens remine-eligible pairs; case-level unmask; outcomes unmasked / co_reported / vanished / attenuated / amplified / stable | Competition bias (Pariente / Maignen / ENCePP Ch.11) | `/lenses?tab=remine`     |
 | **Risk populations / REM** | REM ranking + logistic segments by age/sex/comorbidity/region                                                                  | Proactive risk mitigation before severe harm         | `/lenses?tab=risk`       |
 | **Predictive intel**       | Feature matrix, 4-gate playground, OMOP, privacy hygiene, BioIE                                                                | Phase 1–2 ClairLabs-aligned spine                    | `/lenses?tab=intel`      |
-| **Ontology**               | MedDRA LLT→SOC tree, ATC/ChEBI/SMILES card, GMDN/EMDN/SaMD badge, SOC-level disproportionality + alerts                         | Terminology identity + organ-class signal strengthening | `/lenses?tab=ontology` · Signal Detail |
-| **Omni-Search**            | Brand→chemical gateway: fuzzy BEL, RxE Has_Ingredient, ATC explorer, Universe vs Subset DMA                                    | International brand harmonisation + formulation contrast | `/lenses?tab=omni` |
-| **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/lenses?tab=mcn` · Spatial tags |
+| **Ontology**               | MedDRA LLT→SOC tree, ATC/ChEBI/SMILES card, GMDN/EMDN/SaMD badge, SOC-level disproportionality + alerts                         | Terminology identity + organ-class signal strengthening | `/terminology?tab=ontology` · Signal Detail |
+| **Omni-Search**            | Brand→chemical + OMOP AE table via shared clinical context                                                                    | International brand harmonisation + Detect filters       | `/signals` Detect |
+| **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/terminology?tab=mcn` |
 | **OMOP SPA**               | CDM v5.4 CONCEPT/PERSON/DRUG_EXPOSURE/CONDITION_OCCURRENCE + shared clinical context from Omni-Search                          | One RxCUI drives Detect PRR/ROR without page reload      | `/signals` Detect · `GET /api/v1/signals/{rxcui}` |
 | **DDI**                    | Co-mention pairs vs chance + clinical risk flags                                                                               | Polypharmacy AE patterns                             | `/lenses?tab=ddi`        |
 | **Pregnancy**              | Exposure + congenital / perinatal events                                                                                       | Special-population PV                                | `/lenses?tab=pregnancy`  |
@@ -1122,7 +1121,7 @@ A large gap between the best single name and the pooled count means the safety p
 
 ### 10.4 Omni-Search — brand → chemical + Universe vs Subset
 
-Module 1 of the search stack. **Lenses → Omni-Search** (`/lenses?tab=omni`) runs a five-step offline-first pipeline:
+Module 1 of the search stack. **Safety Signals → Detect** (`/signals`) runs Omni-Search (brand→chemical + OMOP AE table). The five-step offline-first pipeline:
 
 1. **Extract** — PharmaCoNER-style substances + CADEC/SMM4H colloquial ADE surfaces over noisy text  
 2. **BEL** — MicroMeSH fuzzy synonym / typo linking → surrogate UMLS CUI  
@@ -1154,7 +1153,7 @@ Module 1 of the search stack. **Lenses → Omni-Search** (`/lenses?tab=omni`) ru
 
 Module 2 of the search / normalization stack. **Not a static city dictionary** — Pattabhi’s RWD meet framing: ontology is useful when it changes **what you retrieve** and **how you count**.
 
-**Lenses → MCN** (`/lenses?tab=mcn`) and **Omni-Search** (`/lenses?tab=omni`) share the same expansion:
+**Terminology → MCN** (`/terminology?tab=mcn`) and **Safety Signals → Detect** Omni-Search share the same expansion:
 
 1. **SapBERT encoder** — dense vectors when local HF weights exist; else 64-d char-ngram  
 2. **UMLS linker** — FAISS / cosine → CUI + MedDRA PT + SNOMED-CT  
@@ -1753,7 +1752,8 @@ Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 4. Clear Detect filters; retry a known pair from the keyword index.
 5. For REM: use the paracetamol / hepatic injury teaching pair.
 6. For ontology: **Lenses → Ontology** and map `racing heart` / `Ozempic` / `pacemaker`.
-7. For Omni-Search: **Lenses → Omni-Search** with `Janumet` / `ozmpic`.
+7. For Omni-Search: **Safety Signals → Detect** with `Janumet` / `ozmpic`.
+8. For MCN / Ontology: **Terminology** sidebar (`/terminology`).
 8. For MCN: **Lenses → MCN** with `hard to stay awake` + `Madras`.
 9. If panels say “API not on this backend yet”, wait for Render **and** run `vercel --prod` from `frontend/` (Git push alone may not rebuild Vercel).
 10. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.

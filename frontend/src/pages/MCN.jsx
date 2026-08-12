@@ -80,7 +80,7 @@ export default function MCN({ embedded = false }) {
           </li>
           <li>
             <strong className="text-slate-100">Brand (Omni-Search):</strong> Janumet → chemicals + peer brands as Universe vs Subset.
-            Use <Link className="text-cyan-400 hover:text-cyan-300" to="/lenses?tab=omni">Lenses → Omni-Search</Link>.
+            Use <Link className="text-cyan-400 hover:text-cyan-300" to="/signals">Safety Signals → Detect</Link> for brand / RxCUI Omni-Search.
           </li>
         </ul>
         {teaching && (

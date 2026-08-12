@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, setToken, getToken, wakeApi } from './api';
 import { Button } from './components/ui';
 import { ThemeProvider, ThemeToggle } from './theme';
@@ -9,6 +9,7 @@ import SignalWorkbench from './pages/SignalWorkbench';
 import SignalDetail from './pages/SignalDetail';
 import Evidence from './pages/Evidence';
 import Lenses from './pages/Lenses';
+import Terminology from './pages/Terminology';
 import SourcesHub from './pages/SourcesHub';
 import DiscoveryHub from './pages/DiscoveryHub';
 import Forge from './pages/Forge';
@@ -35,13 +36,14 @@ const CMD_ITEMS = [
   { label: 'Dashboard · ops KPIs', icon: '📈', path: '/dashboard?tab=ops' },
   { label: 'Dashboard · Inspection & COU', icon: '🛡', path: '/dashboard?tab=governance' },
   { label: 'Safety Signals · detect', icon: '🚨', path: '/signals' },
+  { label: 'Safety Signals · Omni-Search', icon: '🔎', path: '/signals' },
   { label: 'Safety Signals · Register', icon: '📋', path: '/signals?tab=register' },
   { label: 'Safety Signals · workflow', icon: '📋', path: '/signals?tab=lifecycle' },
   { label: 'Safety Signals · alert inbox', icon: '🔔', path: '/signals?tab=alerts' },
   { label: 'Analytic Lenses', icon: '◈', path: '/lenses' },
   { label: 'Lenses · Predictive intel', icon: '◈', path: '/lenses?tab=intel' },
-  { label: 'Lenses · Omni-Search', icon: '🔎', path: '/lenses?tab=omni' },
-  { label: 'Lenses · Ontology', icon: '◈', path: '/lenses?tab=ontology' },
+  { label: 'Terminology · MCN', icon: '🧬', path: '/terminology?tab=mcn' },
+  { label: 'Terminology · Ontology', icon: '◈', path: '/terminology?tab=ontology' },
   { label: 'Lenses · SMQ', icon: '◈', path: '/lenses?tab=smq' },
   { label: 'Lenses · class effects', icon: '⚗', path: '/lenses?tab=class' },
   { label: 'Lenses · Remine lab', icon: '◎', path: '/lenses?tab=remine' },
@@ -121,6 +123,16 @@ function CommandPalette({ onClose }) {
 export const AuthContext = createContext({ user: null, login: () => {}, logout: () => {} });
 export const useAuth = () => useContext(AuthContext);
 
+/** Old Lenses deep-links for Omni / MCN / Ontology → new homes. */
+function LensesGate() {
+  const [params] = useSearchParams();
+  const tab = params.get('tab');
+  if (tab === 'omni') return <Navigate to="/signals" replace />;
+  if (tab === 'mcn') return <Navigate to="/terminology?tab=mcn" replace />;
+  if (tab === 'ontology') return <Navigate to="/terminology?tab=ontology" replace />;
+  return <Lenses />;
+}
+
 /** One sidebar item per feature family — related views live as tabs inside. */
 const NAV_SECTIONS = [
   {
@@ -129,6 +141,7 @@ const NAV_SECTIONS = [
       { to: '/', label: 'Homepage', icon: '◈', end: true },
       { to: '/dashboard', label: 'Dashboard', icon: '◧' },
       { to: '/signals', label: 'Safety Signals', icon: '⚠' },
+      { to: '/terminology', label: 'Terminology', icon: '🧬' },
       { to: '/lenses', label: 'Analytic Lenses', icon: '◈' },
       { to: '/graph', label: 'Evidence Explorer', icon: '⬡' },
     ],
@@ -656,7 +669,8 @@ export default function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/signals" element={<SignalWorkbench />} />
                 <Route path="/signals/:id" element={<SignalDetail />} />
-                <Route path="/lenses" element={<Lenses />} />
+                <Route path="/lenses" element={<LensesGate />} />
+                <Route path="/terminology" element={<Terminology />} />
                 <Route path="/graph" element={<Evidence />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/source-queue" element={<DiscoveryHub />} />
@@ -673,6 +687,9 @@ export default function App() {
                 <Route path="/vaccine" element={<Navigate to="/lenses?tab=vaccine" replace />} />
                 <Route path="/spatial" element={<Navigate to="/lenses?tab=spatial" replace />} />
                 <Route path="/divergence" element={<Navigate to="/lenses?tab=divergence" replace />} />
+                <Route path="/omni" element={<Navigate to="/signals" replace />} />
+                <Route path="/ontology" element={<Navigate to="/terminology?tab=ontology" replace />} />
+                <Route path="/mcn" element={<Navigate to="/terminology?tab=mcn" replace />} />
                 <Route path="/story" element={<Navigate to="/graph?tab=story" replace />} />
                 <Route path="/feed" element={<Navigate to="/sources?tab=live" replace />} />
                 <Route path="/command" element={<Navigate to="/sources?tab=agent" replace />} />

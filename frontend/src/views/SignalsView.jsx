@@ -113,8 +113,8 @@ export default function SignalsView({ embedded = false }) {
               {ex}
             </button>
           ))}
-          <Link to="/lenses?tab=omni" className="ml-auto text-cyan-400 hover:text-cyan-300">
-            Full Omni-Search lens →
+          <Link to="/signals" className="ml-auto text-cyan-400 hover:text-cyan-300">
+            Open Detect with this search →
           </Link>
         </div>
         {err && <p className="mt-3 text-sm text-rose-300">{err}</p>}

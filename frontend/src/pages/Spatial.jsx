@@ -55,10 +55,10 @@ export default function Spatial({ embedded = false }) {
             {geoMatch?.why
               || 'Searching Chennai expands to Madras so historical-name narratives are not missed.'}
           </span>
-          <Link to="/lenses?tab=omni" className="text-xs text-cyan-400 hover:text-cyan-300">
-            Try in Omni-Search →
+          <Link to="/signals" className="text-xs text-cyan-400 hover:text-cyan-300">
+            Try in Omni-Search (Detect) →
           </Link>
-          <Link to="/lenses?tab=mcn" className="text-xs text-cyan-400 hover:text-cyan-300">
+          <Link to="/terminology?tab=mcn" className="text-xs text-cyan-400 hover:text-cyan-300">
             MCN playground →
           </Link>
         </div>
