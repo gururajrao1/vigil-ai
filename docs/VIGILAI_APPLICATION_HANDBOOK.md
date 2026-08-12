@@ -1299,7 +1299,7 @@ These look up **what is already ingested**. Same strings often appear in project
 
 **Say:** "Keywords find *more* data. Search finds *existing* data. Ontology makes *different names* count as the same product."
 
-**Layer C+ — full ontology mapping engine.** Where the product ontology pools names, the mapping engine (§10.3) codes them. Type any verbatim into **Lenses → Ontology → Terminology playground**, or call `GET /api/ontology/engine/map?verbatim=…&entity_type=auto`, to get the MedDRA 5-tier chain, the ATC ladder with ChEBI/SMILES, or the GMDN/EMDN device taxonomy — whichever applies. The same coded terms (Preferred Term, SOC, ATC code, GMDN code) can be pasted back into Detect / Remine search as-is, which is the fastest way to pull every post that shares a class or organ system rather than a spelling.
+**Layer C+ — full ontology mapping engine.** Where the product ontology pools names, the mapping engine (§10.3) codes them. Type any verbatim into **Terminology → Ontology → Terminology playground**, or call `GET /api/ontology/engine/map?verbatim=…&entity_type=auto`, to get the MedDRA 5-tier chain, the ATC ladder with ChEBI/SMILES, or the GMDN/EMDN device taxonomy — whichever applies. The same coded terms (Preferred Term, SOC, ATC code, GMDN code) can be pasted back into Detect / Remine search as-is, which is the fastest way to pull every post that shares a class or organ system rather than a spelling.
 
 **Not bundled:** licensed MedDRA, live UMLS, SNOMED-CT as a full distribution — VigilAI uses open surrogates (see §10.2, §10.3).
 
@@ -1751,10 +1751,9 @@ Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 3. **Data Sources → Load PV demo pack**.
 4. Clear Detect filters; retry a known pair from the keyword index.
 5. For REM: use the paracetamol / hepatic injury teaching pair.
-6. For ontology: **Lenses → Ontology** and map `racing heart` / `Ozempic` / `pacemaker`.
+6. For ontology: **Terminology → Ontology** and map `racing heart` / `Ozempic` / `pacemaker`.
 7. For Omni-Search: **Safety Signals → Detect** with `Janumet` / `ozmpic`.
-8. For MCN / Ontology: **Terminology** sidebar (`/terminology`).
-8. For MCN: **Lenses → MCN** with `hard to stay awake` + `Madras`.
+8. For MCN: **Terminology → MCN** with `hard to stay awake` + `Madras`.
 9. If panels say “API not on this backend yet”, wait for Render **and** run `vercel --prod` from `frontend/` (Git push alone may not rebuild Vercel).
 10. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
 
