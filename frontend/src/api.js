@@ -306,6 +306,18 @@ export const api = {
       + `&subset=${encodeURIComponent(subset)}&online=${online}&top_n=${topN}`,
     ),
   searchStatus: () => req('/api/search/status'),
+  normalizationStatus: () => req('/api/normalization/status'),
+  normalizationLink: (term, { topK = 5 } = {}) =>
+    req(`/api/normalization/link?term=${encodeURIComponent(term)}&top_k=${topK}`),
+  normalizationTrace: (term) =>
+    req(`/api/normalization/trace?term=${encodeURIComponent(term)}`),
+  normalizationGeo: (location) =>
+    req(`/api/normalization/geo?location=${encodeURIComponent(location)}`),
+  normalizationNormalize: (clinical, location = '') =>
+    req(`/api/normalization/normalize?clinical=${encodeURIComponent(clinical)}&location=${encodeURIComponent(location)}`),
+  normalizationAggregate: (mentions) =>
+    req('/api/normalization/aggregate', { method: 'POST', body: JSON.stringify({ mentions }) }),
+  normalizationEval: () => req('/api/normalization/eval'),
   featureStoreMatrix: ({ productId, targetAe, includeExplainability = false } = {}) => {
     const q = new URLSearchParams();
     if (productId) q.set('product_id', productId);

@@ -1,0 +1,39 @@
+{
+  "version": "2026.08-mcn.1",
+  "is_surrogate": true,
+  "note": "Mantra GSC / CADEC-inspired gold sample for MCN F1 evaluation. gold_cui / gold_pt are the expected normalized targets.",
+  "clinical_cases": [
+    {"verbatim": "hard to stay awake", "gold_pt": "Somnolence", "gold_cui": "CUI-SUR-SOMNO"},
+    {"verbatim": "racing heart", "gold_pt": "Palpitations", "gold_cui": "CUI-SUR-0030252"},
+    {"verbatim": "sick to my stomach", "gold_pt": "Nausea", "gold_cui": "CUI-SUR-0027497"},
+    {"verbatim": "threw up", "gold_pt": "Vomiting", "gold_cui": "CUI-SUR-0042963"},
+    {"verbatim": "the runs", "gold_pt": "Diarrhoea", "gold_cui": "CUI-SUR-DIARR"},
+    {"verbatim": "itchy as hell", "gold_pt": "Pruritus", "gold_cui": "CUI-SUR-PRUR"},
+    {"verbatim": "short of breath", "gold_pt": "Dyspnoea", "gold_cui": "CUI-SUR-DYSP"},
+    {"verbatim": "passed out", "gold_pt": "Syncope", "gold_cui": "CUI-SUR-SYN"},
+    {"verbatim": "heart attack", "gold_pt": "Myocardial infarction", "gold_cui": "CUI-SUR-MI"},
+    {"verbatim": "lou gehrig's disease", "gold_pt": "Amyotrophic lateral sclerosis", "gold_cui": "CUI-SUR-ALS"},
+    {"verbatim": "diabetes", "gold_pt": "Diabetes mellitus", "gold_cui": "CUI-SUR-0011869"},
+    {"verbatim": "diabetic", "gold_pt": "Diabetes mellitus", "gold_cui": "CUI-SUR-0011869"},
+    {"verbatim": "Type 2 diabetic mellitus", "gold_pt": "Diabetes mellitus", "gold_cui": "CUI-SUR-0011869"},
+    {"verbatim": "t2dm", "gold_pt": "Diabetes mellitus", "gold_cui": "CUI-SUR-0011869"},
+    {"verbatim": "high blood pressure", "gold_pt": "Hypertension", "gold_cui": "CUI-SUR-HTN"},
+    {"verbatim": "liver damage", "gold_pt": "Hepatic injury", "gold_cui": "CUI-SUR-0160390"},
+    {"verbatim": "can't sleep", "gold_pt": "Insomnia", "gold_cui": "CUI-SUR-INSOM"},
+    {"verbatim": "headache", "gold_pt": "Headache", "gold_cui": "CUI-SUR-0018681"},
+    {"verbatim": "skin rash", "gold_pt": "Rash", "gold_cui": "CUI-SUR-0015230"},
+    {"verbatim": "dizziness", "gold_pt": "Dizziness", "gold_cui": "CUI-SUR-DIZZY"}
+  ],
+  "geo_cases": [
+    {"verbatim": "Madras", "gold_canonical": "Chennai"},
+    {"verbatim": "Bangalore", "gold_canonical": "Bengaluru"},
+    {"verbatim": "Bombay", "gold_canonical": "Mumbai"},
+    {"verbatim": "Calcutta", "gold_canonical": "Kolkata"},
+    {"verbatim": "Peking", "gold_canonical": "Beijing"},
+    {"verbatim": "Saigon", "gold_canonical": "Ho Chi Minh City"},
+    {"verbatim": "Trivandrum", "gold_canonical": "Thiruvananthapuram"},
+    {"verbatim": "Poona", "gold_canonical": "Pune"},
+    {"verbatim": "Mysore", "gold_canonical": "Mysuru"},
+    {"verbatim": "Constantinople", "gold_canonical": "Istanbul"}
+  ]
+}

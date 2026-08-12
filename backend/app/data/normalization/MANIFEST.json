@@ -1,0 +1,15 @@
+{
+  "artifact": "VigilAI Deep Medical Concept Normalization (MCN) surrogate pack",
+  "version": "2026.08-mcn.1",
+  "is_surrogate": true,
+  "research_grounding": {
+    "SapBERT": "Self-alignment pretraining for biomedical entity vectors (cambridgeltl/SapBERT-from-PubMedBERT-fulltext) — used when local HF weights exist; otherwise deterministic char-ngram vectors",
+    "MedNorm": "Cross-terminology alignment UMLS ↔ MedDRA ↔ SNOMED",
+    "BERGAMOT": "Multi-ontology mapping patterns for regulatory + EHR coding",
+    "FAISS": "IndexFlatIP cosine k-NN over precomputed concept vectors",
+    "GeoNames": "Municipal alias gazetteer for geographic synonym normalization",
+    "Mantra_GSC": "Evaluation sample inspired by Mantra Gold Standard Corpus styles",
+    "CADEC": "Colloquial ADE surfaces for MCN eval (not redistributed CADEC files)"
+  },
+  "disclaimer": "Open teaching surrogates. Not licensed UMLS Metathesaurus, MedDRA, SNOMED-CT, or GeoNames bulk redistribution. Prototype — not for regulatory or clinical use."
+}

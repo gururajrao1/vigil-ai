@@ -46,6 +46,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | ATC class read-across            | `class effects`                           | `/lenses?tab=class`                          |
 | MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/lenses?tab=ontology` + Signal Detail       |
 | Brand → chemical Omni-Search     | `Omni-Search`, `Janumet`, `RxE`, `Universe` | `/lenses?tab=omni`                           |
+| Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/lenses?tab=mcn`                            |
 | Organ-class (SOC) disproportion  | `SOC alert`, `organ class`                | `/lenses?tab=ontology`                       |
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
@@ -73,6 +74,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | PrOACT balance                    | Any Signal Detail near top (badge **PrOACT-URL / BRAT**)          |
 | Ontology playground               | `/lenses?tab=ontology` → map `racing heart` / `Ozempic` / `pacemaker` |
 | Omni-Search brand→chemical        | `/lenses?tab=omni` → `Janumet` / `ozmpic` / `Coumadin` |
+| MCN slang → MedDRA + geo alias    | `/lenses?tab=mcn` → `hard to stay awake` + `Madras` |
 | Inspection + COU                  | `/dashboard?tab=governance`                                       |
 
 
@@ -753,6 +755,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Predictive intel**       | Feature matrix, 4-gate playground, OMOP, privacy hygiene, BioIE                                                                | Phase 1–2 ClairLabs-aligned spine                    | `/lenses?tab=intel`      |
 | **Ontology**               | MedDRA LLT→SOC tree, ATC/ChEBI/SMILES card, GMDN/EMDN/SaMD badge, SOC-level disproportionality + alerts                         | Terminology identity + organ-class signal strengthening | `/lenses?tab=ontology` · Signal Detail |
 | **Omni-Search**            | Brand→chemical gateway: fuzzy BEL, RxE Has_Ingredient, ATC explorer, Universe vs Subset DMA                                    | International brand harmonisation + formulation contrast | `/lenses?tab=omni` |
+| **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/lenses?tab=mcn` · Spatial tags |
 | **DDI**                    | Co-mention pairs vs chance + clinical risk flags                                                                               | Polypharmacy AE patterns                             | `/lenses?tab=ddi`        |
 | **Pregnancy**              | Exposure + congenital / perinatal events                                                                                       | Special-population PV                                | `/lenses?tab=pregnancy`  |
 | **SMQ**                    | Pool PTs into syndrome signals                                                                                                 | Catch fragmented reporting                           | `/lenses?tab=smq`        |
@@ -1144,6 +1147,36 @@ Module 1 of the search stack. **Lenses → Omni-Search** (`/lenses?tab=omni`) ru
 | Universe reports = 0 | No AE-coded exposures for that chemical in the workspace | Ingest / Load PV demo / `POST /api/omop/sync` |
 | Subset empty but Universe filled | No selected brand reports (or brand not in corpus under that surface) | Tick other subset brands; search Detect for the brand |
 | Discontinued badge (Accutane) | Historical RxE status — ingredients still resolve | Expected for surveillance of legacy names |
+
+### 10.5 Deep Medical Concept Normalization (MCN)
+
+Module 2 of the search / normalization stack. **Lenses → MCN** (`/lenses?tab=mcn`) runs a five-step offline-first pipeline grounded in SapBERT self-alignment, MedNorm/BERGAMOT cross-terminology, FAISS cosine k-NN, and GeoNames-style municipal aliases:
+
+1. **SapBERT encoder** — dense vectors for entity spans (`cambridgeltl/SapBERT-from-PubMedBERT-fulltext` when local HF weights exist; else deterministic 64-d char-ngram)  
+2. **UMLS linker** — FAISS `IndexFlatIP` (or numpy cosine) over a surrogate Metathesaurus catalog → top CUI + concept name  
+3. **MedNorm / BERGAMOT dual map** — each CUI carries MedDRA PT (regulatory AE) and SNOMED-CT (EHR) simultaneously  
+4. **Clinical aggregator** — collapse synonym fragments (`diabetic` / `Type 2 diabetic mellitus` / `diabetes`) and **sum patient counts** into one cohort N for disproportionality  
+5. **Geo normalizer** — historical city aliases (`Madras`→`Chennai`, `Bangalore`→`Bengaluru`) with centroid coordinates  
+
+| Surface | What it shows |
+| ------- | ------------- |
+| Concept mapping trace | Verbatim → embedding preview → cosine top-k → MedDRA PT / SNOMED |
+| Geographic resolution tag | Canonical city badge; hover shows verbatim alias (also on **Geo clusters**) |
+| Cohort aggregation card | Demo N=10 diabetes merge for DMA-ready denominators |
+| F1 gate badge | Mantra GSC / CADEC-inspired eval must exceed 0.85 |
+
+**Data:** `backend/app/data/normalization/` (`umls_concept_catalog_surrogate`, `geo_gazetteer_surrogate`, `mantra_cadec_eval_sample`).  
+**API:** `GET /api/normalization/trace` · `link` · `geo` · `normalize` · `eval` · `status` · `POST /api/normalization/aggregate`  
+**FastMCP:** `normalize_clinical_and_geo_entities(raw_clinical_term, raw_location)`  
+
+**Try:** `hard to stay awake`, `racing heart`, `lou gehrig's disease`, location `Madras` / `Bangalore` / `Bombay`.
+
+| If you see… | Why | What to do |
+| ----------- | --- | ---------- |
+| Unmatched clinical | Outside the surrogate UMLS catalog surfaces | Try the playground defaults or CADEC-style slang in the eval sample |
+| Encoder badge `ngram` | SapBERT weights not cached locally | Expected offline; set `VIGILAI_ALLOW_EMBED_DOWNLOAD=1` only if you intentionally pull HF weights |
+| F1 gate ✗ | Eval sample or catalog drift | Re-run `GET /api/normalization/eval`; check `tests/test_normalization.py` |
+| Geo tag shows only the raw area | Alias not in the gazetteer (country codes often pass through) | Try city aliases; extend `geo_gazetteer_surrogate.json` for demos |
 
 ---
 
@@ -1673,7 +1706,18 @@ Full table and API list: [§10.3](#103-ontology-mapping-engine--full-terminology
 
 Details: [§10.4](#104-omni-search--brand--chemical--universe-vs-subset).
 
-### 19.12 Quick recovery checklist
+### 19.12 MCN looks empty or unmatched
+
+| What you see | Usually means | What to try |
+| ------------ | ------------- | ----------- |
+| Clinical unmatched | Outside surrogate catalog | `hard to stay awake`, `diabetes`, `racing heart` |
+| Geo unmatched | Not a city alias in the gazetteer | `Madras`, `Bangalore`, `Bombay`, `Peking` |
+| Tab missing in Lenses | Frontend deploy behind | Hard-refresh; `vercel --prod` from `frontend/` |
+| F1 gate red | Eval regressions | Check `/api/normalization/eval` after API deploy |
+
+Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
+
+### 19.13 Quick recovery checklist
 
 1. Hard-refresh the browser (Ctrl+Shift+R).
 2. Confirm API health: [https://vigil-ai-api.onrender.com/api/health](https://vigil-ai-api.onrender.com/api/health)
@@ -1682,9 +1726,10 @@ Details: [§10.4](#104-omni-search--brand--chemical--universe-vs-subset).
 5. For REM: use the paracetamol / hepatic injury teaching pair.
 6. For ontology: **Lenses → Ontology** and map `racing heart` / `Ozempic` / `pacemaker`.
 7. For Omni-Search: **Lenses → Omni-Search** with `Janumet` / `ozmpic`.
-8. If panels say “API not on this backend yet”, wait for Render **and** run `vercel --prod` from `frontend/` (Git push alone may not rebuild Vercel).
-9. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
+8. For MCN: **Lenses → MCN** with `hard to stay awake` + `Madras`.
+9. If panels say “API not on this backend yet”, wait for Render **and** run `vercel --prod` from `frontend/` (Git push alone may not rebuild Vercel).
+10. If still 404 on `/api/inspection/*` or `/api/frontiers/summary`, the frontend is ahead of Render — wait for deploy or push `main`.
 
 ---
 
-*Document version aligned with GVP Modules 1–4, Signal Register, REM ranking, Signal conclusions, Inspection/COU frontiers, PGx always-on card, PrOACT visibility, lot/longitudinal relevance gating, the ontology mapping engine (§10.3), Omni-Search brand→chemical (§10.4), and empty-result teaching scripts (§19). For slide-ready bullets see* `README.md`*; for deploy steps see* `DEPLOY_FREE.md`*.*
+*Document version aligned with GVP Modules 1–4, Signal Register, REM ranking, Signal conclusions, Inspection/COU frontiers, PGx always-on card, PrOACT visibility, lot/longitudinal relevance gating, the ontology mapping engine (§10.3), Omni-Search brand→chemical (§10.4), Deep MCN (§10.5), and empty-result teaching scripts (§19). For slide-ready bullets see* `README.md`*; for deploy steps see* `DEPLOY_FREE.md`*.*

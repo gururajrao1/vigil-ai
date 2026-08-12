@@ -1,0 +1,168 @@
+{
+  "version": "2026.08-mcn.1",
+  "is_surrogate": true,
+  "embedding_dim": 64,
+  "note": "UMLS-style concept catalog for dense retrieval + MedNorm/BERGAMOT crosswalk. Embeddings are built at runtime (SapBERT when local, else 64-d char-ngram).",
+  "concepts": [
+    {
+      "cui": "CUI-SUR-0011869",
+      "preferred": "Diabetes mellitus",
+      "meddra_pt": "Diabetes mellitus",
+      "snomed_ct": "SNOMED_SUR:73211009",
+      "kind": "condition",
+      "aliases": ["diabetes", "diabetic", "type 2 diabetes", "type 2 diabetic mellitus", "t2dm", "niddm", "sugar disease", "type ii diabetes mellitus", "diabetes mellitus type 2"]
+    },
+    {
+      "cui": "CUI-SUR-0027497",
+      "preferred": "Nausea",
+      "meddra_pt": "Nausea",
+      "snomed_ct": "SNOMED_SUR:422587007",
+      "kind": "event",
+      "aliases": ["nausea", "nauseous", "queasy", "sick to my stomach", "feeling sick", "nauseated"]
+    },
+    {
+      "cui": "CUI-SUR-0042963",
+      "preferred": "Vomiting",
+      "meddra_pt": "Vomiting",
+      "snomed_ct": "SNOMED_SUR:422400008",
+      "kind": "event",
+      "aliases": ["vomiting", "threw up", "throwing up", "puking", "being sick"]
+    },
+    {
+      "cui": "CUI-SUR-0018681",
+      "preferred": "Headache",
+      "meddra_pt": "Headache",
+      "snomed_ct": "SNOMED_SUR:25064002",
+      "kind": "event",
+      "aliases": ["headache", "head pain", "pounding head", "head ache", "migraine headache"]
+    },
+    {
+      "cui": "CUI-SUR-0015230",
+      "preferred": "Rash",
+      "meddra_pt": "Rash",
+      "snomed_ct": "SNOMED_SUR:271807003",
+      "kind": "event",
+      "aliases": ["rash", "skin rash", "breakout", "red spots", "broke out"]
+    },
+    {
+      "cui": "CUI-SUR-0030252",
+      "preferred": "Palpitations",
+      "meddra_pt": "Palpitations",
+      "snomed_ct": "SNOMED_SUR:80313002",
+      "kind": "event",
+      "aliases": ["palpitations", "racing heart", "heart racing", "heart pounding", "fluttering heart"]
+    },
+    {
+      "cui": "CUI-SUR-SOMNO",
+      "preferred": "Somnolence",
+      "meddra_pt": "Somnolence",
+      "snomed_ct": "SNOMED_SUR:271782001",
+      "kind": "event",
+      "aliases": ["somnolence", "drowsiness", "hard to stay awake", "sleepy all day", "knocked me out", "very sleepy", "cannot stay awake"]
+    },
+    {
+      "cui": "CUI-SUR-FATIG",
+      "preferred": "Fatigue",
+      "meddra_pt": "Fatigue",
+      "snomed_ct": "SNOMED_SUR:84229001",
+      "kind": "event",
+      "aliases": ["fatigue", "tiredness", "worn out", "no energy", "exhausted"]
+    },
+    {
+      "cui": "CUI-SUR-INSOM",
+      "preferred": "Insomnia",
+      "meddra_pt": "Insomnia",
+      "snomed_ct": "SNOMED_SUR:193462001",
+      "kind": "event",
+      "aliases": ["insomnia", "cant sleep", "can't sleep", "sleeplessness", "up all night"]
+    },
+    {
+      "cui": "CUI-SUR-DIZZY",
+      "preferred": "Dizziness",
+      "meddra_pt": "Dizziness",
+      "snomed_ct": "SNOMED_SUR:404640003",
+      "kind": "event",
+      "aliases": ["dizziness", "dizzy", "lightheaded", "woozy", "room spinning"]
+    },
+    {
+      "cui": "CUI-SUR-0160390",
+      "preferred": "Hepatic injury",
+      "meddra_pt": "Hepatic injury",
+      "snomed_ct": "SNOMED_SUR:197354009",
+      "kind": "event",
+      "aliases": ["hepatic injury", "liver damage", "liver injury", "dili", "liver numbers spiked", "acute liver failure"]
+    },
+    {
+      "cui": "CUI-SUR-MI",
+      "preferred": "Myocardial infarction",
+      "meddra_pt": "Myocardial infarction",
+      "snomed_ct": "SNOMED_SUR:22298006",
+      "kind": "event",
+      "aliases": ["myocardial infarction", "heart attack", "mi", "cardiac infarction"]
+    },
+    {
+      "cui": "CUI-SUR-ALS",
+      "preferred": "Amyotrophic lateral sclerosis",
+      "meddra_pt": "Amyotrophic lateral sclerosis",
+      "snomed_ct": "SNOMED_SUR:86044005",
+      "kind": "condition",
+      "aliases": ["amyotrophic lateral sclerosis", "als", "lou gehrig's disease", "lou gehrigs disease", "motor neurone disease"]
+    },
+    {
+      "cui": "CUI-SUR-PRUR",
+      "preferred": "Pruritus",
+      "meddra_pt": "Pruritus",
+      "snomed_ct": "SNOMED_SUR:418363000",
+      "kind": "event",
+      "aliases": ["pruritus", "itching", "itchy", "itchy as hell", "itchiness"]
+    },
+    {
+      "cui": "CUI-SUR-DYSP",
+      "preferred": "Dyspnoea",
+      "meddra_pt": "Dyspnoea",
+      "snomed_ct": "SNOMED_SUR:267036007",
+      "kind": "event",
+      "aliases": ["dyspnoea", "dyspnea", "shortness of breath", "short of breath", "breathlessness", "couldnt catch my breath"]
+    },
+    {
+      "cui": "CUI-SUR-HTN",
+      "preferred": "Hypertension",
+      "meddra_pt": "Hypertension",
+      "snomed_ct": "SNOMED_SUR:38341003",
+      "kind": "condition",
+      "aliases": ["hypertension", "high blood pressure", "raised bp", "htn"]
+    },
+    {
+      "cui": "CUI-SUR-ANX",
+      "preferred": "Anxiety",
+      "meddra_pt": "Anxiety",
+      "snomed_ct": "SNOMED_SUR:48694002",
+      "kind": "event",
+      "aliases": ["anxiety", "anxious", "on edge", "nervousness"]
+    },
+    {
+      "cui": "CUI-SUR-DEP",
+      "preferred": "Depression",
+      "meddra_pt": "Depression",
+      "snomed_ct": "SNOMED_SUR:35489007",
+      "kind": "event",
+      "aliases": ["depression", "depressed", "low mood", "depressed mood"]
+    },
+    {
+      "cui": "CUI-SUR-DIARR",
+      "preferred": "Diarrhoea",
+      "meddra_pt": "Diarrhoea",
+      "snomed_ct": "SNOMED_SUR:62315008",
+      "kind": "event",
+      "aliases": ["diarrhoea", "diarrhea", "the runs", "loose stools"]
+    },
+    {
+      "cui": "CUI-SUR-SYN",
+      "preferred": "Syncope",
+      "meddra_pt": "Syncope",
+      "snomed_ct": "SNOMED_SUR:271594007",
+      "kind": "event",
+      "aliases": ["syncope", "fainting", "passed out", "blacked out", "fainted"]
+    }
+  ]
+}

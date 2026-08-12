@@ -1178,6 +1178,71 @@ def search_engine_status():
     return engine_status()
 
 
+# --------------------- Deep Medical Concept Normalization (MCN) ------------- #
+@router.get("/normalization/status")
+def normalization_status():
+    """SapBERT / FAISS / gazetteer readiness for Module 2 MCN."""
+    from ..normalization import engine_status
+
+    return engine_status()
+
+
+@router.get("/normalization/link")
+def normalization_link(term: str, top_k: int = 5):
+    """Embed a clinical span and link to UMLS CUI + MedDRA PT + SNOMED-CT."""
+    from ..normalization import normalize_clinical_term
+
+    return normalize_clinical_term(term, top_k=top_k).model_dump()
+
+
+@router.get("/normalization/trace")
+def normalization_trace(term: str):
+    """Full ConceptMappingTrace payload (embed → cosine → MedDRA PT)."""
+    from ..normalization import mapping_trace
+
+    return mapping_trace(term).model_dump()
+
+
+@router.get("/normalization/geo")
+def normalization_geo(location: str):
+    """Resolve municipal aliases (e.g. Madras → Chennai) with coordinates."""
+    from ..normalization import normalize_location
+
+    return normalize_location(location).model_dump()
+
+
+@router.post("/normalization/aggregate")
+def normalization_aggregate(payload: dict):
+    """Collapse synonymous mentions and sum patient counts into cohort N."""
+    from ..normalization import aggregate_clinical_cohorts
+
+    mentions = payload.get("mentions") or []
+    return aggregate_clinical_cohorts(mentions).model_dump()
+
+
+@router.get("/normalization/normalize")
+def normalization_normalize(clinical: str = "", location: str = ""):
+    """Joint clinical + geographic normalization (MCP mirror)."""
+    from ..normalization import normalize_clinical_and_geo_entities
+
+    return normalize_clinical_and_geo_entities(clinical, location).model_dump()
+
+
+@router.get("/normalization/eval")
+def normalization_eval():
+    """Mantra GSC / CADEC-inspired F1 gate (must be > 0.85 for downstream ML)."""
+    from ..normalization import evaluate_clinical_f1, evaluate_geo_f1
+
+    clinical = evaluate_clinical_f1()
+    geo = evaluate_geo_f1()
+    return {
+        "clinical": clinical.model_dump(),
+        "geography": geo.model_dump(),
+        "pass_gate": clinical.f1 > 0.85 and geo.f1 > 0.85,
+        "threshold": 0.85,
+    }
+
+
 @router.post("/normalize/label-novelty")
 def normalize_label_novelty(db: Session = Depends(get_db)):
     """Recompute FDA-label novelty tiers (in_label / novel / boxed) for existing signals."""

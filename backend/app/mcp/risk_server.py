@@ -120,6 +120,18 @@ def resolve_brand_to_chemical_impl(query_term: str) -> dict:
     return resolve_brand_to_chemical(query_term, online=False).model_dump()
 
 
+def normalize_clinical_and_geo_entities_impl(
+    raw_clinical_term: str,
+    raw_location: str = "",
+) -> dict:
+    """Offline MCN: clinical slang → UMLS/MedDRA/SNOMED + geo alias → city."""
+    from ..normalization import normalize_clinical_and_geo_entities
+
+    return normalize_clinical_and_geo_entities(
+        raw_clinical_term, raw_location
+    ).model_dump()
+
+
 def _build_mcp():
     try:
         from mcp.server.fastmcp import FastMCP
@@ -278,6 +290,34 @@ def _build_mcp():
             BrandChemicalResolution JSON.
         """
         out = resolve_brand_to_chemical_impl(query_term)
+        return json.dumps(out, ensure_ascii=False)
+
+    @mcp.tool()
+    async def normalize_clinical_and_geo_entities(
+        raw_clinical_term: str,
+        raw_location: str = "",
+    ) -> str:
+        """Deep Medical Concept Normalization for noisy clinical + geo text.
+
+        Embeds the clinical span (SapBERT when local weights exist, else
+        deterministic n-gram vectors), runs FAISS / cosine k-NN against a
+        surrogate UMLS catalog, dual-maps to MedDRA PT + SNOMED-CT (MedNorm /
+        BERGAMOT style), and resolves municipal aliases (e.g. Madras→Chennai)
+        via a GeoNames-inspired gazetteer with centroid coordinates.
+
+        Args:
+            raw_clinical_term: Consumer slang or fragmented disease term
+                (e.g. 'hard to stay awake', 'Type 2 diabetic mellitus').
+            raw_location: City alias or historical name (e.g. 'Bangalore').
+
+        Returns:
+            ClinicalGeoNormalization JSON with UMLS CUI, MedDRA PT, SNOMED-CT,
+            and standardized city / lat / lon.
+        """
+        out = normalize_clinical_and_geo_entities_impl(
+            raw_clinical_term=raw_clinical_term,
+            raw_location=raw_location,
+        )
         return json.dumps(out, ensure_ascii=False)
 
     @mcp.tool()

@@ -11,10 +11,12 @@ import RiskPopulations from './RiskPopulations';
 import PredictiveIntelligence from './PredictiveIntelligence';
 import Ontology from './Ontology';
 import OmniSearch from './OmniSearch';
+import MCN from './MCN';
 
 const TABS = [
   { id: 'intel', label: 'Predictive intel' },
   { id: 'omni', label: 'Omni-Search' },
+  { id: 'mcn', label: 'MCN' },
   { id: 'ontology', label: 'Ontology' },
   { id: 'remine', label: 'Remine lab' },
   { id: 'risk', label: 'Risk populations' },
@@ -32,13 +34,14 @@ export default function Lenses() {
   return (
     <HubShell
       title="Analytic Lenses"
-      subtitle="Predictive intel, Omni-Search, ontology, Remine, risk populations, DDI, pregnancy, SMQ, class effects, vaccine AESI, geo, and vs FAERS."
+      subtitle="Predictive intel, Omni-Search, MCN, ontology, Remine, risk populations, DDI, pregnancy, SMQ, class effects, vaccine AESI, geo, and vs FAERS."
       tabDefs={TABS}
       defaultTab="intel"
     >
       {(tab) => {
         if (tab === 'intel') return <PredictiveIntelligence embedded />;
         if (tab === 'omni') return <OmniSearch embedded />;
+        if (tab === 'mcn') return <MCN embedded />;
         if (tab === 'ontology') return <Ontology embedded />;
         if (tab === 'remine') return <RemineLab embedded />;
         if (tab === 'risk') return <RiskPopulations embedded />;
