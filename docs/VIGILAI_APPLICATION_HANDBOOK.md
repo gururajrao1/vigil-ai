@@ -18,7 +18,7 @@ VigilAI uses **three related vocabularies**. Do not mix them up:
 |-------|---------|--------------------------------|
 | **A. Project keywords** | Enhanced **data retrieval** — Pathfinder finds forums; literature crawls narrow PubMed-style queries | **Projects → keywords** (comma-separated), then activate project + Run Pathfinder |
 | **B. Search / jump strings** | Find what’s **already in the corpus** | Detect search, Remine search, ⌘K / Ctrl+K, Risk product/AE boxes, Graph filters |
-| **C. Ontology terms** | Same product under many names **and** full coding (MedDRA 5-tier, ATC/ChEBI, GMDN/EMDN) | Signal Detail ontology panels · **Lenses → Ontology** playground · API `ontology/resolve` + `ontology/engine/*` |
+| **C. Ontology terms** | Same product under many names **and** full coding (MedDRA 5-tier, ATC/ChEBI, GMDN/EMDN) | Signal Detail ontology panels · **Terminology → Ontology** playground · API `ontology/resolve` + `ontology/engine/*` |
 
 Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the **Projects → keywords** field (layer A). Demo product names in layer B work as typed.
 
@@ -1097,7 +1097,7 @@ A large gap between the best single name and the pooled count means the safety p
 | Surface | What it shows |
 | ------- | ------------- |
 | **Signal Detail → Ontology engine** card | Device taxonomy badge (device signals), chemical identity card with the ATC ladder and SMILES (drug signals), and the MedDRA hierarchy tree for the event |
-| **Lenses → Ontology** | Organ-class (SOC) disproportionality table + alerts, and a terminology playground where you can type any verbatim and see how it codes |
+| **Terminology → Ontology** | Organ-class (SOC) disproportionality table + alerts, and a terminology playground where you can type any verbatim and see how it codes |
 | **API** | `GET /api/ontology/engine/map` · `meddra-chain` · `hierarchy` · `drug-chemical` · `device` · `disproportionality` · `knowledge-graph` · `status` |
 | **FastMCP** | `map_verbatim_to_full_ontology(verbatim_term, entity_type, failure_mode)` in `app.mcp.risk_server` — returns the same JSON for external AI assistants |
 
