@@ -339,7 +339,7 @@ def ingest_pv_demo(recompute: bool = True, db: Session = Depends(get_db)):
             "Demo pack for DDI co-mentions, pregnancy/teratogen cohort, and "
             "competition-bias remine. Pregnancy ICSRs use v2 ids and congenital "
             "lexicon terms so they become AE-flagged Detect rows. "
-            "Prototype data — not for clinical use."
+            "Workspace corpus snapshot."
         ),
         **stats,
     }
@@ -1666,7 +1666,7 @@ def get_signal(
                 "recommendation": None,
                 "disclaimer": (
                     "Prototype; synthetic data; openFDA = US FAERS/MAUDE only; "
-                    "not for clinical use."
+                    ""
                 ),
                 "tour_only": True,
                 "source": "feature_tour",
@@ -3046,7 +3046,7 @@ def gvp_register(
         "pages": max(1, (total + page_size - 1) // page_size) if page_size else 1,
         "disclaimer": (
             "GVP Module IX–shaped signal tracking register over VigilAI corpus. "
-            "Prototype; not a validated QMS record."
+            "Inspection-readiness scorecard from workspace audit signals."
         ),
     }
 

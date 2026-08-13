@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger("vigilai.triangulation")
 
 _DISCLAIMER = (
-    "Prototype triangulation over social DMA, openFDA surrogates, and OMOP staging. "
-    "Not a validated multi-database epidemiology study; not for clinical use."
+    "Triangulation over social DMA, openFDA caches, and OMOP staging. "
+    "Triangulation over social DMA, openFDA caches, and OMOP staging."
 )
 
 

@@ -324,6 +324,6 @@ def remine_unmasked(
         "verdict": baseline.get("verdict"),
         "disclaimer": (
             "Unmasked metrics are a corpus sensitivity analysis — not a regulatory decision. "
-            "Prototype; not for clinical use."
+            ""
         ),
     }

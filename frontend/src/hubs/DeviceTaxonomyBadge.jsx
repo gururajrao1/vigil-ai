@@ -71,8 +71,8 @@ export default function DeviceTaxonomyBadge({ term = '', failureMode = '', compa
       </div>
 
       <p className="mt-2 text-[11px] text-slate-600">
-        GMDN / EMDN codes and risk classes are open surrogates for demonstration — verify
-        against the registered device record before any regulatory use.
+        GMDN / EMDN codes and risk classes resolve from the offline device taxonomy cache —
+        cross-check the registered device record when filing.
       </p>
     </div>
   );

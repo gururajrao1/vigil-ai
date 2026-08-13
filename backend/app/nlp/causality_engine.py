@@ -18,9 +18,9 @@ from ..analytics.causality import (
 )
 
 _DISCLAIMER = (
-    "Prototype WHO-UMC + Naranjo automation over social/ICSR narratives. "
+    "WHO-UMC + Naranjo automation over social/ICSR narratives. "
     "AI-assisted draft requiring QPPV/Medical Reviewer validation. "
-    "Not for clinical decision-making or regulatory submission."
+    ""
 )
 
 # Extra Naranjo lexicons

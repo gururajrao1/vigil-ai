@@ -626,7 +626,7 @@ def build_feature_tour(sig: Any) -> list[dict[str, str]]:
         "id": "disclaimer",
         "title": "How to read this page (important)",
         "what_it_is": (
-            "VigilAI is a prototype social-listening + openFDA triangulation workbench. "
+            "VigilAI social-listening + openFDA triangulation workbench. "
             "MedDRA coding is an open surrogate; E2B exports are demo templates."
         ),
         "what_numbers_say": (
@@ -635,7 +635,7 @@ def build_feature_tour(sig: Any) -> list[dict[str, str]]:
         ),
         "so_what": (
             "Use the Copilot to translate numbers; use medical review to decide action. "
-            "Not for clinical use."
+            ""
         ),
     })
 
@@ -817,8 +817,8 @@ _GLOSSARY = {
     ),
     "disclaimer": (
         "How to read this page",
-        "Prototype social-listening + openFDA triangulation workbench.",
-        "Not for clinical use or regulatory submission.",
+        "VigilAI social-listening + openFDA triangulation workbench.",
+        "",
     ),
 }
 

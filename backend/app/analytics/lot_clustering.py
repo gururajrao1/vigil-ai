@@ -12,7 +12,7 @@ from collections import Counter
 from typing import Any, Iterable, Optional
 
 _DISCLAIMER = (
-    "Prototype lot/batch clustering. Lot extraction is heuristic NLP over social/"
+    "Lot/batch clustering. Lot extraction is heuristic NLP over social/"
     "MAUDE-like text; manufacturing flags are triage aids, not confirmed GMP findings."
 )
 

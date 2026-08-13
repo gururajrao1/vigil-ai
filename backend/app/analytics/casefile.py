@@ -109,7 +109,7 @@ def _label_change_heuristic(timeline: List[dict], current: Signal) -> dict:
         "reasons": reasons,
         "disclaimer": (
             "Heuristic only — not a prediction of FDA/EMA label action. "
-            "Prototype; not for regulatory decision-making."
+            ""
         ),
     }
 

@@ -17,7 +17,7 @@ _DISCLAIMER = (
     "sections shaped after ICH E2C (R2). Requires QPPV / Medical Reviewer "
     "validation. Synthetic/social data may be fictional; openFDA = US only; "
     "MedDRA is an open surrogate. NOT a validated regulatory submission; "
-    "NOT for clinical use."
+    ""
 )
 
 

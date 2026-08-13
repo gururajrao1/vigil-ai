@@ -149,7 +149,7 @@ def _build_mcp():
         instructions=(
             "VigilAI proactive risk stratification, ranking, feature store, and "
             "narrative causality (WHO-UMC + Naranjo). Offline-first; "
-            "not for clinical decisions."
+            ""
         ),
     )
 

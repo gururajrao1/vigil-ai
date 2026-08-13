@@ -38,9 +38,9 @@ _APPROVAL_DATES: Dict[str, str] = {
 }
 
 _DISCLAIMER = (
-    "Prototype label filter over DailyMed/open surrogates. Weber adjustment "
+    "Label filter over DailyMed/open caches. Weber adjustment "
     "raises alert gates only — it does not alter stored PRR/ROR cells. "
-    "Not for regulatory submission or clinical use."
+    ""
 )
 
 

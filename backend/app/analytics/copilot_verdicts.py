@@ -431,7 +431,7 @@ def enrich_step_verdict(step: dict[str, str], sig: Any) -> dict[str, str]:
     elif sid == "disclaimer":
         out["verdict"] = "caution"
         out["takeaway"] = (
-            "Prototype / social-listening context — none of these panels equal a confirmed "
+            "Social-listening context — none of these panels equal a confirmed "
             "ADR for regulatory submission or clinical care."
         )
     else:

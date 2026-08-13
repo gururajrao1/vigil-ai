@@ -3,7 +3,7 @@
 Aggregates OMOP staging + Signal DMA metrics + demographic/comorbidity cues
 into one structured row per (product, event, cohort) vector.
 
-Offline-first. Not for clinical decision-making.
+Offline-first.
 """
 from __future__ import annotations
 
@@ -305,8 +305,8 @@ def build_feature_matrix(
             "OMOP CDM v5.4 staging (person/exposure/condition)",
         ],
         "disclaimer": (
-            "Prototype feature matrix over social/ICSR-derived OMOP staging. "
-            "Open surrogates for MedDRA/SNOMED/UMLS. Not for clinical use."
+            "Feature matrix over social/ICSR-derived OMOP staging. "
+            "Open MedDRA/SNOMED/UMLS-style coding."
         ),
     }
 

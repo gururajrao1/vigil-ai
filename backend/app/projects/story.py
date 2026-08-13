@@ -126,7 +126,7 @@ def _deterministic_summary(event: str, drug_a: dict, drug_b: dict) -> str:
         _cmp("IC025", a_ic, b_ic) + ";",
         _cmp("EBGM", drug_a.get("ebgm"), drug_b.get("ebgm")) + ".",
         "UMC-style interpretation treats IC025>0 as a signal of disproportionate reporting; "
-        "this prototype summary is not for clinical decision-making.",
+        "summary drawn from social-listening extractions.",
     ]
     return " ".join(parts)
 
@@ -136,7 +136,7 @@ def _llm_summary(event: str, drug_a: dict, drug_b: dict) -> tuple[str, str]:
         "You are a pharmacovigilance signal analyst. Write ONE concise paragraph (max 120 words) "
         "comparing two drugs on the same adverse event using the metrics JSON. "
         "Mention PRR, ROR, IC025, EBGM, case counts, and whether IC025>0. "
-        "Do not invent numbers. End with a caution that this is a prototype, not clinical advice.\n\n"
+        "Do not invent numbers. Keep claims grounded in the provided numbers.\n\n"
         f"Event: {event}\n"
         f"Drug A metrics: {json.dumps(drug_a, default=str)}\n"
         f"Drug B metrics: {json.dumps(drug_b, default=str)}\n"
@@ -268,7 +268,7 @@ def build_story(
         "chart": chart,
         "disclaimer": (
             "Prototype; synthetic/social data may be fictional; openFDA = US FAERS/MAUDE only; "
-            "MedDRA coding is an open surrogate; not for clinical use."
+            "MedDRA coding is an open surrogate; "
         ),
     }
 

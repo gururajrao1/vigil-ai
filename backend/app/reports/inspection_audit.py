@@ -21,9 +21,9 @@ SLA_ROUTINE_DAYS = 30
 _TERMINAL_REQUIRE_JUSTIFICATION = {"rejected", "closed"}
 _URGENT_STRENGTHS = {"STRONG"}
 _DISCLAIMER = (
-    "Prototype GVP Module IX inspection-readiness analytics. "
+    "GVP Module IX inspection-readiness analytics. "
     "Lead-time SLAs are operational surrogates for demo/teaching; "
-    "not a validated inspection submission artifact."
+    "workspace audit signals."
 )
 
 

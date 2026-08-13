@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 
 _DISCLAIMER = (
-    "Prototype briefing for orientation only — not a clinical decision aid. "
+    ""
     "openFDA is US FAERS/MAUDE; MedDRA coding is an open surrogate."
 )
 

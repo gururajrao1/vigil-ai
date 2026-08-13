@@ -1754,7 +1754,7 @@ export default function SignalDetail() {
         <div className="mt-3 flex items-start gap-2 text-[11px] text-amber-400/80">
           <span>⚠</span>
           <span>
-            {hrDetail?.note || 'Illustrative social-listening surrogate — NOT a clinical hazard ratio.'}
+            {hrDetail?.note || 'Social-listening time-to-event estimate (Cox PH).'}
             {' '}All times are days from the signal's earliest post; all posts are treated as observed events (no censoring).
             Unexposed comparator = AE posts from other drugs. This estimate has no clinical validity and is shown for exploratory purposes only.
           </span>

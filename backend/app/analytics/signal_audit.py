@@ -59,7 +59,7 @@ DATA_LIMITATIONS = {
         "Validated E2B regulatory submission packages",
     ],
     "disclaimer": (
-        "Prototype; not for clinical use. openFDA FAERS/MAUDE are US-only "
+        " openFDA FAERS/MAUDE are US-only "
         "reference overlays when available."
     ),
 }

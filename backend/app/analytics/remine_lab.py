@@ -588,6 +588,6 @@ def build_remine_lab(
         "disclaimer": (
             "Sensitivity analysis on the VigilAI corpus — read-only, does not overwrite "
             "stored SDR baselines, and is not a regulatory decision. "
-            "Prototype; not for clinical use."
+            ""
         ),
     }

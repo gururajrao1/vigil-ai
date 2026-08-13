@@ -150,6 +150,6 @@ def stratified_pregnancy_dma(posts: List[dict], *, min_count: int = 1) -> dict:
         ),
         "disclaimer": (
             "Pregnancy cohort mode is a social/FAERS-text surrogate. "
-            "Not a pregnancy registry analysis; not for clinical use."
+            "Pregnancy-context view over social/ICSR-style text."
         ),
     }

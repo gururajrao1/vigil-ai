@@ -443,14 +443,6 @@ export default function BiotechHomepageRenderer({ layout, onNavigate, onAction }
       <Honesty honesty={layout.honesty} />
       <CtaStrip strip={layout.cta_strip} onNavigate={onNavigate} />
       <ActionBar actions={layout.actions} onAction={onAction} />
-      {layout.disclaimer && (
-        <footer
-          className="border-t border-[var(--cds-sys-border-glass)] text-[11px] leading-snug text-[var(--cds-sys-text-tertiary)]"
-          style={{ padding: '18px clamp(20px, 4vw, 56px) 40px' }}
-        >
-          {layout.disclaimer}
-        </footer>
-      )}
     </div>
   );
 }

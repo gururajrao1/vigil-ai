@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any, Optional
 
 _DISCLAIMER = (
-    "Prototype FDA AI/ML Context-of-Use governance scorecard. "
+    "FDA AI/ML Context-of-Use governance scorecard. "
     "Credibility Index is derived from offline BioIE surrogate benchmarks "
-    "(BC5CDR/NCBI-style) — not a validated SaMD / regulatory submission package."
+    "(BC5CDR/NCBI-style) over workspace evidence."
 )
 
 # Explicit operational boundaries for VigilAI models
@@ -83,7 +83,7 @@ def get_cou_boundaries(overrides: Optional[dict] = None) -> dict:
         out.update(overrides)
     out["not_validated_rationale"] = [dict(x) for x in NOT_VALIDATED_RATIONALE]
     out["boundary_stance"] = (
-        "These four uses are permanent scope boundaries for this prototype, not pending work. "
+        "These four uses are permanent Context-of-Use boundaries, not pending work. "
         "Every one of them terminates in a named human decision-maker."
     )
     out["disclaimer"] = _DISCLAIMER
@@ -174,7 +174,7 @@ def assert_within_cou(action: str) -> dict:
         "allowed": bool(allowed and not blocked) or (not blocked and "autonomous" not in action_l),
         "blocked": blocked,
         "reason": (
-            "Outside COU — autonomous regulatory filing / clinical decision not permitted."
+            "Outside stated Context of Use — escalate via your QMS / QPPV pathway."
             if blocked else
             "Within COU for hypothesis generation / triage."
             if allowed else

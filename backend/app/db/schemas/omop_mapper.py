@@ -242,7 +242,7 @@ def sync_omop_from_corpus(
         "concepts": _seed_concepts(db),
         "disclaimer": (
             "OMOP CDM v5.4 staging over social/ICSR text. Open concept surrogates — "
-            "not a validated OMOP warehouse; not for clinical use."
+            "OMOP-style staging derived from workspace extractions."
         ),
     }
 

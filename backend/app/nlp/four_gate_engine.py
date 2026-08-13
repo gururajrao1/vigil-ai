@@ -207,7 +207,7 @@ def run_four_gates(
         "offline": True,
         "disclaimer": (
             "Deterministic 4-gate AE engine with open ontology surrogates. "
-            "Not licensed MedDRA/UMLS; not for clinical use."
+            "Open MedDRA/UMLS-style coding."
         ),
     }
 

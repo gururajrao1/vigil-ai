@@ -217,5 +217,5 @@ def mine_ddi(
 _DISCLAIMER = (
     "DDI mining on social/FAERS co-mentions is a hypothesis generator. "
     "Ω/interaction-ROR are corpus surrogates — not validated interaction screens. "
-    "Prototype; not for clinical use."
+    ""
 )

@@ -18,8 +18,8 @@ logger = logging.getLogger("vigilai.pgx_engine")
 
 _CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "pgx_cache"
 _DISCLAIMER = (
-    "Prototype PGx overlay. Offline CPIC/PharmGKB curated surrogate with optional "
-    "live API enrichment. Not a clinical decision-support system."
+    "PGx overlay. Offline CPIC/PharmGKB curated cache with optional "
+    "live API enrichment."
 )
 
 PHARMGKB_BASE = "https://api.pharmgkb.org/v1"

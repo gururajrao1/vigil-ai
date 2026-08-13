@@ -258,7 +258,7 @@ def reference_table() -> dict:
     """Public reference view of the PGx knowledge base (for a reference UI)."""
     return {
         "count": len(PGX_TABLE),
-        "note": "Curated CPIC/PharmGKB associations (offline surrogate; not clinical "
+        "note": "Curated CPIC/PharmGKB associations (offline cache; "
                 "decision support). A signal is flagged PGx-actionable only when the "
                 "drug AND its reaction match a documented gene-associated toxicity.",
         "associations": [

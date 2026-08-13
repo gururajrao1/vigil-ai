@@ -293,7 +293,7 @@ def compute_divergence(
         "disproportionality": metrics,
         "disclaimer": (
             "Prototype surveillance discrepancy view. Social data is unverified; "
-            "openFDA reflects US FAERS only. Not for clinical or regulatory submission."
+            "openFDA reflects US FAERS only."
         ),
     }
 

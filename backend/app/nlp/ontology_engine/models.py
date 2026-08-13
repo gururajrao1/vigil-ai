@@ -14,9 +14,8 @@ from pydantic import BaseModel, Field
 ONTOLOGY_VERSION = "2026.08-surrogate.1"
 
 SURROGATE_DISCLAIMER = (
-    "Open MedDRA / UMLS / SNOMED-CT / GMDN / EMDN surrogate — authored offline "
-    "crosswalks, not a licensed terminology distribution. Prototype output; not "
-    "for regulatory submission or clinical use."
+    "Open MedDRA / UMLS / SNOMED-CT / GMDN / EMDN coding cache — authored offline "
+    "crosswalks, not a licensed terminology distribution."
 )
 
 EntityType = Literal["auto", "event", "drug", "device"]

@@ -74,7 +74,7 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
     navigation: {
       brand: 'VigilAI',
       wordmark_sub: 'Computational pharmacovigilance',
-      env_tags: ['OFFLINE-FIRST', 'SURROGATE BENCHMARKS', 'PROTOTYPE'],
+      env_tags: ['OFFLINE-FIRST', 'SURROGATE BENCHMARKS', 'WORLDWIDE'],
       items: [
         { id: 'mission', label: 'Mission', href: '/#manifesto' },
         { id: 'tech', label: 'Technology', href: '/#pillars' },
@@ -89,7 +89,7 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
         'VigilAI is a life-sciences listening engine — unstructured patient narratives become disproportionality stories with honest provenance.',
       body:
         'We fuse a 4-gate adverse-event detector, offline-first NLP, and Bayesian screens (PRR · EB05 · IC025) into an editorial workspace. Comparative registry math runs on local reference surrogates — never a fake live pipe into VigiBase or Sentinel.',
-      env_tags: ['LIVE LOCAL STREAM', 'OPENFDA SURROGATE CACHE', 'NOT FOR CLINICAL USE'],
+      env_tags: ['LIVE LOCAL STREAM', 'OPENFDA SURROGATE CACHE', 'PHARMACOVIGILANCE'],
       throughput: [
         { label: 'Stream throughput', value: String(posts), unit: 'docs', provenance: 'live_unstructured_pipeline' },
         { label: 'AE-gated yield', value: String(ae), unit: 'posts', provenance: 'live_unstructured_pipeline' },
@@ -165,7 +165,6 @@ export function buildFallbackHomepage({ stats = {}, signals = [], focusDrug } = 
       { id: 'forge_tick', label: 'Forge simulation pulse', kind: 'forge_sim', payload: { n: 5 } },
       { id: 'recompute', label: 'Recompute pairs', kind: 'recompute', payload: {} },
     ],
-    disclaimer:
-      'Prototype. Synthetic data may be fictional. openFDA = US FAERS/MAUDE only. MedDRA coding is an open surrogate. Comparative cells are local reference surrogates — never live VigiBase/Sentinel.',
+    disclaimer: '',
   };
 }

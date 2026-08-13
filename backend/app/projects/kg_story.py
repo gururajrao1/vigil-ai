@@ -56,8 +56,8 @@ def build_kg_story(
             "edge_count": stats.get("edge_count", 0),
             "top_paths": [],
             "disclaimer": (
-                "Prototype briefing from social-listening extractions; "
-                "PRR can inflate at small N — not for clinical or regulatory use."
+                "Briefing from social-listening extractions; "
+                "PRR can inflate at small N."
             ),
         }
 
@@ -96,7 +96,7 @@ def build_kg_story(
             for p in top
         ],
         "disclaimer": (
-            "Prototype briefing from social-listening extractions; "
-            "PRR can inflate at small N — not for clinical or regulatory use."
+            "Briefing from social-listening extractions; "
+            "PRR can inflate at small N."
         ),
     }

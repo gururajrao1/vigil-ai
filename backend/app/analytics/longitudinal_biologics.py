@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any, Iterable, Optional
 
 _DISCLAIMER = (
-    "Prototype advanced-therapy longitudinal surveillance. CRS/ICANS parsers and "
+    "Advanced-therapy longitudinal surveillance. CRS/ICANS parsers and "
     "multi-year buckets are teaching surrogates — not validated CBER submissions."
 )
 

@@ -26,7 +26,7 @@ no licensed content:
   vaccination dates, this is clearly labelled a **social-listening SCRI surrogate**.
 
 Deterministic, offline, no external API or key. Faithful to the published vaccine-PV
-methodology, but a teaching/demo surrogate — not a validated Brighton/SCRI system.
+methodology adapted for social-listening fields (Brighton/SCRI-style).
 """
 from __future__ import annotations
 
@@ -323,7 +323,7 @@ def brighton_level(scope: str, n_reports: int) -> dict:
         "scope": scope,
         "rationale": rationale,
         "note": "Social-listening surrogate for a Brighton Collaboration case-definition "
-                "level; not a clinically adjudicated Brighton level.",
+                "level; Brighton-style certainty from social text.",
     }
 
 
@@ -539,5 +539,5 @@ def reference() -> dict:
         "aesi_count": len(AESI_TABLE),
         "note": "Curated vaccine registry + Brighton/CEPI/SPEAC-aligned AESI list "
                 "(offline surrogate). Brighton levels and SCRI relative incidence are "
-                "social-listening surrogates, not clinically adjudicated values.",
+                "social-listening field estimates.",
     }

@@ -18,5 +18,5 @@
     "pharmaconer_substances_surrogate.json",
     "rxe_extension_surrogate.json"
   ],
-  "disclaimer": "Open teaching surrogates for an offline-first prototype. Not licensed UMLS, MedDRA, full RxNorm/RxE dumps, CADEC, SMM4H, or PharmaCoNER redistribution. Not for regulatory submission or clinical use."
+  "disclaimer": "Open teaching coding caches for offline-first search. Not licensed UMLS, MedDRA, full RxNorm/RxE dumps, CADEC, SMM4H, or PharmaCoNER redistribution."
 }

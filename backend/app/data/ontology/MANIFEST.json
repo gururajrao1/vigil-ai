@@ -43,5 +43,5 @@
     "GMDN-": "Surrogate GMDN-style device term code",
     "EMDN-": "Surrogate EMDN-style device category code"
   },
-  "disclaimer": "Open surrogate terminology for an offline-first prototype. Not licensed MedDRA, SNOMED-CT, UMLS, GMDN, or EMDN distribution. Not validated for regulatory submission or clinical use."
+  "disclaimer": "Open terminology cache for offline-first mapping. Not licensed MedDRA, SNOMED-CT, UMLS, GMDN, or EMDN distribution."
 }

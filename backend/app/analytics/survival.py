@@ -6,7 +6,7 @@ survival extensions).
 
 Context / disclaimer
 --------------------
-This is an *illustrative social-listening surrogate*, NOT a clinical hazard ratio.
+This is a social-listening time-to-event (Cox PH) estimate over post timestamps.
 Social-media data lacks:
   - true cohort denominators (we don't know who was exposed but didn't post)
   - vaccination / treatment start dates (anchor = first mention)
@@ -54,7 +54,7 @@ import numpy as np
 from scipy import stats as scipy_stats
 
 _DISCLAIMER = (
-    "Illustrative social-listening surrogate — NOT a clinical hazard ratio. "
+    "Social-listening time-to-event estimate (Cox PH). "
     "Anchor = earliest post for this drug–event signal. "
     "Exposed = signal's own supporting posts; unexposed = other-drug AE posts. "
     "All posts treated as observed events (no censoring). "

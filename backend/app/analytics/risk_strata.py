@@ -13,7 +13,7 @@ Outputs calibrated segment risk scores, relative risk elevation vs baseline,
 and coefficient-as-SHAP contributing factors. Drugs vs devices get domain-
 specific actionable insight text (labeling/REMS vs procedure/design RCA).
 
-Not for clinical decision-making. MedDRA/UMLS/GMDN/ATC are open surrogates.
+MedDRA/UMLS/GMDN/ATC are open coding caches.
 """
 from __future__ import annotations
 
@@ -54,8 +54,8 @@ _CV = {"hypertension", "heart failure"}
 _CANCER = {"malignant neoplasm"}
 
 _DISCLAIMER = (
-    "Prototype proactive risk stratification over social/ICSR-style text. "
-    "Not a validated clinical risk model; not for patient-level decisions. "
+    "Risk stratification over social/ICSR-style text. "
+    ""
     "MedDRA/UMLS/GMDN/ATC coding is an open surrogate. Syn3DWound/AZH wound "
     "datasets are referenced as multi-modal validation targets — narrative "
     "comorbidity tags only unless imaging adapters are configured."

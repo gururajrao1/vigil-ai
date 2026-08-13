@@ -17,7 +17,7 @@ Domain mitigation:
   • Pharmaceuticals → Section 5 Warnings / Contraindications language
   • Devices → Engineering redesign / procedure-protocol RCA triggers
 
-Not for clinical decision-making. Prototype; open MedDRA/UMLS/GMDN surrogates.
+Open MedDRA/UMLS/GMDN coding caches.
 """
 from __future__ import annotations
 

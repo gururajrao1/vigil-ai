@@ -22,7 +22,7 @@ from .copilot_tour import attach_feature_tour
 DISCLAIMER = (
     "PROTOTYPE — Synthetic data only. Evidence is derived from social-listening and "
     "surrogate analytics; not a validated pharmacovigilance submission. openFDA = US "
-    "FAERS/MAUDE only; MedDRA coding is an open surrogate; not for clinical use."
+    "FAERS/MAUDE only; MedDRA coding is an open surrogate; "
 )
 
 _SYSTEM = (

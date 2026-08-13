@@ -5,7 +5,6 @@ series summary, label-gap, literature, openFDA corroboration, recommended next
 action, reviewer + timestamps.
 
 Aligned with EMA GVP Module IX signal-management documentation expectations.
-Clearly labeled as a prototype / not a validated regulatory submission.
 """
 from __future__ import annotations
 
@@ -22,7 +21,7 @@ from ..models import ProcessedPost, RawPost, Signal
 _DISCLAIMER = (
     "Prototype Signal Assessment Report (SAR). Synthetic/social data may be "
     "fictional; openFDA = US FAERS/MAUDE only; MedDRA coding is an open surrogate; "
-    "not a validated regulatory submission; not for clinical use."
+    ""
 )
 
 

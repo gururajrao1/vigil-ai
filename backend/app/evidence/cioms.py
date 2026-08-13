@@ -6,7 +6,7 @@ Medical Sciences) Individual Case Safety Report (ICSR) for each VigilAI signal.
 All patient fields are [REDACTED] per PII guardrails. Produces both an
 HTML version (printable, table layout) and a plain-text fallback.
 
-Demo template — not a validated regulatory submission.
+CIOMS I export from workspace extractions.
 """
 from __future__ import annotations
 
@@ -386,18 +386,18 @@ def generate_cioms_html(signal: dict) -> str:
 <tr>
   <td style="{_HEADER_STYLE}">Sender / Manufacturer</td>
   <td colspan="3" style="{_CELL_STYLE}">
-    VigilAI — Pharmacovigilance Signal Detection Platform (prototype / demo)
+    VigilAI — Pharmacovigilance Signal Detection Platform
   </td>
 </tr>
 
 </table>
 
 <p class="disclaimer">
-  PROTOTYPE — DEMO DATA ONLY. This CIOMS I form is auto-generated from aggregated
-  social-listening data. It is NOT a validated regulatory submission. Patient
+  This CIOMS I form is auto-generated from aggregated
+  social-listening data. Patient
   identifiers are fully redacted per PII guardrails. MedDRA coding is an open
   surrogate (not licensed MedDRA). WHO-UMC causality is deterministic-lexicon-based.
-  Not for clinical use. VigilAI © {datetime.utcnow().year}.
+  VigilAI © {datetime.utcnow().year}.
 </p>
 
 </body>
@@ -506,11 +506,11 @@ def generate_cioms_text(signal: dict) -> str:
         f"Date           : {now_str}",
         "Report type    : Initial",
         "Source         : Spontaneous (social media aggregation)",
-        "Sender         : VigilAI — Pharmacovigilance Signal Detection Platform (prototype / demo)",
+        "Sender         : VigilAI — Pharmacovigilance Signal Detection Platform",
         "",
         sep,
-        "PROTOTYPE — DEMO DATA ONLY. Not for clinical use. PII fully redacted.",
-        "MedDRA coding is an open surrogate. Not a validated regulatory submission.",
+        "PII fully redacted.",
+        "MedDRA-style open coding.",
         sep,
     ]
     return "\n".join(lines)

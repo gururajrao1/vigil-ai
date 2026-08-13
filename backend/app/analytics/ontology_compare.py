@@ -21,7 +21,7 @@ from ..nlp.ontology import ontology_stack, resolve_product
 _DISCLAIMER = (
     "Alias pooling uses curated brand/INN/chemical crosswalks plus optional "
     "keyless RxNorm and ChEBI lookups. Open surrogates — not licensed MedDRA, "
-    "SNOMED-CT, or UMLS. Prototype output, not for clinical use."
+    "SNOMED-CT, or UMLS. Open terminology crosswalk output."
 )
 
 

@@ -166,7 +166,7 @@ def render_biotech_homepage(
         navigation=NavigationNode(
             brand="VigilAI",
             wordmark_sub="Computational pharmacovigilance",
-            env_tags=["OFFLINE-FIRST", "SURROGATE BENCHMARKS", "PROTOTYPE"],
+            env_tags=["OFFLINE-FIRST", "SURROGATE BENCHMARKS", "WORLDWIDE"],
             items=[
                 NavItem(id="mission", label="Mission", href="/#manifesto"),
                 NavItem(id="tech", label="Technology", href="/#pillars"),
@@ -187,7 +187,7 @@ def render_biotech_homepage(
                 "Comparative registry math runs on local reference surrogates — never "
                 "a fake live pipe into VigiBase or Sentinel."
             ),
-            env_tags=["LIVE LOCAL STREAM", "OPENFDA SURROGATE CACHE", "NOT FOR CLINICAL USE"],
+            env_tags=["LIVE LOCAL STREAM", "OPENFDA SURROGATE CACHE", "PHARMACOVIGILANCE"],
             throughput=[
                 HeroStat(
                     label="Stream throughput",
@@ -337,11 +337,6 @@ def render_biotech_homepage(
                 },
             ),
         ],
-        disclaimer=(
-            "Prototype. Synthetic data may be fictional. openFDA = US FAERS/MAUDE only. "
-            "MedDRA coding is an open surrogate. Comparative cells are local reference "
-            "surrogates — never live VigiBase/Sentinel. E2B is a demo template. "
-            "Not for clinical use."
-        ),
+        disclaimer="",
     )
     return layout.to_wire()

@@ -68,7 +68,7 @@ def explain_term(surface: str) -> dict[str, Any]:
         "patient_phrases": phrases,
         "disclaimer": (
             "Open MedDRA surrogate coding — not a licensed MedDRA dictionary. "
-            "Prototype; not for clinical use."
+            ""
         ),
     }
 
@@ -176,7 +176,7 @@ def build_glossary() -> dict[str, Any]:
         "disclaimer": (
             "Patient-voice phrases are mapped to an open MedDRA-style Preferred Term "
             "and System Organ Class. Individual comorbidities in consumer text remain "
-            "unverified. Not for clinical use."
+            "unverified."
         ),
     }
 

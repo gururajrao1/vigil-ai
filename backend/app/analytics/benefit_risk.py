@@ -613,7 +613,7 @@ def drug_table(rows: List[dict]) -> List[dict]:
 # PrOACT-URL / BRAT quantitative balance (ClinicalTrials.gov optional)
 # --------------------------------------------------------------------------- #
 _PROACT_DISCLAIMER = (
-    "Prototype PrOACT-URL / BRAT balance. Efficacy rates are ClinicalTrials.gov "
+    "PrOACT-URL / BRAT balance. Efficacy rates are ClinicalTrials.gov "
     "or curated offline surrogates; SAE rates are social/DMA-derived — NOT a "
     "CHMP/FDA benefit–risk determination."
 )
