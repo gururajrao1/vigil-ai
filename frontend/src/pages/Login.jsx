@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Alert, Button, Card, Input } from '@clairlabs-ai/prp-ui';
 import { api, wakeApi } from '../api';
 import { useAuth } from '../App';
-import { Button } from '../components/ui';
 
 export default function Login() {
   const { login } = useAuth();
@@ -69,25 +69,22 @@ export default function Login() {
 
   return (
     <div className="login-gate min-h-[100dvh] w-full flex items-center justify-center px-4 py-10">
-      <div
-        className="login-gate-panel w-full max-w-md border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-6 sm:p-8"
-        style={{ borderRadius: 4 }}
-      >
+      <Card variant="glass" className="login-gate-panel w-full max-w-md p-6 sm:p-8">
         <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--app-accent)] mb-2 font-mono">VigilAI</p>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--app-text)] leading-tight" style={{ letterSpacing: '-0.04em' }}>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--cds-sys-accent-primary)] mb-2 font-mono">VigilAI</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--cds-sys-text-primary)] leading-tight tracking-tight">
             {mode === 'login' ? 'Sign in' : 'Create account'}
           </h1>
-          <p className="mt-2 text-sm text-[var(--app-text-muted)] leading-snug">
+          <p className="mt-2 text-sm text-[var(--cds-sys-text-secondary)] leading-snug">
             Worldwide pharmacovigilance & device-vigilance — social listening to explainable safety signals.
           </p>
           {mode === 'register' && (
-            <p className="mt-2 text-[11px] text-[var(--app-text-faint)] leading-snug">
-              Self-registered accounts start as <span className="text-[var(--app-text-muted)]">viewer</span> (read-only).
+            <p className="mt-2 text-[11px] text-[var(--cds-sys-text-tertiary)] leading-snug">
+              Self-registered accounts start as <span className="text-[var(--cds-sys-text-secondary)]">viewer</span> (read-only).
               An admin promotes analysts from the Users page.
             </p>
           )}
-          <p className={`mt-2 text-[11px] font-mono ${apiReady ? 'text-emerald-400/90' : 'text-[var(--app-text-faint)]'}`}>
+          <p className={`mt-2 text-[11px] font-mono ${apiReady ? 'text-[var(--cds-ref-green-400)]' : 'text-[var(--cds-sys-text-tertiary)]'}`}>
             {status}
           </p>
         </div>
@@ -100,8 +97,8 @@ export default function Login() {
 
         <form key={formKey} onSubmit={submit} className="space-y-3" autoComplete="off">
           {mode === 'register' && (
-            <input
-              className="app-input"
+            <Input
+              label="Full name"
               placeholder="Full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -109,8 +106,8 @@ export default function Login() {
               name={`full-name-${formKey}`}
             />
           )}
-          <input
-            className="app-input"
+          <Input
+            label="Email"
             placeholder="Email"
             type="email"
             name={`email-${formKey}`}
@@ -121,9 +118,9 @@ export default function Login() {
             onFocus={() => setUnlockEmail(true)}
             required
           />
-          <input
+          <Input
+            label="Password"
             type="password"
-            className="app-input"
             placeholder="Password"
             name={`pass-${formKey}`}
             value={password}
@@ -133,26 +130,27 @@ export default function Login() {
             onFocus={() => setUnlockPassword(true)}
             required
           />
-          {err && <div className="text-xs text-rose-400 font-mono">{err}</div>}
-          <Button type="submit" variant="primary" disabled={busy} className="w-full">
+          {err && <Alert tone="error" title="Sign-in failed">{err}</Alert>}
+          <Button type="submit" variant="gradient" disabled={busy} loading={busy} className="w-full">
             {busy ? 'Please wait…' : (mode === 'login' ? 'Sign in' : 'Register')}
           </Button>
         </form>
 
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          className="mt-4"
           onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
-          className="mt-4 text-xs text-[var(--app-accent)]"
         >
           {mode === 'login' ? 'Need an account? Register' : 'Have an account? Sign in'}
-        </button>
+        </Button>
 
         <div className="mt-6">
-          <Link to="/" className="text-xs text-[var(--app-text-muted)] font-mono">
+          <Link to="/" className="text-xs text-[var(--cds-sys-text-secondary)] font-mono">
             ← Back to homepage
           </Link>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

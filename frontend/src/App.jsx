@@ -1,6 +1,28 @@
 import { useEffect, useState, useRef, createContext, useContext, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Alert,
+  Avatar,
+  Badge,
+  BrandIcon,
+  Button as CdsButton,
+  Card,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  EmptyState,
+  Input,
+} from '@clairlabs-ai/prp-ui';
 import { api, setToken, getToken, wakeApi } from './api';
 import { Button } from './components/ui';
 import { ThemeProvider, ThemeToggle } from './theme';
@@ -70,9 +92,6 @@ function CommandPalette({ onClose }) {
   const { user } = useAuth();
   const [q, setQ] = useState('');
   const nav = useNavigate();
-  const inputRef = useRef(null);
-
-  useEffect(() => { inputRef.current?.focus(); }, []);
 
   const allowed = CMD_ITEMS.filter((i) => !i.minRole || hasMinRole(user, i.minRole));
   const filtered = q.trim()
@@ -81,42 +100,53 @@ function CommandPalette({ onClose }) {
 
   const go = (path) => { nav(path); onClose(); };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[99999] flex items-start justify-center pt-24 px-4"
-         style={{ background: 'var(--app-overlay)', backdropFilter: 'blur(4px)' }}
-         onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] overflow-hidden" style={{ borderRadius: 4 }}>
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--app-border)]">
-          <span className="text-[var(--app-text-muted)] text-sm">⌘</span>
-          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)}
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Quick navigation</DialogTitle>
+          <DialogDescription>Jump to a VigilAI page</DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--cds-sys-border-glass)]">
+          <span className="text-[var(--cds-sys-text-tertiary)] text-sm">⌘</span>
+          <Input
+            aria-label="Filter pages"
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') onClose();
               if (e.key === 'Enter' && filtered.length > 0) go(filtered[0].path);
             }}
             placeholder="Go to page… (type to filter)"
-            className="flex-1 bg-transparent text-[var(--app-text)] text-sm outline-none placeholder:text-[var(--app-text-faint)]" />
-          <kbd className="text-[10px] text-[var(--app-text-faint)] border border-[var(--app-border)] rounded px-1">ESC</kbd>
+            className="flex-1 border-0 bg-transparent shadow-none"
+          />
+          <kbd className="text-[10px] text-[var(--cds-sys-text-tertiary)] border border-[var(--cds-sys-border-glass)] rounded px-1">ESC</kbd>
         </div>
         <div className="max-h-80 overflow-y-auto py-1">
-          {filtered.length === 0 && (
-            <div className="px-4 py-3 text-xs text-[var(--app-text-muted)]">No pages match "{q}"</div>
+          {filtered.length === 0 ? (
+            <EmptyState title={`No pages match "${q}"`} description="Try another keyword or clear the filter." />
+          ) : (
+            filtered.map((item) => (
+              <button
+                key={item.path}
+                type="button"
+                onClick={() => go(item.path)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--cds-sys-text-secondary)] hover:bg-[var(--cds-sys-surface-hover)] text-left"
+              >
+                <span className="text-base">{item.icon}</span>
+                {item.label}
+                <span className="ml-auto text-[10px] font-mono text-[var(--cds-sys-text-tertiary)]">{item.path}</span>
+              </button>
+            ))
           )}
-          {filtered.map((item) => (
-            <button key={item.path} type="button" onClick={() => go(item.path)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--app-text-secondary)] hover:bg-[var(--app-surface-hover)] transition-colors text-left">
-              <span className="text-base">{item.icon}</span>
-              {item.label}
-              <span className="ml-auto text-[10px] font-mono text-[var(--app-text-faint)]">{item.path}</span>
-            </button>
-          ))}
         </div>
-        <div className="px-4 py-2 border-t border-[var(--app-border)] flex items-center gap-4 text-[10px] text-[var(--app-text-faint)]">
+        <div className="px-4 py-2 border-t border-[var(--cds-sys-border-glass)] flex items-center gap-4 text-[10px] text-[var(--cds-sys-text-tertiary)]">
           <span>↵ open</span><span>↑↓ navigate</span><span>ESC close</span>
-          <span className="ml-auto">Press <kbd className="border border-slate-700 rounded px-1">⌘K</kbd> / <kbd className="border border-slate-700 rounded px-1">Ctrl+K</kbd> to toggle</span>
+          <span className="ml-auto">⌘K / Ctrl+K</span>
         </div>
-      </div>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -163,18 +193,9 @@ function Sidebar({ health, open, onNavigate, user }) {
     <aside className={`app-sidebar shrink-0 border-r flex flex-col ${open ? 'is-open' : ''}`}>
       <div className="px-5 py-5 border-b border-[var(--app-border)]">
         <div className="flex items-center gap-3">
-          <div
-            className="h-9 w-9 shrink-0 flex items-center justify-center border border-[var(--app-border)] bg-[var(--app-surface)] font-mono text-[10px] font-bold text-[var(--app-accent)] tracking-widest"
-            style={{ borderRadius: 4 }}
-            aria-hidden
-          >
-            VA
-          </div>
+          <BrandIcon aria-hidden>VA</BrandIcon>
           <div className="min-w-0">
-            <div
-              className="font-extrabold text-[var(--app-text)] leading-tight truncate"
-              style={{ letterSpacing: '-0.04em' }}
-            >
+            <div className="font-extrabold text-[var(--app-text)] leading-tight truncate tracking-tight">
               VigilAI
             </div>
             <div className="text-[10px] text-[var(--app-text-muted)] leading-tight uppercase tracking-[0.12em] truncate font-mono">
@@ -356,97 +377,105 @@ function DemoBar({ onAction }) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap justify-end">
-      {/* Multi-source picker — portal so dropdown doesn't overlap page content */}
-      <button
+      <CdsButton
         ref={btnRef}
         type="button"
+        variant="glass"
+        size="sm"
         onClick={openDrop}
         disabled={running}
-        className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 border border-sky-700 bg-sky-900/20 text-sky-300 hover:bg-sky-800/30 disabled:opacity-50 transition-colors"
       >
-        <span>📡 Sources</span>
-        <span className="bg-sky-700 text-white rounded-full px-1.5 text-[10px]">{selected.length}</span>
-        <span className="text-[10px]">{open ? '▲' : '▼'}</span>
-      </button>
+        📡 Sources
+        <Badge tone="info" className="ml-1">{selected.length}</Badge>
+        <span className="text-[10px] ml-1">{open ? '▲' : '▼'}</span>
+      </CdsButton>
 
       {open && typeof document !== 'undefined' && createPortal(
-        <div
+        <Card
           ref={panelRef}
+          variant="deep"
           style={{ position: 'fixed', top: dropPos.top, right: dropPos.right, zIndex: 9999 }}
-          className="w-[min(16rem,calc(100vw-1.5rem))] max-h-[min(70vh,28rem)] overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-2 space-y-0.5"
+          className="w-[min(16rem,calc(100vw-1.5rem))] max-h-[min(70vh,28rem)] overflow-y-auto p-2 space-y-0.5"
         >
           <div className="flex items-center justify-between px-2 py-1">
-            <span className="text-[10px] uppercase tracking-wide text-slate-500">Select sources</span>
-            <button type="button"
-              className="text-[10px] text-sky-400 hover:text-sky-300"
+            <span className="text-[10px] uppercase tracking-wide text-[var(--cds-sys-text-tertiary)]">Select sources</span>
+            <CdsButton
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setSelected(
                 FAST_SOURCE_IDS.every((id) => selected.includes(id))
                   ? []
                   : [...FAST_SOURCE_IDS]
-              )}>
+              )}
+            >
               {FAST_SOURCE_IDS.every((id) => selected.includes(id)) ? 'Clear all' : 'Select fast'}
-            </button>
+            </CdsButton>
           </div>
-          <p className="px-2 pb-1 text-[10px] text-amber-400/90 leading-snug">
-            Deploy tip: wake API first, then Fetch 2–3 sources (not all). Free Render times out if you stack every feed.
-          </p>
+          <Alert tone="warning" title="Deploy tip" className="mx-1 mb-1 text-[10px]">
+            Wake API first, then Fetch 2–3 sources (not all). Free Render times out if you stack every feed.
+          </Alert>
           {results._wake && !results._wake.ok && (
-            <p className="px-2 py-1.5 mb-1 text-[10px] text-rose-300 bg-rose-950/40 rounded-lg border border-rose-800/50 leading-snug">
+            <Alert tone="error" title="API unreachable" className="mx-1 mb-1 text-[10px]">
               {results._wake.error}
-            </p>
+            </Alert>
           )}
           {INGEST_SOURCES.map((s) => {
             const checked = selected.includes(s.id);
             const res = results[s.id];
             return (
-              <label key={s.id}
-                className={`flex items-start gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-sky-900/30' : 'hover:bg-slate-800'}`}>
-                <input type="checkbox" checked={checked} onChange={() => toggle(s.id)}
-                       className="mt-0.5 accent-sky-400 shrink-0" />
+              <label
+                key={s.id}
+                className={`flex items-start gap-2 px-2 py-1.5 rounded-lg cursor-pointer ${checked ? 'bg-[var(--cds-sys-surface-hover)]' : 'hover:bg-[var(--cds-sys-surface-hover)]'}`}
+              >
+                <Checkbox
+                  checked={checked}
+                  onCheckedChange={() => toggle(s.id)}
+                  aria-label={s.label}
+                  className="mt-0.5 shrink-0"
+                />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-slate-200">{s.icon} {s.label}</div>
-                  <div className="text-[10px] text-slate-500 truncate">{s.note}</div>
+                  <div className="text-xs text-[var(--cds-sys-text-primary)]">{s.icon} {s.label}</div>
+                  <div className="text-[10px] text-[var(--cds-sys-text-tertiary)] truncate">{s.note}</div>
                   {res && !res.ok && (
-                    <div className="text-[10px] text-rose-400 mt-0.5 break-words whitespace-normal">
+                    <div className="text-[10px] text-[var(--cds-sys-status-error-border)] mt-0.5 break-words whitespace-normal">
                       {res.error || 'Ingest failed'}
                     </div>
                   )}
                 </div>
                 {res && (
-                  <span
-                    title={res.ok ? undefined : (res.error || 'Ingest failed')}
-                    className={`text-[10px] shrink-0 ${res.ok ? 'text-emerald-400' : 'text-rose-400'}`}
-                  >
+                  <Badge tone={res.ok ? 'ok' : 'err'} className="shrink-0">
                     {res.ok ? `+${res.ingested}` : '✗'}
-                  </span>
+                  </Badge>
                 )}
               </label>
             );
           })}
           {lastIngest?.source === 'pathfinder' && lastIngest.ingested > 0 && (
-            <div className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-teal-900/20 border border-teal-800/40 mt-1">
-              <span className="text-xs text-teal-200">🔗 Pathfinder</span>
-              <span className="ml-auto text-[10px] text-emerald-400 shrink-0">
+            <div className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[var(--cds-sys-status-success-tint)] border border-[var(--cds-sys-status-success-border)] mt-1">
+              <span className="text-xs text-[var(--cds-sys-text-primary)]">🔗 Pathfinder</span>
+              <Badge tone="ok" className="ml-auto shrink-0">
                 +{lastIngest.ingested}
                 {lastIngest.signals != null && (
-                  <span className="text-slate-500 ml-1">· {lastIngest.signals} signals</span>
+                  <span className="opacity-70 ml-1">· {lastIngest.signals} signals</span>
                 )}
-              </span>
+              </Badge>
             </div>
           )}
-        </div>,
+        </Card>,
         document.body
       )}
 
-      {/* Run button */}
-      <button
+      <CdsButton
         type="button"
+        variant="gradient"
+        size="sm"
         onClick={runSelected}
         disabled={running || !selected.length}
-        className="text-xs rounded-lg px-3 py-1.5 border border-emerald-700 bg-emerald-900/20 text-emerald-300 hover:bg-emerald-800/30 disabled:opacity-40 font-medium transition-colors"
+        loading={running}
       >
-        {running ? <span className="animate-pulse">Ingesting…</span> : '▶ Fetch'}
-      </button>
+        {running ? 'Ingesting…' : '▶ Fetch'}
+      </CdsButton>
 
       {anyResult && !running && (
         <span className="text-[11px] text-emerald-400" title={lastIngest?.url || ''}>
@@ -477,59 +506,30 @@ function DemoBar({ onAction }) {
 function UserMenu() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const panelRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, right: 0 });
-
-  const toggle = () => {
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
-    }
-    setOpen((o) => !o);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e) => {
-      const inBtn = btnRef.current && btnRef.current.contains(e.target);
-      const inPanel = panelRef.current && panelRef.current.contains(e.target);
-      if (!inBtn && !inPanel) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
 
   if (!user) return null;
   return (
-    <>
-      <button ref={btnRef} onClick={toggle} className="flex items-center gap-2 text-xs text-slate-300">
-        <span className="h-7 w-7 rounded-full bg-gradient-to-br from-sky-500 to-teal-600 flex items-center justify-center text-white font-bold">
-          {(user.email || '?')[0].toUpperCase()}
-        </span>
-        <span className="hidden md:block">{user.role}</span>
-      </button>
-      {open && typeof document !== 'undefined' && createPortal(
-        <div ref={panelRef} style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
-          className="w-52 rounded-lg border border-slate-700 bg-slate-900 shadow-2xl p-2 text-xs">
-          <div className="px-2 py-1 text-slate-400 truncate">{user.email}</div>
-          <div className="px-2 py-1 text-teal-400 capitalize font-semibold">{user.role}</div>
-          {isAdmin(user) && (
-            <button
-              type="button"
-              onClick={() => { setOpen(false); nav('/users'); }}
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800 text-sky-300"
-            >
-              Manage users
-            </button>
-          )}
-          <hr className="border-slate-700 my-1"/>
-          <button onClick={() => { setOpen(false); logout(); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-slate-800 text-rose-300">Sign out</button>
-        </div>,
-        document.body
-      )}
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <CdsButton type="button" variant="ghost" size="sm" className="gap-2">
+          <Avatar size="sm" name={user.email || '?'} />
+          <span className="hidden md:block capitalize">{user.role}</span>
+        </CdsButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
+        <div className="px-2 pb-1 text-[var(--cds-sys-accent-primary)] capitalize font-semibold text-xs">{user.role}</div>
+        {isAdmin(user) && (
+          <DropdownMenuItem onSelect={() => nav('/users')}>
+            Manage users
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem danger onSelect={() => logout()}>
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -629,15 +629,18 @@ export default function App() {
             <header className="app-header px-3 sm:px-4 md:px-5 py-2.5 border-b">
               <div className="app-header-row">
                 <div className="app-header-brand min-w-0">
-                  <button
+                  <CdsButton
                     type="button"
+                    variant="outline"
+                    size="sm"
+                    iconOnly
                     aria-label="Open navigation"
                     aria-expanded={navOpen}
                     onClick={() => setNavOpen((o) => !o)}
-                    className="app-nav-toggle shrink-0 rounded-lg border border-[var(--app-border)] px-2.5 py-1.5 text-sm text-[var(--app-text-muted)] hover:bg-[var(--app-surface-hover)]"
+                    className="app-nav-toggle shrink-0"
                   >
                     ☰
-                  </button>
+                  </CdsButton>
                   <div className="min-w-0 flex-1">
                     <h1 className="app-header-title-full text-sm lg:text-base font-semibold text-[var(--app-text)] leading-tight truncate">
                       Social listening for patient safety
@@ -652,11 +655,9 @@ export default function App() {
                   </div>
                 </div>
                 <div className="app-header-actions">
-                  <button type="button" onClick={openCmd}
-                    className="hidden xl:flex items-center gap-1.5 text-[11px] text-[var(--app-text-muted)] border border-[var(--app-border)] rounded-lg px-2.5 py-1 hover:text-[var(--app-text)] transition-colors shrink-0">
-                    <span>⌘K</span>
-                    <span className="text-[var(--app-text-faint)]">Quick nav</span>
-                  </button>
+                  <CdsButton type="button" variant="ghost" size="sm" onClick={openCmd} className="hidden xl:inline-flex">
+                    ⌘K Quick nav
+                  </CdsButton>
                   <ProjectSelector />
                   <ThemeToggle />
                   <DemoBar onAction={bump} />

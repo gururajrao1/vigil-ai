@@ -1,4 +1,4 @@
-import { Badge, Card, CardHeader } from '../../components/ui';
+import { Badge, Button, Card, CardHeader } from '../../components/ui';
 
 const num = (v, d = 2) => (v == null ? '—' : Number(v).toFixed(d));
 
@@ -65,13 +65,15 @@ export default function UniverseVersusSubsetFilter({
             ))}
           </div>
           {brands.length > 0 && (
-            <button
+            <Button
               type="button"
-              className="mt-2 text-xs text-sky-300 hover:text-sky-200"
+              variant="ghost"
+              size="sm"
+              className="mt-2"
               onClick={() => onRerun?.(selected)}
             >
               Recompute Universe vs Subset →
-            </button>
+            </Button>
           )}
         </div>
 

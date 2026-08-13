@@ -192,34 +192,34 @@ export default function SignalTrackingRegister({ embedded = false }) {
                     <td className="p-2">
                       <div className="flex flex-wrap gap-1">
                         {(r.next_states || []).map((st) => (
-                          <button
+                          <Button
                             key={st}
                             type="button"
+                            size="sm"
+                            variant={st === 'rejected' ? 'danger' : 'outline'}
                             disabled={acting === r.id}
                             onClick={() => advance(r.id, st)}
                             title={`Move to ${stateLabel(st)} (${st})`}
-                            className="text-[10px] border border-slate-700 px-1.5 py-0.5 text-slate-300 hover:border-sky-500/40 hover:text-sky-200"
-                            style={{ borderRadius: 4 }}
                           >
                             → {stateLabel(st)}
-                          </button>
+                          </Button>
                         ))}
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="outline"
                           onClick={() => download(`/api/signals/${r.id}/sar.pdf`, `signal_${r.id}_sar.pdf`)}
-                          className="text-[10px] border border-teal-700/50 px-1.5 py-0.5 text-teal-200"
-                          style={{ borderRadius: 4 }}
                         >
                           SAR PDF
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="outline"
                           onClick={() => download(`/api/signals/${r.id}/pbrer.pdf`, `signal_${r.id}_pbrer.pdf`)}
-                          className="text-[10px] border border-teal-700/50 px-1.5 py-0.5 text-teal-200"
-                          style={{ borderRadius: 4 }}
                         >
                           PBRER
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

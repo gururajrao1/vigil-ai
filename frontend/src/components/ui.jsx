@@ -1,13 +1,18 @@
-// Small reusable UI primitives — VigilAI Life Sciences stage (4px, no motion).
+// VigilAI shared primitives — thin wrappers over @clairlabs-ai/prp-ui.
+// Preserve existing call sites (kind/value Badge, labeled Spinner, PaginationBar).
 
-export function Card({ children, className = '' }) {
+import {
+  Badge as CdsBadge,
+  Button as CdsButton,
+  Card as CdsCard,
+  Spinner as CdsSpinner,
+} from '@clairlabs-ai/prp-ui';
+
+export function Card({ children, className = '', variant = 'glass', ...rest }) {
   return (
-    <div
-      className={`border border-[var(--app-border)] bg-[var(--app-surface)] ${className}`}
-      style={{ borderRadius: 'var(--va-radius, 4px)' }}
-    >
+    <CdsCard variant={variant} className={className} {...rest}>
       {children}
-    </div>
+    </CdsCard>
   );
 }
 
@@ -15,95 +20,100 @@ export function CardHeader({ title, subtitle, right }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-2 px-4 pt-4">
       <div className="min-w-0 flex-1">
-        <h3
-          className="text-sm font-bold text-[var(--app-text)] break-words"
-          style={{ letterSpacing: '-0.03em' }}
-        >
+        <h3 className="text-sm font-bold text-[var(--cds-sys-text-primary)] break-words tracking-tight">
           {title}
         </h3>
-        {subtitle && <p className="text-xs text-[var(--app-text-muted)] mt-0.5 break-words">{subtitle}</p>}
+        {subtitle && (
+          <p className="text-xs text-[var(--cds-sys-text-secondary)] mt-0.5 break-words">{subtitle}</p>
+        )}
       </div>
       {right != null && <div className="shrink-0 max-w-full">{right}</div>}
     </div>
   );
 }
 
-const STRENGTH_COLORS = {
-  STRONG: 'bg-[rgba(45,212,191,0.12)] text-[var(--app-accent)] border-[var(--app-border)]',
-  MODERATE: 'bg-[rgba(56,189,248,0.12)] text-[var(--app-accent-sky)] border-[var(--app-border)]',
-  WEAK: 'bg-transparent text-[var(--app-text-muted)] border-[var(--app-border)]',
-};
-const SEVERITY_COLORS = {
-  Critical: 'bg-[rgba(244,63,94,0.12)] text-rose-300 border-[var(--app-border)]',
-  High: 'bg-[rgba(56,189,248,0.12)] text-[var(--app-accent-sky)] border-[var(--app-border)]',
-  Medium: 'bg-transparent text-[var(--app-text-muted)] border-[var(--app-border)]',
-  Low: 'bg-[rgba(45,212,191,0.12)] text-[var(--app-accent)] border-[var(--app-border)]',
-};
-const CAUSALITY_COLORS = {
-  Certain: 'bg-[rgba(45,212,191,0.12)] text-[var(--app-accent)] border-[var(--app-border)]',
-  Probable: 'bg-[rgba(56,189,248,0.12)] text-[var(--app-accent-sky)] border-[var(--app-border)]',
-  Possible: 'bg-transparent text-[var(--app-text-muted)] border-[var(--app-border)]',
-  Unlikely: 'bg-transparent text-[var(--app-text-faint)] border-[var(--app-border)]',
-  Unassessable: 'bg-transparent text-[var(--app-text-faint)] border-[var(--app-border)]',
+const STRENGTH_TONE = { STRONG: 'ok', MODERATE: 'info', WEAK: 'muted' };
+const SEVERITY_TONE = { Critical: 'err', High: 'warn', Medium: 'muted', Low: 'ok' };
+const CAUSALITY_TONE = {
+  Certain: 'ok',
+  Probable: 'info',
+  Possible: 'muted',
+  Unlikely: 'muted',
+  Unassessable: 'muted',
 };
 
-export function Badge({ children, kind, value, className = '' }) {
-  let colors = 'bg-transparent text-[var(--app-text-muted)] border-[var(--app-border)]';
-  if (kind === 'strength') colors = STRENGTH_COLORS[value] || colors;
-  if (kind === 'severity') colors = SEVERITY_COLORS[value] || colors;
-  if (kind === 'causality') colors = CAUSALITY_COLORS[value] || colors;
+export function Badge({ children, kind, value, className = '', tone, dot, pulse, ...rest }) {
+  let resolved = tone || 'muted';
+  if (!tone) {
+    if (kind === 'strength') resolved = STRENGTH_TONE[value] || 'muted';
+    if (kind === 'severity') resolved = SEVERITY_TONE[value] || 'muted';
+    if (kind === 'causality') resolved = CAUSALITY_TONE[value] || 'muted';
+  }
   return (
-    <span
-      className={`inline-flex items-center border px-2 py-0.5 text-[10px] font-medium font-mono tracking-wide ${colors} ${className}`}
-      style={{ borderRadius: 'var(--va-radius, 4px)' }}
-    >
+    <CdsBadge tone={resolved} dot={dot} pulse={pulse} className={className} {...rest}>
       {children ?? value}
-    </span>
+    </CdsBadge>
   );
 }
 
-export function StatCard({ label, value, sub, accent = 'text-[var(--app-accent-sky)]', icon }) {
+export function StatCard({ label, value, sub, accent = 'text-[var(--cds-sys-accent-primary)]', icon }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" variant="glass">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.08em] text-[var(--app-text-muted)] font-mono">{label}</span>
-        {icon && <span className="text-[var(--app-text-faint)]">{icon}</span>}
+        <span className="text-[10px] uppercase tracking-[0.08em] text-[var(--cds-sys-text-secondary)] font-mono">
+          {label}
+        </span>
+        {icon && <span className="text-[var(--cds-sys-text-tertiary)]">{icon}</span>}
       </div>
       <div className={`mt-2 font-mono font-bold tracking-tight text-2xl sm:text-3xl ${accent}`}>{value}</div>
-      {sub && <div className="mt-1 text-xs text-[var(--app-text-muted)]">{sub}</div>}
+      {sub && <div className="mt-1 text-xs text-[var(--cds-sys-text-secondary)]">{sub}</div>}
     </Card>
   );
 }
 
-export function Spinner({ label = 'Loading…' }) {
+export function Spinner({ label = 'Loading…', size = 'sm' }) {
   return (
-    <div className="flex items-center gap-2 text-[var(--app-text-muted)] text-sm py-8 justify-center font-mono text-xs tracking-wide">
-      <span
-        className="inline-block h-2 w-2 bg-[var(--app-accent)]"
-        style={{ borderRadius: 0 }}
-        aria-hidden
-      />
-      {label}
+    <div className="flex items-center gap-2 text-[var(--cds-sys-text-secondary)] py-8 justify-center font-mono text-xs tracking-wide">
+      <CdsSpinner size={size} label={label} />
+      <span>{label}</span>
     </div>
   );
 }
 
-export function Button({ children, onClick, variant = 'primary', disabled, className = '', type = 'button' }) {
-  const styles = {
-    primary: 'bg-[var(--app-accent)] hover:opacity-90 text-[#030712]',
-    ghost: 'bg-[var(--app-surface)] hover:bg-[var(--app-surface-hover)] text-[var(--app-text-secondary)] border border-[var(--app-border)]',
-    danger: 'bg-rose-700 hover:opacity-90 text-white',
-  };
+const BUTTON_VARIANT = {
+  primary: 'gradient',
+  secondary: 'outline',
+  gradient: 'gradient',
+  ghost: 'ghost',
+  danger: 'danger',
+  outline: 'outline',
+  glass: 'glass',
+};
+
+export function Button({
+  children,
+  onClick,
+  variant = 'primary',
+  disabled,
+  className = '',
+  type = 'button',
+  loading,
+  size,
+  ...rest
+}) {
   return (
-    <button
+    <CdsButton
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`px-3 py-1.5 text-sm font-semibold disabled:opacity-50 ${styles[variant] || styles.primary} ${className}`}
-      style={{ borderRadius: 'var(--va-radius, 4px)', letterSpacing: '-0.02em' }}
+      variant={BUTTON_VARIANT[variant] || 'primary'}
+      loading={loading}
+      size={size}
+      className={className}
+      {...rest}
     >
       {children}
-    </button>
+    </CdsButton>
   );
 }
 
@@ -122,7 +132,7 @@ export function PaginationBar({
   const to = Math.min(total, safePage * pageSize);
   if (total <= pageSize) {
     return (
-      <div className={`flex items-center justify-between gap-2 text-[11px] text-slate-500 ${className}`}>
+      <div className={`flex items-center justify-between gap-2 text-[11px] text-[var(--cds-sys-text-tertiary)] ${className}`}>
         <span>
           {total} {label}
         </span>
@@ -130,33 +140,31 @@ export function PaginationBar({
     );
   }
   return (
-    <div className={`flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 ${className}`}>
+    <div className={`flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--cds-sys-text-secondary)] ${className}`}>
       <span>
-        Showing <span className="text-slate-200 tabular-nums">{from}–{to}</span> of{' '}
-        <span className="text-slate-200 tabular-nums">{total}</span> {label}
+        Showing <span className="text-[var(--cds-sys-text-primary)] tabular-nums">{from}–{to}</span> of{' '}
+        <span className="text-[var(--cds-sys-text-primary)] tabular-nums">{total}</span> {label}
       </span>
       <div className="flex items-center gap-1.5">
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           disabled={safePage <= 1}
           onClick={() => onPageChange?.(safePage - 1)}
-          className="px-2 py-1 border border-slate-700 disabled:opacity-40 hover:border-sky-500/40 hover:text-sky-200"
-          style={{ borderRadius: 4 }}
         >
           Prev
-        </button>
-        <span className="font-mono text-slate-300 px-1">
+        </Button>
+        <span className="font-mono text-[var(--cds-sys-text-primary)] px-1">
           {safePage} / {totalPages}
         </span>
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           disabled={safePage >= totalPages}
           onClick={() => onPageChange?.(safePage + 1)}
-          className="px-2 py-1 border border-slate-700 disabled:opacity-40 hover:border-sky-500/40 hover:text-sky-200"
-          style={{ borderRadius: 4 }}
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );

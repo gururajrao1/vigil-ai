@@ -182,18 +182,15 @@ export default function PredictiveIntelligence({ embedded = false }) {
 
       <div className="flex flex-wrap gap-2">
         {tabs.map((t) => (
-          <button
+          <Button
             key={t.id}
             type="button"
+            size="sm"
+            variant={tab === t.id ? 'gradient' : 'ghost'}
             onClick={() => setTab(t.id)}
-            className={`px-3 py-1.5 rounded text-xs border ${
-              tab === t.id
-                ? 'bg-sky-500/20 text-sky-200 border-sky-500/40'
-                : 'bg-slate-900/40 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
           >
             {t.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -246,19 +243,17 @@ export default function PredictiveIntelligence({ embedded = false }) {
                   const on =
                     productId === p.product_id && targetAe === p.target_ae_pt;
                   return (
-                    <button
+                    <Button
                       key={`${p.product_id}|${p.target_ae_pt}`}
                       type="button"
+                      size="sm"
+                      variant={on ? 'glass' : 'outline'}
                       onClick={() => applyPair(p.product_id, p.target_ae_pt)}
-                      className={`rounded border px-2 py-1 text-[11px] capitalize ${
-                        on
-                          ? 'border-sky-500/50 bg-sky-500/15 text-sky-200'
-                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-sky-600/40 hover:text-sky-200'
-                      }`}
+                      className="capitalize"
                     >
                       {p.product_id} → {p.target_ae_pt}{' '}
-                      <span className="text-slate-500">n={p.n}</span>
-                    </button>
+                      <span className="opacity-60">n={p.n}</span>
+                    </Button>
                   );
                 })}
               </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { Badge, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 import OmniSearchGateway from '../modules/search/OmniSearchGateway';
 import { usePharmacovigilance } from '../context/PharmacovigilanceContext';
 import Signals from '../pages/Signals';
@@ -104,14 +104,15 @@ export default function SignalsView({ embedded = false }) {
         <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
           <span>Try:</span>
           {['Janumet', 'Ozempic', 'Coumadin', 'metformin', 'RXNORM:VIG-6809'].map((ex) => (
-            <button
+            <Button
               key={ex}
               type="button"
-              className="rounded border border-slate-700 px-1.5 py-0.5 text-slate-300 hover:border-slate-500"
+              size="sm"
+              variant="outline"
               onClick={() => runOmni(ex)}
             >
               {ex}
-            </button>
+            </Button>
           ))}
           <Link to="/signals" className="ml-auto text-cyan-400 hover:text-cyan-300">
             Open Detect with this search →
@@ -142,13 +143,14 @@ export default function SignalsView({ embedded = false }) {
           {rows.length === 0 ? (
             <p className="mt-3 text-sm text-slate-400">
               No AE rows yet. Load the PV demo pack, then{' '}
-              <button
+              <Button
                 type="button"
-                className="text-cyan-400 hover:text-cyan-300"
+                variant="ghost"
+                size="sm"
                 onClick={() => api.omopSync({ limit: 300 }).then(() => runOmni(activeSearchTerm || 'Janumet'))}
               >
                 sync OMOP staging
-              </button>
+              </Button>
               .
             </p>
           ) : (

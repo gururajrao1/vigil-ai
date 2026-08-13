@@ -1,38 +1,19 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Tabs, TabsList, TabsTrigger } from '@clairlabs-ai/prp-ui';
 
 /** Horizontal tab strip for hub pages (one window, multiple related views). */
 export function PageTabs({ tabs, active, onChange }) {
   return (
-    <div
-      className="flex flex-wrap gap-0 border border-[var(--app-border)] bg-[var(--app-surface)]"
-      role="tablist"
-      style={{ borderRadius: 4 }}
-    >
-      {tabs.map((t, i) => {
-        const on = active === t.id;
-        return (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={on}
-            onClick={() => onChange(t.id)}
-            className={`px-3 py-2 text-xs font-semibold border-r border-[var(--app-border)] last:border-r-0 ${
-              on
-                ? 'text-[var(--app-accent)] bg-[var(--app-accent-muted)]'
-                : 'text-[var(--app-text-muted)] hover:text-[var(--app-text)] hover:bg-[var(--app-surface-hover)]'
-            }`}
-            style={{
-              letterSpacing: '-0.02em',
-              borderBottom: on ? '2px solid var(--app-accent)' : '2px solid transparent',
-            }}
-          >
+    <Tabs value={active} onValueChange={onChange}>
+      <TabsList aria-label="Hub sections">
+        {tabs.map((t) => (
+          <TabsTrigger key={t.id} value={t.id}>
             {t.label}
-          </button>
-        );
-      })}
-    </div>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }
 

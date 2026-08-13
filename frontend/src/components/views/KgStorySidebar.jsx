@@ -1,3 +1,5 @@
+import { Badge, Button, Card } from '../ui';
+
 /**
  * Signal Story Mode — left-rail controller for KG narrative focus steps.
  */
@@ -26,20 +28,20 @@ export default function KgStorySidebar({
   const on = activeStoryStep > 0;
 
   return (
-    <aside className="w-full lg:w-[30%] shrink-0 rounded-xl border border-slate-700/60 bg-slate-950/80 p-4 space-y-4">
+    <Card className="w-full lg:w-[30%] shrink-0 p-4 space-y-4" variant="glass">
       <div>
-        <h3 className="text-sm font-semibold text-slate-100">Signal Story Mode</h3>
-        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+        <h3 className="text-sm font-semibold text-[var(--cds-sys-text-primary)]">Signal Story Mode</h3>
+        <p className="text-[11px] text-[var(--cds-sys-text-tertiary)] mt-1 leading-relaxed">
           Step through a clinical narrative. The canvas opacity tracks this stepper so the hairball never owns the room.
         </p>
       </div>
 
       <label className="block space-y-1">
-        <span className="text-[10px] uppercase tracking-wide text-slate-500">Target drug</span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--cds-sys-text-tertiary)]">Target drug</span>
         <select
           value={targetDrug || ''}
           onChange={(e) => onPickTarget(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs text-slate-200"
+          className="w-full px-2.5 py-2 text-xs"
         >
           <option value="">Pick a product…</option>
           {drugOptions.map((d) => (
@@ -49,18 +51,16 @@ export default function KgStorySidebar({
       </label>
 
       <div className="flex items-center gap-2">
-        <button
+        <Button
           type="button"
           disabled={!targetDrug}
           onClick={() => setActiveStoryStep(on ? 0 : 1)}
-          className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium border transition disabled:opacity-40 ${
-            on
-              ? 'bg-teal-500/20 text-teal-200 border-teal-500/40'
-              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-          }`}
+          variant={on ? 'outline' : 'gradient'}
+          size="sm"
+          className="flex-1"
         >
           {on ? 'Exit story' : 'Start story'}
-        </button>
+        </Button>
       </div>
 
       <ol className="space-y-2">
@@ -69,54 +69,44 @@ export default function KgStorySidebar({
           const done = activeStoryStep > s.id;
           return (
             <li key={s.id}>
-              <button
+              <Button
                 type="button"
                 disabled={!targetDrug}
                 onClick={() => setActiveStoryStep(s.id)}
-                className={`w-full text-left rounded-lg border px-3 py-2.5 transition disabled:opacity-40 ${
-                  active
-                    ? 'border-teal-500/50 bg-teal-500/10'
-                    : done
-                      ? 'border-slate-700/80 bg-slate-900/40'
-                      : 'border-slate-800 bg-slate-900/20 hover:border-slate-600'
-                }`}
+                variant={active ? 'glass' : 'ghost'}
+                className="w-full justify-start text-left h-auto py-2.5"
               >
-                <div className="flex items-center gap-2">
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                    active ? 'bg-teal-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                  }`}
-                  >
-                    {s.id}
-                  </span>
-                  <span className={`text-xs font-medium ${active ? 'text-teal-100' : 'text-slate-300'}`}>
-                    {s.title}
-                  </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge tone={active ? 'brand' : done ? 'ok' : 'muted'} value={String(s.id)} />
+                    <span className="text-xs font-medium">{s.title}</span>
+                  </div>
+                  {active && (
+                    <p className="text-[11px] text-[var(--cds-sys-text-secondary)] mt-2 leading-relaxed pl-1">{s.body}</p>
+                  )}
                 </div>
-                {active && (
-                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed pl-7">{s.body}</p>
-                )}
-              </button>
+              </Button>
             </li>
           );
         })}
       </ol>
 
       {activeStoryStep === 1 && targetDrug && (
-        <div className="rounded-lg border border-sky-500/25 bg-sky-500/5 px-3 py-2 text-[11px] text-slate-400 space-y-1">
-          <div className="text-sky-300 font-medium">Focus · {targetDrug}</div>
+        <div className="px-3 py-2 text-[11px] text-[var(--cds-sys-text-secondary)] space-y-1">
+          <div className="font-medium text-[var(--cds-sys-accent-primary)]">Focus · {targetDrug}</div>
           <div>{targetAes.length} linked AE{targetAes.length === 1 ? '' : 's'} in neighborhood</div>
         </div>
       )}
 
       {activeStoryStep === 2 && (
-        <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[11px] text-slate-400 space-y-1">
-          <div className="text-amber-300 font-medium">Contrast set</div>
+        <div className="px-3 py-2 text-[11px] text-[var(--cds-sys-text-secondary)] space-y-1">
+          <Badge tone="warn" value="Contrast set" />
           {contrastDrugs.length === 0 ? (
             <div>No comparator products share these AEs in the current graph.</div>
           ) : (
             <ul className="list-disc pl-4 space-y-0.5">
               {contrastDrugs.slice(0, 8).map((d) => (
-                <li key={d} className="text-slate-300">{d}</li>
+                <li key={d}>{d}</li>
               ))}
             </ul>
           )}
@@ -124,24 +114,28 @@ export default function KgStorySidebar({
       )}
 
       <div className="flex gap-2 pt-1">
-        <button
+        <Button
           type="button"
           disabled={activeStoryStep <= 1 || !targetDrug}
           onClick={() => setActiveStoryStep((s) => Math.max(1, s - 1))}
-          className="flex-1 rounded-lg border border-slate-700 px-2 py-1.5 text-xs text-slate-400 disabled:opacity-30 hover:bg-slate-800"
+          variant="outline"
+          size="sm"
+          className="flex-1"
         >
           ← Prev
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           disabled={!targetDrug || activeStoryStep >= 2}
           onClick={() => setActiveStoryStep((s) => Math.min(2, (s || 0) + 1 || 1))}
-          className="flex-1 rounded-lg border border-teal-700/50 bg-teal-500/10 px-2 py-1.5 text-xs text-teal-200 disabled:opacity-30 hover:bg-teal-500/20"
+          variant="gradient"
+          size="sm"
+          className="flex-1"
         >
           Next →
-        </button>
+        </Button>
       </div>
-    </aside>
+    </Card>
   );
 }
 

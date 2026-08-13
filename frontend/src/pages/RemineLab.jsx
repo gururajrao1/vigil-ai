@@ -203,19 +203,22 @@ export default function RemineLab({ embedded = false }) {
             {(data.products || []).map((p) => <option key={p} value={p} />)}
           </datalist>
           {draft && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setDraft('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200 px-1.5 py-0.5"
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+              aria-label="Clear product filter"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
         <select
           value={sort}
           onChange={(e) => { setSort(e.target.value); setOffset(0); }}
-          className="sm:w-52 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500/60"
+          className="sm:w-52 px-3 py-2.5 text-sm"
           aria-label="Sort remine candidates"
         >
           {SORTS.map((s) => <option key={s.id} value={s.id}>Sort: {s.label}</option>)}
@@ -228,18 +231,15 @@ export default function RemineLab({ embedded = false }) {
           const n = f.id === 'all' ? facets.all : facets[f.id];
           const active = only === f.id;
           return (
-            <button
+            <Button
               key={f.id}
               type="button"
+              size="sm"
+              variant={active ? 'gradient' : 'ghost'}
               onClick={() => { setOnly(f.id); setOffset(0); }}
-              className={`rounded-full border px-3 py-1 text-xs transition ${
-                active
-                  ? 'bg-sky-500/20 text-sky-200 border-sky-500/40'
-                  : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
-              }`}
             >
-              {f.label}{n != null && <span className="ml-1.5 text-slate-500">{n}</span>}
-            </button>
+              {f.label}{n != null && <span className="ml-1.5 opacity-60">{n}</span>}
+            </Button>
           );
         })}
       </div>

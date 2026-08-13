@@ -72,17 +72,18 @@ export default function OmniSearchGateway({
             <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
               {suggestions.map((s) => (
                 <li key={`${s.term}-${s.score}`}>
-                  <button
+                  <Button
                     type="button"
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800/80"
+                    variant="ghost"
+                    className="w-full justify-between text-left h-auto py-2 px-3"
                     onClick={() => {
                       setQ(s.term);
                       submit(s.term);
                     }}
                   >
                     <span>{s.term}</span>
-                    <span className="font-mono text-[10px] text-slate-500">{s.score}</span>
-                  </button>
+                    <span className="font-mono text-[10px] opacity-60">{s.score}</span>
+                  </Button>
                 </li>
               ))}
             </ul>

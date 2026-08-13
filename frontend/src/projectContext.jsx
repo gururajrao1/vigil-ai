@@ -1,4 +1,11 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@clairlabs-ai/prp-ui';
 import { api, getProjectId, setProjectId } from './api';
 
 const ProjectContext = createContext({
@@ -51,20 +58,27 @@ export function ProjectSelector() {
   const { project, projects, setActiveProject } = useProject();
   if (!projects.length) return null;
   return (
-    <select
-      value={project?.id || ''}
-      onChange={(e) => {
-        const p = projects.find((x) => String(x.id) === e.target.value);
+    <Select
+      value={project?.id != null ? String(project.id) : undefined}
+      onValueChange={(id) => {
+        const p = projects.find((x) => String(x.id) === id);
         if (p) setActiveProject(p);
       }}
-      className="text-xs rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-text-secondary)] px-2 py-1.5 max-w-[min(220px,42vw)] truncate"
-      title="Active surveillance workspace — Fetch, Demo, Pathfinder, and KG use this project"
     >
-      {projects.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.name}{(p.post_count ?? 0) === 0 ? ' (empty)' : ''}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger
+        aria-label="Active surveillance workspace"
+        className="max-w-[min(220px,42vw)]"
+        title="Active surveillance workspace — Fetch, Demo, Pathfinder, and KG use this project"
+      >
+        <SelectValue placeholder="Project" />
+      </SelectTrigger>
+      <SelectContent>
+        {projects.map((p) => (
+          <SelectItem key={p.id} value={String(p.id)}>
+            {p.name}{(p.post_count ?? 0) === 0 ? ' (empty)' : ''}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

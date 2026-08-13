@@ -148,18 +148,15 @@ export default function RiskPopulations({ embedded = false }) {
           { id: 'rank', label: 'REM ranking' },
           { id: 'predict', label: 'Logistic segments' },
         ].map((m) => (
-          <button
+          <Button
             key={m.id}
             type="button"
+            size="sm"
+            variant={mode === m.id ? 'gradient' : 'ghost'}
             onClick={() => setMode(m.id)}
-            className={`rounded-full border px-3 py-1 text-xs transition ${
-              mode === m.id
-                ? 'bg-sky-500/20 text-sky-200 border-sky-500/40'
-                : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
           >
             {m.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -212,18 +209,20 @@ export default function RiskPopulations({ embedded = false }) {
           />
           <div className="flex flex-wrap gap-1.5">
             {pairSlice.map((p) => (
-              <button
+              <Button
                 key={`${p.product_id}|${p.target_ae_pt}`}
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => {
                   setProductId(p.product_id);
                   setTargetAe(p.target_ae_pt);
                   load(p.product_id, p.target_ae_pt);
                 }}
-                className="rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1 text-[11px] text-slate-300 hover:border-sky-600/50 hover:text-sky-200 capitalize"
+                className="capitalize"
               >
-                {p.product_id} → {p.target_ae_pt} <span className="text-slate-500">n={p.n}</span>
-              </button>
+                {p.product_id} → {p.target_ae_pt} <span className="opacity-60">n={p.n}</span>
+              </Button>
             ))}
           </div>
         </Card>

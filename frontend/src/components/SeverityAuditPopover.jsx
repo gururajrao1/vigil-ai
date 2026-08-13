@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { Badge, Spinner } from './ui';
+import { Badge, Button, Spinner } from './ui';
 
 function CheckCell({ check }) {
   if (!check) return <span className="text-[var(--app-text-faint)]">—</span>;
@@ -83,9 +83,12 @@ export default function SeverityAuditPopover({ signalId, severity, className = '
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <button
+      <Button
         type="button"
-        className="cursor-pointer appearance-none bg-transparent border-0 p-0"
+        variant="ghost"
+        size="sm"
+        className="!p-0 h-auto min-h-0"
+        aria-label={`Severity ${severity || 'unknown'} — open audit`}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={(e) => {
@@ -94,7 +97,7 @@ export default function SeverityAuditPopover({ signalId, severity, className = '
         }}
       >
         <Badge kind="severity" value={severity} />
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -124,7 +127,7 @@ export default function SeverityAuditPopover({ signalId, severity, className = '
               <div className="flex flex-wrap gap-1.5 text-[10px]">
                 <Badge kind="strength" value={audit.strength} />
                 {audit.sdr_flag && (
-                  <Badge value="SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" />
+                  <Badge value="SDR" tone="err" />
                 )}
                 {audit.severity?.who_umc && (
                   <Badge kind="causality" value={audit.severity.who_umc} />

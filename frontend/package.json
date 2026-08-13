@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clairlabs-ai/prp-ui": "file:clairlabs-ai-prp-ui-1.0.0.tgz",
     "@tailwindcss/vite": "^4.3.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

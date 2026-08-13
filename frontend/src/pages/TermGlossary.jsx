@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
-import { Card, CardHeader, Spinner } from '../components/ui';
+import { Button, Card, CardHeader, Spinner } from '../components/ui';
 
 /**
  * Term glossary — browseable patient-phrase → MedDRA PT reference.
@@ -163,18 +163,15 @@ export default function TermGlossary({ embedded = false }) {
           />
           <div className="mt-3 flex flex-wrap gap-2">
             {(activePtBlock.patient_phrases || []).map((phrase) => (
-              <button
+              <Button
                 key={phrase}
                 type="button"
+                size="sm"
+                variant={phrase === selectedPhrase ? 'glass' : 'outline'}
                 onClick={() => onPickPhrase(phrase)}
-                className={`rounded-md border px-2.5 py-1 text-xs transition ${
-                  phrase === selectedPhrase
-                    ? 'border-sky-500/50 bg-sky-500/15 text-sky-200'
-                    : 'border-[var(--app-border)] bg-[var(--app-surface)] text-[var(--app-text-muted)] hover:text-[var(--app-text)]'
-                }`}
               >
                 {phrase}
-              </button>
+              </Button>
             ))}
           </div>
         </Card>

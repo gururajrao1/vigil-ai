@@ -283,19 +283,21 @@ export default function SourceQueue({ embedded = false }) {
                           <Button disabled={busy} onClick={() => approve(s.id, false)}>
                             {busy ? 'Onboarding…' : 'Approve & Onboard'}
                           </Button>
-                          <button type="button" disabled={busy} onClick={() => reject(s.id)}
-                            className="text-xs text-rose-400 px-2">Skip</button>
+                          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => reject(s.id)}>
+                            Skip
+                          </Button>
                         </>
                       ) : (
                         <>
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             disabled={busy}
                             onClick={() => reject(s.id)}
-                            className="text-xs rounded-lg px-3 py-2 border border-amber-600/40 text-amber-200 hover:bg-amber-500/10"
                           >
                             {busy ? '…' : 'Skip paywall'}
-                          </button>
+                          </Button>
                           <Button
                             variant="ghost"
                             disabled={busy}

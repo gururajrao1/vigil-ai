@@ -4,7 +4,7 @@ import ForceGraph2D from 'react-force-graph-2d';
 import { api } from '../api';
 import { useRefresh } from '../App';
 import { useProject } from '../projectContext';
-import { Card, CardHeader, Spinner, Badge } from '../components/ui';
+import { Card, CardHeader, Spinner, Badge, Button } from '../components/ui';
 import KgStorySidebar, { computeStoryFocus } from '../components/views/KgStorySidebar';
 import { filterGraph, adverseEventsForDrug, drugsForAdverseEvent } from './kgFilter';
 import {
@@ -111,7 +111,7 @@ function FilterSelect({ label, value, options, onChange }) {
         {label} {count > 0 && <span className="text-[var(--app-text-faint)]">({count})</span>}
       </label>
       <select
-        className="app-input app-select block mt-1 w-full text-sm"
+        className="block mt-1 w-full text-sm"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={count === 0}
@@ -138,11 +138,9 @@ function ActiveFilterPills({ drug, symptom, condition, country, strength, onClea
     <div className="flex flex-wrap items-center gap-2 mt-3">
       <span className="text-[10px] uppercase tracking-wide text-[var(--app-text-faint)]">Active</span>
       {pills.map((p) => (
-        <span key={p.key} className="rounded-md px-2.5 py-0.5 text-xs bg-teal-500/15 text-teal-300 border border-teal-500/30">
-          {p.label}
-        </span>
+        <Badge key={p.key} tone="brand" value={p.label} />
       ))}
-      <button type="button" onClick={onClear} className="text-xs text-teal-400">Clear all</button>
+      <Button type="button" variant="ghost" size="sm" onClick={onClear}>Clear all</Button>
     </div>
   );
 }
@@ -187,14 +185,16 @@ function NodeDetailPanel({
     <aside className="w-full lg:w-[360px] shrink-0 border-l border-[#3c4947] bg-[#122131] flex flex-col max-h-[640px]">
       <div className="px-4 py-3 border-b border-[#3c4947] bg-[#1c2b3c]/50 flex items-center justify-between">
         <h2 className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#859490]">Entity inspector</h2>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
+          iconOnly
           onClick={onClose}
-          className="text-[#859490] hover:text-[#d4e4fa] text-lg leading-none px-1"
           aria-label="Close inspector"
         >
           ×
-        </button>
+        </Button>
       </div>
       <div className="p-4 border-b border-[#3c4947]">
         <div className="min-w-0">
@@ -210,22 +210,24 @@ function NodeDetailPanel({
 
         <div className="flex flex-wrap gap-2 mt-3">
           {isDrug && onFilterDrug && (
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() => onFilterDrug(displayLabel(node))}
-              className="text-[10px] rounded px-2 py-1 bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25"
             >
               Filter graph to this drug
-            </button>
+            </Button>
           )}
           {isAe && onFilterAe && (
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() => onFilterAe(displayLabel(node))}
-              className="text-[10px] rounded px-2 py-1 bg-rose-500/15 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25"
             >
               Filter graph to this AE
-            </button>
+            </Button>
           )}
         </div>
 
@@ -300,24 +302,27 @@ function NodeDetailPanel({
               {aeNeighbors.map(({ node: nb, edge }) => (
                 <li key={nb.id}>
                   <div className="flex items-stretch gap-1">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => onSelectNeighbor(nb.id)}
-                      className="flex-1 text-left text-xs rounded-lg px-2.5 py-2 hover:bg-slate-800 border border-slate-700/50"
+                      className="flex-1 justify-start text-left h-auto py-2"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-rose-300 font-medium">{displayLabel(nb)}</span>
-                        <StrengthBadge value={edge.strength} />
+                      <div className="min-w-0 w-full">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{displayLabel(nb)}</span>
+                          <StrengthBadge value={edge.strength} />
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-[var(--cds-sys-text-tertiary)]">
+                          {edge.prr != null && <span>PRR {edge.prr}</span>}
+                          {edge.ror != null && <span>ROR {edge.ror}</span>}
+                          {edge.post_count != null && <span>{edge.post_count} posts</span>}
+                          {edge.severity && (
+                            <Badge kind="severity" value={edge.severity} className="!text-[9px] !px-1.5 !py-0" />
+                          )}
+                        </div>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-slate-500">
-                        {edge.prr != null && <span className="text-rose-300/80">PRR {edge.prr}</span>}
-                        {edge.ror != null && <span>ROR {edge.ror}</span>}
-                        {edge.post_count != null && <span>{edge.post_count} posts</span>}
-                        {edge.severity && (
-                          <Badge kind="severity" value={edge.severity} className="!text-[9px] !px-1.5 !py-0" />
-                        )}
-                      </div>
-                    </button>
+                    </Button>
                     {edge.signal_id && (
                       <Link
                         to={`/signals/${edge.signal_id}`}
@@ -329,14 +334,15 @@ function NodeDetailPanel({
                       </Link>
                     )}
                     {onFilterAe && (
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
+                        variant="outline"
                         title="Filter graph to this AE"
                         onClick={() => onFilterAe(displayLabel(nb))}
-                        className="shrink-0 text-[10px] px-2 rounded-lg border border-rose-500/30 text-rose-300 hover:bg-rose-500/15"
                       >
                         Filter
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </li>
@@ -394,29 +400,32 @@ function NodeDetailPanel({
                   <ul className="space-y-1">
                     {items.map(({ node: nb, edge, direction }) => (
                       <li key={`${nb.id}-${kind}-${direction}`}>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => onSelectNeighbor(nb.id)}
-                          className="w-full text-left text-xs rounded-lg px-2.5 py-2 hover:bg-slate-800 border border-transparent hover:border-slate-700/80 transition-colors group"
+                          className="w-full justify-start text-left h-auto py-2"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="flex items-center gap-2 min-w-0">
-                              <span
-                                className="w-2 h-2 rounded-full shrink-0"
-                                style={{ background: TYPE_COLORS[nb.type] }}
-                              />
-                              <span className="truncate text-slate-100 group-hover:text-white font-medium">{displayLabel(nb)}</span>
-                            </span>
-                            <span className="text-[9px] uppercase tracking-wide text-slate-600 shrink-0">
-                              {direction === 'outgoing' ? 'out' : 'in'}
-                            </span>
+                          <div className="min-w-0 w-full">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{ background: TYPE_COLORS[nb.type] }}
+                                />
+                                <span className="truncate font-medium">{displayLabel(nb)}</span>
+                              </span>
+                              <span className="text-[9px] uppercase tracking-wide text-[var(--cds-sys-text-tertiary)] shrink-0">
+                                {direction === 'outgoing' ? 'out' : 'in'}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--cds-sys-text-tertiary)] pl-4">
+                              <span>{TYPE_META[nb.type]?.label || nb.type}</span>
+                              {edge.prr != null && <span>PRR {edge.prr}</span>}
+                              {edge.strength && <StrengthBadge value={edge.strength} />}
+                            </div>
                           </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-500 pl-4">
-                            <span>{TYPE_META[nb.type]?.label || nb.type}</span>
-                            {edge.prr != null && <span className="text-rose-300/90">PRR {edge.prr}</span>}
-                            {edge.strength && <StrengthBadge value={edge.strength} />}
-                          </div>
-                        </button>
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -428,13 +437,15 @@ function NodeDetailPanel({
       </div>
 
       <div className="p-3 border-t border-[var(--app-border)] flex gap-2 bg-slate-950/80">
-        <button
+        <Button
           type="button"
+          variant="gradient"
+          size="sm"
           onClick={onFocus}
-          className="flex-1 text-xs rounded-lg px-3 py-2.5 bg-teal-500/15 text-teal-200 border border-teal-500/35 hover:bg-teal-500/25 font-medium"
+          className="flex-1"
         >
           {isFocused ? 'Show full graph' : 'Focus 1-hop neighborhood'}
-        </button>
+        </Button>
       </div>
     </aside>
   );
@@ -868,9 +879,9 @@ export default function KnowledgeGraph({ embedded = false }) {
                 <span className="text-slate-500 font-normal ml-1">({drugAeCatalog.length})</span>
               </h4>
               {symptom && (
-                <button type="button" className="text-[10px] text-teal-400" onClick={() => setSymptom('')}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSymptom('')}>
                   Clear AE filter
-                </button>
+                </Button>
               )}
             </div>
             {drugAeCatalog.length === 0 ? (
@@ -878,9 +889,11 @@ export default function KnowledgeGraph({ embedded = false }) {
             ) : (
               <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
                 {drugAeCatalog.map((a) => (
-                  <button
+                  <Button
                     key={a.symptom}
                     type="button"
+                    size="sm"
+                    variant={symptom === a.symptom ? 'glass' : 'outline'}
                     onClick={() => {
                       setSymptom(a.symptom);
                       setFocusNode(null);
@@ -892,22 +905,17 @@ export default function KnowledgeGraph({ embedded = false }) {
                         if (n) setSelectedNodeId(n.id);
                       }
                     }}
-                    className={`rounded-md px-2.5 py-1 text-[11px] border transition-colors ${
-                      symptom === a.symptom
-                        ? 'bg-rose-500/25 border-rose-400/50 text-rose-100'
-                        : 'bg-slate-900/60 border-slate-700 text-slate-300 hover:border-rose-500/40 hover:text-rose-200'
-                    }`}
                   >
                     {a.symptom}
                     {a.prr != null && (
-                      <span className="ml-1.5 tabular-nums text-slate-500">PRR {a.prr}</span>
+                      <span className="ml-1.5 tabular-nums opacity-60">PRR {a.prr}</span>
                     )}
                     {a.strength && (
                       <span className="ml-1.5 inline-block align-middle">
                         <StrengthBadge value={a.strength} />
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -924,9 +932,11 @@ export default function KnowledgeGraph({ embedded = false }) {
             ) : (
               <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
                 {aeDrugCatalog.map((d) => (
-                  <button
+                  <Button
                     key={d.drug}
                     type="button"
+                    size="sm"
+                    variant="outline"
                     onClick={() => {
                       setDrug(d.drug);
                       setFocusNode(null);
@@ -938,16 +948,15 @@ export default function KnowledgeGraph({ embedded = false }) {
                         if (n) setSelectedNodeId(n.id);
                       }
                     }}
-                    className="rounded-md px-2.5 py-1 text-[11px] border bg-slate-900/60 border-slate-700 text-slate-300 hover:border-sky-500/40"
                   >
                     {d.drug}
-                    {d.prr != null && <span className="ml-1.5 text-slate-500">PRR {d.prr}</span>}
+                    {d.prr != null && <span className="ml-1.5 opacity-60">PRR {d.prr}</span>}
                     {d.strength && (
                       <span className="ml-1.5 inline-block align-middle">
                         <StrengthBadge value={d.strength} />
                       </span>
                     )}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
@@ -1000,19 +1009,16 @@ export default function KnowledgeGraph({ embedded = false }) {
           <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1.5">Hubs — click to inspect</div>
           <div className="flex flex-wrap gap-1 max-h-[52px] overflow-y-auto">
             {(kg.hubs || []).slice(0, 8).map((h) => (
-              <button
+              <Button
                 key={h.id}
                 type="button"
+                size="sm"
+                variant={selectedNodeId === h.id ? 'glass' : 'ghost'}
                 onClick={() => setSelectedNodeId(h.id)}
-                className={`rounded-md px-2 py-0.5 text-[10px] border transition-colors ${
-                  selectedNodeId === h.id
-                    ? 'bg-teal-500/20 border-teal-500/40 text-teal-200'
-                    : 'bg-slate-800/80 border-slate-700/50 text-slate-300 hover:border-slate-500'
-                }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{ background: TYPE_COLORS[h.type] }} />
                 {h.label}
-              </button>
+              </Button>
             ))}
           </div>
         </Card>
@@ -1031,32 +1037,28 @@ export default function KnowledgeGraph({ embedded = false }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <div className="flex rounded border border-[#3c4947] overflow-hidden text-[10px]">
+            <div className="flex gap-1">
               {['auto', 'hubs', 'all'].map((m) => (
-                <button
+                <Button
                   key={m}
                   type="button"
+                  size="sm"
+                  variant={labelMode === m ? 'glass' : 'ghost'}
                   onClick={() => setLabelMode(m)}
-                  className={`px-2.5 py-1 uppercase tracking-wide ${
-                    labelMode === m ? 'bg-[#14b8a6]/25 text-[#4fdbc8]' : 'text-[#859490] hover:bg-[#1c2b3c]'
-                  }`}
                 >
                   Labels: {m}
-                </button>
+                </Button>
               ))}
             </div>
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant={hubsOnly ? 'outline' : 'ghost'}
               onClick={() => setHubsOnly((v) => !v)}
-              className={`text-[10px] uppercase tracking-wide px-2.5 py-1 rounded border ${
-                hubsOnly
-                  ? 'border-[#4fdbc8]/50 text-[#4fdbc8] bg-[#14b8a6]/10'
-                  : 'border-[#3c4947] text-[#859490]'
-              }`}
               title="When crowded, keep top-degree nodes per column"
             >
               {hubsOnly ? 'Hubs density ON' : 'Hubs density OFF'}
-            </button>
+            </Button>
             {selectedNodeId && (
               <span className="text-[10px] text-[#4fdbc8]">Inspector open</span>
             )}
@@ -1113,13 +1115,15 @@ export default function KnowledgeGraph({ embedded = false }) {
               <div className="flex-1" />
             </div>
             {focusNode && (
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => setFocusNode(null)}
-                className="absolute top-10 left-3 z-10 text-xs text-[#4fdbc8] bg-[#051424]/95 px-2.5 py-1 rounded border border-[#4fdbc8]/40"
+                className="absolute top-10 left-3 z-10"
               >
                 Clear neighborhood focus
-              </button>
+              </Button>
             )}
             <div ref={wrapRef} className="overflow-hidden relative z-[2]" style={{ height: canvasH }}>
               {graphData.nodes.length === 0 ? (

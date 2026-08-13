@@ -1,70 +1,72 @@
+import {
+  Alert,
+  AppHeader,
+  AppHeaderBrand,
+  AppHeaderControls,
+  AppHeaderNav,
+  AppHeaderTitle,
+  Badge,
+  BrandIcon,
+  Button,
+  Card,
+  Spinner,
+} from '@clairlabs-ai/prp-ui';
 import { BIOTECH_TOKENS as T } from './tokens';
 
-const toneColor = (tone) => {
-  if (tone === 'mint') return T.mint;
-  if (tone === 'sky') return T.sky;
-  return T.muted;
+const toneBadge = (tone) => {
+  if (tone === 'mint') return 'ok';
+  if (tone === 'sky') return 'info';
+  return 'muted';
 };
 
 function TopNav({ navigation, onNavigate }) {
   if (!navigation) return null;
+  const items = navigation.items || [];
+  const primary = items.find((i) => i.emphasis);
+  const links = items.filter((i) => !i.emphasis);
+
   return (
-    <header
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-        background: 'rgba(11,18,32,0.92)',
-        borderBottom: `1px solid ${T.border}`,
-        backdropFilter: 'blur(10px)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 28,
-        padding: '0 clamp(20px, 4vw, 56px)',
-        height: 64,
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span
-          style={{
-            fontFamily: T.fontDisplay,
-            fontWeight: 800,
-            fontSize: 17,
-            letterSpacing: '-0.04em',
-            color: T.text,
-          }}
-        >
-          {navigation.brand}
-        </span>
-        <span style={{ fontSize: 10, color: T.muted, letterSpacing: '0.04em' }}>
-          {navigation.wordmark_sub}
-        </span>
-      </div>
-      <nav style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-        {(navigation.items || []).map((item) => (
-          <button
+    <AppHeader>
+      <AppHeaderBrand>
+        <BrandIcon aria-hidden>VA</BrandIcon>
+        <AppHeaderTitle>
+          <span className="cds-text-gradient">{navigation.brand}</span>
+          {navigation.wordmark_sub ? (
+            <div className="text-[10px] text-[var(--cds-sys-text-tertiary)] tracking-wide font-normal mt-0.5">
+              {navigation.wordmark_sub}
+            </div>
+          ) : null}
+        </AppHeaderTitle>
+      </AppHeaderBrand>
+      <AppHeaderNav aria-label="Homepage sections">
+        {links.map((item) => (
+          <Button
             key={item.id}
             type="button"
+            variant="ghost"
+            size="sm"
             disabled={!!item.disabled}
             onClick={() => { if (!item.disabled) onNavigate?.(item.href); }}
-            style={{
-              fontFamily: T.fontDisplay,
-              fontSize: 13,
-              fontWeight: item.emphasis ? 700 : 500,
-              color: item.emphasis ? T.canvas : T.muted,
-              background: item.emphasis ? T.mint : 'transparent',
-              border: item.emphasis ? 'none' : `1px solid ${T.border}`,
-              padding: '8px 14px',
-              cursor: item.disabled ? 'wait' : 'pointer',
-              letterSpacing: '-0.02em',
-              opacity: item.disabled ? 0.55 : 1,
-            }}
           >
             {item.label}
-          </button>
+          </Button>
         ))}
-      </nav>
-    </header>
+      </AppHeaderNav>
+      <AppHeaderControls>
+        {primary && (
+          <Button
+            type="button"
+            variant="gradient"
+            size="sm"
+            disabled={!!primary.disabled}
+            loading={!!primary.disabled}
+            onClick={() => { if (!primary.disabled) onNavigate?.(primary.href); }}
+          >
+            {primary.label}
+          </Button>
+        )}
+      </AppHeaderControls>
+    </AppHeader>
   );
 }
 
@@ -73,149 +75,104 @@ function HeroManifesto({ hero, onNavigate }) {
   return (
     <section
       id="manifesto"
+      className="biotech-hero relative overflow-hidden border-b border-[var(--cds-sys-border-glass)]"
       style={{
-        background: T.navy,
-        borderBottom: `1px solid ${T.border}`,
         padding: 'clamp(48px, 8vw, 96px) clamp(20px, 4vw, 56px)',
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.4fr) minmax(240px, 0.7fr)',
-        gap: 'clamp(28px, 5vw, 64px)',
-        alignItems: 'start',
+        background: 'var(--cds-sys-gradient-deep)',
       }}
-      className="biotech-hero-grid"
     >
-      <div style={{ borderLeft: `3px solid ${T.mint}`, paddingLeft: 28 }}>
-        <p
-          style={{
-            margin: 0,
-            fontFamily: T.fontMono,
-            fontSize: 11,
-            color: T.sky,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-          }}
-        >
-          {hero.eyebrow}
-        </p>
-        <h1
-          style={{
-            margin: '18px 0 0',
-            fontFamily: T.fontDisplay,
-            fontWeight: 800,
-            fontSize: 'clamp(2.4rem, 5.5vw, 4.25rem)',
-            letterSpacing: '-0.04em',
-            lineHeight: 1.02,
-            color: T.text,
-            maxWidth: 720,
-          }}
-        >
-          {hero.title}
-        </h1>
-        <p
-          style={{
-            margin: '22px 0 0',
-            fontSize: 18,
-            lineHeight: 1.55,
-            color: T.text,
-            maxWidth: 560,
-            fontWeight: 500,
-            letterSpacing: '-0.02em',
-          }}
-        >
-          {hero.lede}
-        </p>
-        <p style={{ margin: '16px 0 0', fontSize: 15, lineHeight: 1.65, color: T.muted, maxWidth: 580 }}>
-          {hero.body}
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 22 }}>
-          {(hero.env_tags || []).map((t) => (
-            <span
-              key={t}
-              style={{
-                fontFamily: T.fontMono,
-                fontSize: 10,
-                color: T.mint,
-                border: `1px solid ${T.border}`,
-                padding: '5px 9px',
-                letterSpacing: '0.06em',
-              }}
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 28 }}>
-          {hero.primary_cta?.href && (
-            <button
-              type="button"
-              disabled={!!hero.primary_cta.disabled}
-              onClick={() => { if (!hero.primary_cta.disabled) onNavigate?.(hero.primary_cta.href); }}
-              style={{
-                fontFamily: T.fontDisplay,
-                fontWeight: 700,
-                fontSize: 14,
-                letterSpacing: '-0.03em',
-                background: T.mint,
-                color: T.canvas,
-                border: 'none',
-                padding: '12px 20px',
-                cursor: hero.primary_cta.disabled ? 'wait' : 'pointer',
-                opacity: hero.primary_cta.disabled ? 0.55 : 1,
-              }}
-            >
-              {hero.primary_cta.label}
-            </button>
-          )}
-          {hero.secondary_cta?.href && hero.secondary_cta?.label ? (
-            <button
-              type="button"
-              disabled={!!hero.secondary_cta.disabled}
-              onClick={() => { if (!hero.secondary_cta.disabled) onNavigate?.(hero.secondary_cta.href); }}
-              style={{
-                fontFamily: T.fontDisplay,
-                fontWeight: 600,
-                fontSize: 14,
-                letterSpacing: '-0.03em',
-                background: 'transparent',
-                color: T.text,
-                border: `1px solid ${T.border}`,
-                padding: '12px 20px',
-                cursor: hero.secondary_cta.disabled ? 'wait' : 'pointer',
-                opacity: hero.secondary_cta.disabled ? 0.55 : 1,
-              }}
-            >
-              {hero.secondary_cta.label}
-            </button>
-          ) : null}
-        </div>
-      </div>
-      <aside style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {(hero.throughput || []).map((s) => (
-          <div
-            key={s.label}
+      {/* Clair orb atmosphere — decorative only */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `
+            ${'var(--cds-sys-orb-1)'} 0% 0% / 55% 55% no-repeat,
+            ${'var(--cds-sys-orb-2)'} 100% 10% / 50% 50% no-repeat,
+            ${'var(--cds-sys-orb-3)'} 60% 100% / 45% 45% no-repeat
+          `,
+          opacity: 0.85,
+        }}
+      />
+      <div
+        className="biotech-hero-grid relative z-[1] grid gap-[clamp(28px,5vw,64px)] items-start"
+        style={{ gridTemplateColumns: 'minmax(0, 1.4fr) minmax(240px, 0.7fr)' }}
+      >
+        <div className="border-l-[3px] border-[var(--cds-sys-accent-primary)] pl-7">
+          <p className="m-0 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--cds-sys-accent-secondary)]">
+            {hero.eyebrow}
+          </p>
+          <h1
+            className="cds-text-gradient mt-[18px] mb-0 font-extrabold leading-[1.02] tracking-tight max-w-[720px]"
             style={{
-              background: T.glass,
-              border: `1px solid ${T.border}`,
-              padding: '18px 20px',
+              fontFamily: T.fontDisplay,
+              fontSize: 'clamp(2.4rem, 5.5vw, 4.25rem)',
             }}
           >
-            <div style={{ fontSize: 11, color: T.muted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              {s.label}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8 }}>
-              <span style={{ fontFamily: T.fontMono, fontSize: 32, fontWeight: 600, color: T.sky }}>
-                {s.value}
-              </span>
-              {s.unit && (
-                <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.muted }}>{s.unit}</span>
-              )}
-            </div>
-            <div style={{ marginTop: 8, fontFamily: T.fontMono, fontSize: 9, color: T.muted, letterSpacing: '0.04em' }}>
-              {s.provenance}
-            </div>
+            {hero.title}
+          </h1>
+          <p
+            className="mt-[22px] mb-0 max-w-[560px] text-[18px] font-medium leading-[1.55] tracking-tight text-[var(--cds-sys-text-primary)]"
+          >
+            {hero.lede}
+          </p>
+          <p className="mt-4 mb-0 max-w-[580px] text-[15px] leading-[1.65] text-[var(--cds-sys-text-secondary)]">
+            {hero.body}
+          </p>
+          <div className="mt-[22px] flex flex-wrap gap-2">
+            {(hero.env_tags || []).map((tag) => (
+              <Badge key={tag} tone="brand">
+                {tag}
+              </Badge>
+            ))}
           </div>
-        ))}
-      </aside>
+          <div className="mt-7 flex flex-wrap gap-3">
+            {hero.primary_cta?.href && (
+              <Button
+                type="button"
+                variant="gradient"
+                size="lg"
+                disabled={!!hero.primary_cta.disabled}
+                loading={!!hero.primary_cta.disabled}
+                onClick={() => { if (!hero.primary_cta.disabled) onNavigate?.(hero.primary_cta.href); }}
+              >
+                {hero.primary_cta.label}
+              </Button>
+            )}
+            {hero.secondary_cta?.href && hero.secondary_cta?.label ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                disabled={!!hero.secondary_cta.disabled}
+                onClick={() => { if (!hero.secondary_cta.disabled) onNavigate?.(hero.secondary_cta.href); }}
+              >
+                {hero.secondary_cta.label}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        <aside className="flex flex-col gap-3">
+          {(hero.throughput || []).map((s) => (
+            <Card key={s.label} variant="glass" className="px-5 py-[18px]">
+              <div className="text-[11px] uppercase tracking-[0.06em] text-[var(--cds-sys-text-secondary)]">
+                {s.label}
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="font-mono text-[32px] font-semibold text-[var(--cds-sys-accent-primary)]">
+                  {s.value}
+                </span>
+                {s.unit && (
+                  <span className="font-mono text-[11px] text-[var(--cds-sys-text-tertiary)]">{s.unit}</span>
+                )}
+              </div>
+              <div className="mt-2 font-mono text-[9px] tracking-wide text-[var(--cds-sys-text-tertiary)]">
+                {s.provenance}
+              </div>
+            </Card>
+          ))}
+        </aside>
+      </div>
       <style>{`
         @media (max-width: 900px) {
           .biotech-hero-grid { grid-template-columns: 1fr !important; }
@@ -230,62 +187,37 @@ function TechnologyPillars({ pillars }) {
   return (
     <section
       id="pillars"
-      style={{
-        padding: 'clamp(48px, 7vw, 88px) clamp(20px, 4vw, 56px)',
-        borderBottom: `1px solid ${T.border}`,
-      }}
+      className="border-b border-[var(--cds-sys-border-glass)]"
+      style={{ padding: 'clamp(48px, 7vw, 88px) clamp(20px, 4vw, 56px)' }}
     >
-      <p style={{ margin: 0, fontFamily: T.fontMono, fontSize: 11, color: T.mint, letterSpacing: '0.1em' }}>
+      <p className="m-0 font-mono text-[11px] tracking-[0.1em] text-[var(--cds-sys-accent-primary)]">
         CORE TECHNOLOGY PILLARS
       </p>
       <h2
-        style={{
-          margin: '12px 0 0',
-          fontFamily: T.fontDisplay,
-          fontWeight: 800,
-          fontSize: 'clamp(1.75rem, 3vw, 2.5rem)',
-          letterSpacing: '-0.04em',
-          color: T.text,
-          maxWidth: 520,
-        }}
+        className="mt-3 mb-0 max-w-[520px] font-extrabold tracking-tight text-[var(--cds-sys-text-primary)]"
+        style={{ fontFamily: T.fontDisplay, fontSize: 'clamp(1.75rem, 3vw, 2.5rem)' }}
       >
         Four gates. Offline-first. No silent API key debt.
       </h2>
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 16,
-          marginTop: 36,
-        }}
+        className="mt-9 grid gap-4"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}
       >
         {pillars.map((p) => (
-          <article
-            key={p.id}
-            style={{
-              background: T.navy,
-              border: `1px solid ${T.border}`,
-              padding: '24px 22px',
-              borderTop: `2px solid ${p.accent === 'sky' ? T.sky : T.mint}`,
-            }}
-          >
-            <div style={{ fontFamily: T.fontMono, fontSize: 11, color: p.accent === 'sky' ? T.sky : T.mint }}>
+          <Card key={p.id} variant="interactive" className="p-[22px_22px_24px]">
+            <Badge tone={p.accent === 'sky' ? 'info' : 'brand'} dot>
               {p.gate}
-            </div>
+            </Badge>
             <h3
-              style={{
-                margin: '12px 0 0',
-                fontFamily: T.fontDisplay,
-                fontWeight: 700,
-                fontSize: 20,
-                letterSpacing: '-0.03em',
-                color: T.text,
-              }}
+              className="mt-3 mb-0 font-bold tracking-tight text-[var(--cds-sys-text-primary)]"
+              style={{ fontFamily: T.fontDisplay, fontSize: 20 }}
             >
               {p.title}
             </h3>
-            <p style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.6, color: T.muted }}>{p.narrative}</p>
-          </article>
+            <p className="mt-3 mb-0 text-sm leading-relaxed text-[var(--cds-sys-text-secondary)]">
+              {p.narrative}
+            </p>
+          </Card>
         ))}
       </div>
     </section>
@@ -296,47 +228,39 @@ function PipelineSwimlane({ stages }) {
   if (!stages?.length) return null;
   return (
     <section
+      className="border-b border-[var(--cds-sys-border-glass)]"
       style={{
         padding: '40px clamp(20px, 4vw, 56px)',
-        borderBottom: `1px solid ${T.border}`,
-        background: T.navy,
+        background: 'var(--cds-sys-surface-chrome)',
       }}
     >
-      <p style={{ margin: 0, fontFamily: T.fontMono, fontSize: 11, color: T.sky, letterSpacing: '0.1em' }}>
+      <p className="m-0 font-mono text-[11px] tracking-[0.1em] text-[var(--cds-sys-accent-secondary)]">
         PIPELINE SWIMLANE
       </p>
-      <div
-        style={{
-          display: 'flex',
-          gap: 0,
-          marginTop: 20,
-          overflowX: 'auto',
-          border: `1px solid ${T.border}`,
-        }}
-      >
-        {stages.map((st, i) => (
-          <div
+      <div className="mt-5 flex gap-3 overflow-x-auto pb-1">
+        {stages.map((st) => (
+          <Card
             key={st.id}
-            style={{
-              flex: '1 0 140px',
-              padding: '18px 16px',
-              borderRight: i < stages.length - 1 ? `1px solid ${T.border}` : 'none',
-              background: T.glass,
-            }}
+            variant={st.state === 'active' ? 'deep' : 'glass'}
+            className="min-w-[140px] flex-1 px-4 py-[18px]"
           >
+            <Badge
+              tone={st.state === 'active' ? 'ok' : st.state === 'ready' ? 'info' : 'muted'}
+              dot
+              pulse={st.state === 'active'}
+            >
+              {st.state}
+            </Badge>
             <div
-              style={{
-                width: 8,
-                height: 8,
-                background: st.state === 'active' ? T.mint : st.state === 'ready' ? T.sky : T.border,
-                marginBottom: 12,
-              }}
-            />
-            <div style={{ fontFamily: T.fontDisplay, fontWeight: 700, fontSize: 14, color: T.text, letterSpacing: '-0.02em' }}>
+              className="mt-3 font-bold text-sm tracking-tight text-[var(--cds-sys-text-primary)]"
+              style={{ fontFamily: T.fontDisplay }}
+            >
               {st.label}
             </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: T.muted, lineHeight: 1.4 }}>{st.detail}</div>
-          </div>
+            <div className="mt-1.5 text-xs leading-snug text-[var(--cds-sys-text-secondary)]">
+              {st.detail}
+            </div>
+          </Card>
         ))}
       </div>
     </section>
@@ -348,112 +272,57 @@ function SignalSpotlight({ spot, onNavigate }) {
   return (
     <section
       id="spotlight"
-      style={{
-        padding: 'clamp(48px, 7vw, 88px) clamp(20px, 4vw, 56px)',
-        borderBottom: `1px solid ${T.border}`,
-      }}
+      className="border-b border-[var(--cds-sys-border-glass)]"
+      style={{ padding: 'clamp(48px, 7vw, 88px) clamp(20px, 4vw, 56px)' }}
     >
-      <p style={{ margin: 0, fontFamily: T.fontMono, fontSize: 11, color: T.mint, letterSpacing: '0.1em' }}>
+      <p className="m-0 font-mono text-[11px] tracking-[0.1em] text-[var(--cds-sys-accent-primary)]">
         {spot.eyebrow}
       </p>
-      <div
-        style={{
-          marginTop: 20,
-          background: T.navy,
-          border: `1px solid ${T.border}`,
-          padding: 'clamp(24px, 4vw, 40px)',
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.5fr) minmax(200px, 0.7fr)',
-          gap: 32,
-        }}
-        className="biotech-spot-grid"
+      <Card
+        variant="deep"
+        className="biotech-spot-grid mt-5 grid gap-8 p-[clamp(24px,4vw,40px)]"
+        style={{ gridTemplateColumns: 'minmax(0, 1.5fr) minmax(200px, 0.7fr)' }}
       >
         <div>
           <h2
-            style={{
-              margin: 0,
-              fontFamily: T.fontDisplay,
-              fontWeight: 800,
-              fontSize: 'clamp(1.6rem, 3vw, 2.35rem)',
-              letterSpacing: '-0.04em',
-              color: T.text,
-            }}
+            className="cds-text-gradient m-0 font-extrabold tracking-tight"
+            style={{ fontFamily: T.fontDisplay, fontSize: 'clamp(1.6rem, 3vw, 2.35rem)' }}
           >
             {spot.headline}
           </h2>
-          <p style={{ margin: '16px 0 0', fontSize: 15, lineHeight: 1.7, color: T.muted, maxWidth: 640 }}>
+          <p className="mt-4 mb-0 max-w-[640px] text-[15px] leading-[1.7] text-[var(--cds-sys-text-secondary)]">
             {spot.narrative}
           </p>
           {spot.patient_voice && (
-            <blockquote
-              style={{
-                margin: '22px 0 0',
-                padding: '16px 0 16px 18px',
-                borderLeft: `2px solid ${T.sky}`,
-                color: T.text,
-                fontSize: 15,
-                lineHeight: 1.6,
-                fontStyle: 'normal',
-              }}
-            >
+            <blockquote className="mt-[22px] mb-0 border-l-2 border-[var(--cds-sys-accent-secondary)] py-4 pl-[18px] text-[15px] leading-relaxed text-[var(--cds-sys-text-primary)] not-italic">
               {spot.patient_voice}
             </blockquote>
           )}
-          <p style={{ margin: '18px 0 0', fontFamily: T.fontMono, fontSize: 11, color: T.muted, lineHeight: 1.5 }}>
+          <p className="mt-[18px] mb-0 font-mono text-[11px] leading-snug text-[var(--cds-sys-text-tertiary)]">
             {spot.provenance_note}
           </p>
           {spot.href && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              className="mt-[22px]"
               onClick={() => onNavigate?.(spot.href)}
-              style={{
-                marginTop: 22,
-                fontFamily: T.fontDisplay,
-                fontWeight: 600,
-                fontSize: 13,
-                background: 'transparent',
-                color: T.sky,
-                border: `1px solid ${T.border}`,
-                padding: '10px 16px',
-                cursor: 'pointer',
-              }}
             >
               Open this pair →
-            </button>
+            </Button>
           )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="flex flex-col gap-2.5">
           {(spot.flags || []).map((f) => (
-            <div
-              key={f.key}
-              style={{
-                background: T.glass,
-                border: `1px solid ${T.border}`,
-                padding: '14px 16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                gap: 12,
-              }}
-            >
-              <span style={{ fontFamily: T.fontMono, fontSize: 11, color: T.muted, letterSpacing: '0.06em' }}>
+            <Card key={f.key} variant="glass" className="flex items-baseline justify-between gap-3 px-4 py-3.5">
+              <span className="font-mono text-[11px] tracking-wide text-[var(--cds-sys-text-secondary)]">
                 {f.key}
               </span>
-              <span
-                style={{
-                  fontFamily: T.fontMono,
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: toneColor(f.tone),
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                {f.value}
-              </span>
-            </div>
+              <Badge tone={toneBadge(f.tone)}>{f.value}</Badge>
+            </Card>
           ))}
         </div>
-      </div>
+      </Card>
       <style>{`
         @media (max-width: 800px) {
           .biotech-spot-grid { grid-template-columns: 1fr !important; }
@@ -467,34 +336,31 @@ function Honesty({ honesty }) {
   if (!honesty) return null;
   return (
     <section
+      className="border-b border-[var(--cds-sys-border-glass)]"
       style={{
         padding: '40px clamp(20px, 4vw, 56px)',
-        borderBottom: `1px solid ${T.border}`,
-        background: T.navy,
+        background: 'var(--cds-sys-surface-chrome)',
       }}
     >
       <h2
-        style={{
-          margin: 0,
-          fontFamily: T.fontDisplay,
-          fontWeight: 700,
-          fontSize: 20,
-          letterSpacing: '-0.03em',
-          color: T.text,
-        }}
+        className="m-0 font-bold tracking-tight text-[var(--cds-sys-text-primary)]"
+        style={{ fontFamily: T.fontDisplay, fontSize: 20 }}
       >
         {honesty.title}
       </h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20, marginTop: 20 }}>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: T.muted }}>
-          <strong style={{ color: T.mint }}>Live unstructured pipeline.</strong> {honesty.live_pipeline}
-        </p>
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: T.muted }}>
-          <strong style={{ color: T.sky }}>Local reference surrogates.</strong> {honesty.surrogate_benchmarks}
-        </p>
+      <div
+        className="mt-5 grid gap-5"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}
+      >
+        <Alert tone="info" title="Live unstructured pipeline">
+          {honesty.live_pipeline}
+        </Alert>
+        <Alert tone="success" title="Local reference surrogates">
+          {honesty.surrogate_benchmarks}
+        </Alert>
       </div>
       {(honesty.never_claim || []).length > 0 && (
-        <ul style={{ margin: '18px 0 0', paddingLeft: 18, color: T.muted, fontSize: 13, lineHeight: 1.7 }}>
+        <ul className="mt-[18px] mb-0 list-disc pl-[18px] text-[13px] leading-relaxed text-[var(--cds-sys-text-secondary)]">
           {honesty.never_claim.map((n) => (
             <li key={n}>Never claimed: {n}</li>
           ))}
@@ -507,45 +373,34 @@ function Honesty({ honesty }) {
 function CtaStrip({ strip, onNavigate }) {
   if (!strip) return null;
   return (
-    <section style={{ padding: '48px clamp(20px, 4vw, 56px)', borderBottom: `1px solid ${T.border}` }}>
-      <h2
-        style={{
-          margin: 0,
-          fontFamily: T.fontDisplay,
-          fontWeight: 800,
-          fontSize: 'clamp(1.5rem, 2.5vw, 2rem)',
-          letterSpacing: '-0.04em',
-          color: T.text,
-        }}
-      >
-        {strip.title}
-      </h2>
-      <p style={{ margin: '12px 0 0', color: T.muted, fontSize: 15, maxWidth: 560, lineHeight: 1.6 }}>
-        {strip.body}
-      </p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 22 }}>
-        {(strip.buttons || []).map((b) => (
-          <button
-            key={`${b.label}-${b.href}`}
-            type="button"
-            disabled={!!b.disabled}
-            onClick={() => { if (!b.disabled) onNavigate?.(b.href); }}
-            style={{
-              fontFamily: T.fontDisplay,
-              fontWeight: 600,
-              fontSize: 13,
-              background: T.glass,
-              color: T.text,
-              border: `1px solid ${T.border}`,
-              padding: '10px 16px',
-              cursor: b.disabled ? 'wait' : 'pointer',
-              opacity: b.disabled ? 0.55 : 1,
-            }}
-          >
-            {b.label}
-          </button>
-        ))}
-      </div>
+    <section
+      className="border-b border-[var(--cds-sys-border-glass)]"
+      style={{ padding: '48px clamp(20px, 4vw, 56px)' }}
+    >
+      <Card variant="glass" className="p-8" style={{ background: 'var(--cds-sys-gradient-soft)' }}>
+        <h2
+          className="cds-text-gradient m-0 font-extrabold tracking-tight"
+          style={{ fontFamily: T.fontDisplay, fontSize: 'clamp(1.5rem, 2.5vw, 2rem)' }}
+        >
+          {strip.title}
+        </h2>
+        <p className="mt-3 mb-0 max-w-[560px] text-[15px] leading-relaxed text-[var(--cds-sys-text-secondary)]">
+          {strip.body}
+        </p>
+        <div className="mt-[22px] flex flex-wrap gap-2.5">
+          {(strip.buttons || []).map((b) => (
+            <Button
+              key={`${b.label}-${b.href}`}
+              type="button"
+              variant="gradient"
+              disabled={!!b.disabled}
+              onClick={() => { if (!b.disabled) onNavigate?.(b.href); }}
+            >
+              {b.label}
+            </Button>
+          ))}
+        </div>
+      </Card>
     </section>
   );
 }
@@ -553,38 +408,30 @@ function CtaStrip({ strip, onNavigate }) {
 function ActionBar({ actions, onAction }) {
   if (!actions?.length) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '20px clamp(20px, 4vw, 56px)' }}>
+    <div className="flex flex-wrap gap-2" style={{ padding: '20px clamp(20px, 4vw, 56px)' }}>
       {actions.map((a) => (
-        <button
+        <Button
           key={a.id}
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => onAction?.(a)}
-          style={{
-            fontFamily: T.fontMono,
-            fontSize: 11,
-            color: T.muted,
-            background: 'transparent',
-            border: `1px solid ${T.border}`,
-            padding: '8px 12px',
-            cursor: 'pointer',
-          }}
         >
           {a.label}
-        </button>
+        </Button>
       ))}
     </div>
   );
 }
 
-/** High-contrast digital stage — paints vigilai.biotech_homepage.v1 only. */
+/** Clair-styled public homepage — paints vigilai.biotech_homepage.v1 only. */
 export default function BiotechHomepageRenderer({ layout, onNavigate, onAction }) {
   if (!layout) return null;
   return (
     <div
+      className="min-h-[100vh] text-[var(--cds-sys-text-primary)]"
       style={{
-        minHeight: '100vh',
         background: T.canvas,
-        color: T.text,
         fontFamily: T.fontDisplay,
       }}
     >
@@ -598,13 +445,8 @@ export default function BiotechHomepageRenderer({ layout, onNavigate, onAction }
       <ActionBar actions={layout.actions} onAction={onAction} />
       {layout.disclaimer && (
         <footer
-          style={{
-            borderTop: `1px solid ${T.border}`,
-            padding: '18px clamp(20px, 4vw, 56px) 40px',
-            fontSize: 11,
-            color: T.muted,
-            lineHeight: 1.5,
-          }}
+          className="border-t border-[var(--cds-sys-border-glass)] text-[11px] leading-snug text-[var(--cds-sys-text-tertiary)]"
+          style={{ padding: '18px clamp(20px, 4vw, 56px) 40px' }}
         >
           {layout.disclaimer}
         </footer>

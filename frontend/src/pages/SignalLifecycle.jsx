@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
-import { Card, CardHeader, Spinner } from '../components/ui';
+import { Button, Card, CardHeader, Spinner } from '../components/ui';
 
 const STATES = [
   {
@@ -18,7 +18,7 @@ const STATES = [
     key: 'under_evaluation',
     label: 'Looking into it',
     doNext: 'Decide: looks real, or not a concern',
-    color: 'border-sky-600/40 bg-sky-900/10',
+    color: 'border-[var(--cds-sys-border-subtle)]',
   },
   {
     key: 'validated',
@@ -161,25 +161,30 @@ function SignalCard({ sig, onAdvance, advancing }) {
       {nextStates.length > 0 && (
         <div className="flex items-center gap-1 pt-1 border-t border-slate-800/60">
           {nextKey && (
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
+              className="flex-1"
               disabled={advancing === sig.id}
               onClick={() => onAdvance(sig, nextKey)}
-              className="flex-1 rounded px-2 py-1 bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-600/30 transition-colors disabled:opacity-50"
             >
               {advancing === sig.id ? '…' : `→ ${LABEL_BY_KEY[nextKey] || nextKey}`}
-            </button>
+            </Button>
           )}
           {canReject && (
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="danger"
+              iconOnly
               disabled={advancing === sig.id}
               onClick={() => onAdvance(sig, 'rejected')}
-              className="rounded px-2 py-1 bg-rose-600/15 hover:bg-rose-600/25 text-rose-400 border border-rose-600/25 transition-colors disabled:opacity-50"
               title="Not a concern"
+              aria-label="Not a concern"
             >
               ✕
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -394,25 +399,22 @@ export default function SignalLifecycle({ embedded = false }) {
             {err && <div className="text-rose-400 text-sm">{err}</div>}
 
             <div className="flex gap-3 justify-end">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setAdvanceModal(null)}
-                className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm transition"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 disabled={!!advancing}
+                loading={!!advancing}
+                variant={advanceModal.toState === 'rejected' ? 'danger' : 'gradient'}
                 onClick={confirmAdvance}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-50 ${
-                  advanceModal.toState === 'rejected'
-                    ? 'bg-rose-600/30 border border-rose-600/50 text-rose-200 hover:bg-rose-600/40'
-                    : 'bg-teal-600/30 border border-teal-600/50 text-teal-200 hover:bg-teal-600/40'
-                }`}
               >
                 {advancing ? 'Saving…' : 'Confirm'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

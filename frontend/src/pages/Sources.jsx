@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import { Badge, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 
 // Per-source ingest actions wired to existing API endpoints.
 const SOURCE_ACTIONS = {
@@ -245,15 +245,16 @@ export default function Sources({ embedded = false }) {
                 </div>
                 {action && (
                   <div className="mt-3 flex items-center gap-3 flex-wrap">
-                    <button type="button"
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={action.disabled ? 'ghost' : 'gradient'}
                       disabled={!!crawlBusy || action.disabled}
+                      loading={crawlBusy === s.id}
                       onClick={() => runCrawl(s.id, action.fn)}
-                      className={`text-xs rounded-lg px-3 py-1.5 border transition-colors font-medium
-                        ${action.disabled ? 'border-slate-700 text-slate-600 cursor-not-allowed'
-                          : crawlBusy === s.id ? 'border-emerald-700 bg-emerald-900/30 text-emerald-300 cursor-wait'
-                          : 'border-sky-700 bg-sky-900/20 text-sky-300 hover:bg-sky-800/30'}`}>
+                    >
                       {crawlBusy === s.id ? 'Fetching…' : action.label}
-                    </button>
+                    </Button>
                     <span className={`text-[10px] ${action.disabled ? 'text-amber-600' : 'text-slate-600'}`}>
                       {action.note}
                     </span>
@@ -309,34 +310,35 @@ export default function Sources({ embedded = false }) {
         />
         <div className="mt-3 space-y-3">
           <div className="flex gap-2">
-            <button
-              onClick={() => setFhirJson(SAMPLE_BUNDLE)}
-              className="text-[11px] rounded px-2 py-1 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700"
-            >
+            <Button type="button" size="sm" variant="outline" onClick={() => setFhirJson(SAMPLE_BUNDLE)}>
               Load sample bundle
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
               onClick={() => { setFhirJson(''); setFhirResult(null); setFhirError(null); }}
-              className="text-[11px] rounded px-2 py-1 bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700"
             >
               Clear
-            </button>
+            </Button>
           </div>
           <textarea
             value={fhirJson}
             onChange={(e) => setFhirJson(e.target.value)}
             rows={12}
             placeholder='{"resourceType":"Bundle","type":"collection","entry":[...]}'
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-teal-500 resize-y"
+            className="w-full p-3 text-xs font-mono resize-y"
           />
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              type="button"
+              variant="gradient"
               onClick={handleFhirIngest}
               disabled={fhirBusy || !fhirJson.trim()}
-              className="rounded-lg px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white transition"
+              loading={fhirBusy}
             >
               {fhirBusy ? 'Ingesting…' : 'Ingest FHIR Bundle'}
-            </button>
+            </Button>
             {fhirBusy && <span className="text-xs text-slate-400 animate-pulse">Running NLP pipeline…</span>}
           </div>
 

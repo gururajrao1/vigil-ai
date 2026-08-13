@@ -105,27 +105,37 @@ export default function ContextBanner() {
             Before the charts — why these metrics exist
           </h2>
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={dismiss}
-          className="text-[var(--app-text-faint)] hover:text-[var(--app-text-muted)] text-xs"
           aria-label="Dismiss context banner"
         >
           Dismiss
-        </button>
+        </Button>
       </div>
 
       <div className="px-4 flex gap-1.5 mb-3">
         {STEPS.map((s, i) => (
-          <button
+          <Button
             key={s.id}
             type="button"
+            variant="ghost"
+            size="sm"
+            iconOnly
             onClick={() => setStep(i)}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              i === step ? 'bg-[var(--app-accent)]' : i < step ? 'bg-teal-700/50' : 'bg-[var(--app-border)]'
+            className={`h-1 flex-1 min-w-0 rounded-full ${
+              i === step
+                ? 'bg-[var(--cds-sys-accent-primary)]'
+                : i < step
+                  ? 'bg-[var(--cds-sys-accent-primary)]/40'
+                  : 'bg-[var(--cds-sys-border-subtle)]'
             }`}
             aria-label={`Step ${i + 1}: ${s.title}`}
-          />
+          >
+            <span className="sr-only">{i + 1}</span>
+          </Button>
         ))}
       </div>
 

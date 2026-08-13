@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
 import { useProject } from '../projectContext';
-import { Badge, Card, PaginationBar, Spinner } from '../components/ui';
+import { Badge, Button, Card, PaginationBar, Spinner } from '../components/ui';
 import SeverityAuditPopover from '../components/SeverityAuditPopover';
 import BidirectionalProfilePanel from '../components/views/BidirectionalProfilePanel';
 
@@ -241,9 +241,9 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
           {!textQ && drugQ && <span className="rounded bg-sky-500/20 px-2 py-0.5">drug: {drugQ}</span>}
           {symptomQ && <span className="rounded bg-rose-500/20 px-2 py-0.5">AE: {symptomQ}</span>}
           {socQ && <span className="rounded bg-violet-500/20 px-2 py-0.5">SOC: {socQ}</span>}
-          <button type="button" onClick={clearStoryContext} className="ml-auto text-teal-300 hover:underline">
+          <Button type="button" variant="ghost" size="sm" onClick={clearStoryContext} className="ml-auto">
             Clear
-          </button>
+          </Button>
         </div>
       )}
 
@@ -261,17 +261,20 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
               }
             }}
             placeholder="Jump to drug, vaccine, or device… e.g. catheter, lithium, MMR"
-            className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500/60"
+            className="w-full px-3 py-2.5 text-sm"
             aria-label="Search products"
           />
           {searchDraft && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => { setSearchDraft(''); setTextQ(''); setDrugQ(''); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200 px-1.5 py-0.5"
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+              aria-label="Clear product search"
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
         <input
@@ -285,7 +288,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
             }
           }}
           placeholder="Optional: filter by event / AE…"
-          className="sm:w-56 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500/60"
+          className="sm:w-56 px-3 py-2.5 text-sm"
           aria-label="Search adverse events"
         />
       </div>
@@ -293,15 +296,15 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
       <div className="app-filter-bar justify-between">
         <div className="flex gap-2 flex-wrap">
           {FILTERS.map((f) => (
-            <button
+            <Button
               key={f}
+              type="button"
+              size="sm"
+              variant={filter === f ? 'gradient' : 'ghost'}
               onClick={() => setFilter(f)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                filter === f ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
             >
               {f}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="app-filter-bar">
@@ -559,17 +562,19 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
                   </td>
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-col gap-1 min-w-[7.5rem]">
-                      <button
+                      <Button
                         type="button"
-                        className="text-[10px] rounded px-2 py-1 border border-sky-600/40 text-sky-300 hover:bg-sky-500/15 text-left"
+                        variant="outline"
+                        size="sm"
                         title="Forward: all AEs for this product by severity tier"
                         onClick={() => setProfile({ mode: 'drug', query: s.drug })}
                       >
                         View drug profile
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="text-[10px] rounded px-2 py-1 border border-rose-600/40 text-rose-300 hover:bg-rose-500/15 text-left"
+                        variant="outline"
+                        size="sm"
                         title="Inverse: all products reporting this event"
                         onClick={() => setProfile({
                           mode: 'event',
@@ -577,7 +582,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
                         })}
                       >
                         View event profile
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

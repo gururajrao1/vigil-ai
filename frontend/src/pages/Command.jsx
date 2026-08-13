@@ -71,10 +71,9 @@ export default function Command({ embedded = false }) {
         />
         <div className="mt-3 flex flex-wrap gap-2">
           {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" onClick={() => setMessage(ex)}
-              className="text-[11px] rounded-full border border-slate-700 px-2.5 py-1 text-slate-400 hover:text-slate-200 hover:border-slate-500">
+            <Button key={ex} type="button" size="sm" variant="outline" onClick={() => setMessage(ex)}>
               {ex}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="mt-3 flex gap-2">

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
-import { Badge, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 
 const VIEWS = [
   { id: 'class', label: 'Class effects (2+ drugs)' },
@@ -49,17 +49,18 @@ export default function ClassEffects({ embedded = false }) {
 )}
       <div className="flex flex-wrap items-center gap-2">
         {VIEWS.map((v) => (
-          <button key={v.id} type="button" onClick={() => setView(v.id)}
-                  className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${
-                    view === v.id
-                      ? 'bg-cyan-600/20 border-cyan-500/40 text-cyan-200'
-                      : 'bg-slate-900/60 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}>
+          <Button
+            key={v.id}
+            type="button"
+            size="sm"
+            variant={view === v.id ? 'gradient' : 'ghost'}
+            onClick={() => setView(v.id)}
+          >
             {v.label}
-            <span className="ml-1.5 text-slate-500">
+            <span className="ml-1.5 opacity-60">
               ({v.id === 'class' ? classGroups.length : v.id === 'all' ? allGroups.length : atcClasses.length + analogFamilies.length})
             </span>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -168,10 +169,9 @@ function ClassGroupCard({ g, nav }) {
         </div>
       </div>
       {g.class_effect && (
-        <button type="button" onClick={() => nav('/signals?class_effect=1')}
-                className="mt-3 text-xs text-cyan-400 hover:text-cyan-300">
+        <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => nav('/signals?class_effect=1')}>
           View class-effect signals →
-        </button>
+        </Button>
       )}
     </Card>
   );

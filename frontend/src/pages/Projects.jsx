@@ -173,18 +173,20 @@ export default function Projects() {
                 style={{ borderRadius: 4 }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <button type="button" onClick={() => setActiveProject(p)} className="text-left min-w-0">
-                    <div className="font-bold text-[var(--app-text)]" style={{ letterSpacing: '-0.03em' }}>
-                      {p.name}
+                  <Button type="button" variant="ghost" onClick={() => setActiveProject(p)} className="justify-start text-left h-auto min-w-0">
+                    <div className="min-w-0">
+                      <div className="font-bold text-[var(--app-text)]" style={{ letterSpacing: '-0.03em' }}>
+                        {p.name}
+                      </div>
+                      <div className="text-[10px] font-mono text-[var(--app-text-muted)] mt-1 tracking-wide">
+                        OWNER · {ownerFor(p).toUpperCase()}
+                      </div>
+                      <div className="text-xs text-[var(--app-text-muted)] mt-1">
+                        {p.therapeutic_area} · {p.slug} · {p.post_count ?? 0} posts · {p.signal_count ?? 0} signals
+                        {empty && <span className="text-[var(--app-accent-sky)]"> · empty</span>}
+                      </div>
                     </div>
-                    <div className="text-[10px] font-mono text-[var(--app-text-muted)] mt-1 tracking-wide">
-                      OWNER · {ownerFor(p).toUpperCase()}
-                    </div>
-                    <div className="text-xs text-[var(--app-text-muted)] mt-1">
-                      {p.therapeutic_area} · {p.slug} · {p.post_count ?? 0} posts · {p.signal_count ?? 0} signals
-                      {empty && <span className="text-[var(--app-accent-sky)]"> · empty</span>}
-                    </div>
-                  </button>
+                  </Button>
                   <Button
                     onClick={() => fill(p)}
                     disabled={fillingId === p.id}
@@ -203,12 +205,15 @@ export default function Projects() {
       <Card className="p-4">
         <CardHeader title="Create workspace" />
         <div className="grid gap-3 mt-3 sm:grid-cols-2">
-          <input className="app-input" placeholder="Name" value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input className="app-input" placeholder="slug-kebab-case" value={form.slug}
-            onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-          <select className="app-input" value={form.therapeutic_area}
-            onChange={(e) => setForm({ ...form, therapeutic_area: e.target.value })}>
+          <input placeholder="Name" value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            aria-label="Project name" />
+          <input placeholder="slug-kebab-case" value={form.slug}
+            onChange={(e) => setForm({ ...form, slug: e.target.value })}
+            aria-label="Project slug" />
+          <select value={form.therapeutic_area}
+            onChange={(e) => setForm({ ...form, therapeutic_area: e.target.value })}
+            aria-label="Therapeutic area">
             <option value="general">general</option>
             <option value="oncology">oncology</option>
             <option value="vaccine">vaccine</option>
@@ -216,7 +221,7 @@ export default function Projects() {
           </select>
           <div className="sm:col-span-2 space-y-2">
             <input
-              className="app-input w-full"
+              className="w-full"
               placeholder="keywords, comma-separated — drive Pathfinder + literature retrieval"
               value={form.keywords}
               onChange={(e) => setForm({ ...form, keywords: e.target.value })}
@@ -229,9 +234,11 @@ export default function Projects() {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {KEYWORD_PACKS.map((pack) => (
-                <button
+                <Button
                   key={pack.id}
                   type="button"
+                  size="sm"
+                  variant="outline"
                   onClick={() => setForm((f) => ({
                     ...f,
                     keywords: pack.keywords,
@@ -241,11 +248,10 @@ export default function Projects() {
                           : pack.id === 'vaccine' ? 'vaccine'
                             : f.therapeutic_area,
                   }))}
-                  className="rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] text-[var(--app-text-secondary)] hover:border-[var(--app-accent-sky)] hover:text-[var(--app-accent-sky)] transition"
                   title={pack.keywords}
                 >
                   {pack.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

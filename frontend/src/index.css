@@ -1,65 +1,59 @@
 @import "tailwindcss";
 
-/* ---- VigilAI Life Sciences stage tokens (dark primary) ---- */
+/* ---- App layout tokens bridged from Clair --cds-* (never redefine --cds-*) ---- */
 :root,
+[data-mode="dark"],
 [data-theme="dark"] {
   color-scheme: dark;
-  --va-canvas: #030712;
-  --va-navy: #0B1220;
-  --va-glass: #131C2E;
-  --va-border: #1E293B;
-  --va-text: #F8FAFC;
-  --va-muted: #94A3B8;
-  --va-mint: #2DD4BF;
-  --va-sky: #38BDF8;
-  --va-radius: 4px;
+  --va-radius: var(--cds-ref-radius-6, 6px);
 
-  --app-bg: var(--va-canvas);
+  --app-bg: var(--cds-sys-canvas);
   --app-bg-accent-1: transparent;
   --app-bg-accent-2: transparent;
-  --app-shell: var(--va-navy);
-  --app-header: var(--va-navy);
-  --app-surface: var(--va-glass);
-  --app-surface-solid: var(--va-glass);
-  --app-surface-hover: #1a2438;
-  --app-border: var(--va-border);
-  --app-border-accent: var(--va-border);
-  --app-text: var(--va-text);
-  --app-text-secondary: #E2E8F0;
-  --app-text-muted: var(--va-muted);
-  --app-text-faint: #64748B;
-  --app-accent: var(--va-mint);
-  --app-accent-sky: var(--va-sky);
-  --app-accent-muted: rgba(45, 212, 191, 0.12);
-  --app-scrollbar: #1E293B;
-  --app-overlay: rgba(3, 7, 18, 0.72);
-  --app-font-display: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --app-font-mono: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  --app-shell: var(--cds-sys-surface-chrome);
+  --app-header: var(--cds-sys-surface-topbar);
+  --app-surface: var(--cds-sys-surface-glass);
+  --app-surface-solid: var(--cds-sys-surface-solid);
+  --app-surface-hover: var(--cds-sys-surface-hover);
+  --app-border: var(--cds-sys-border-glass);
+  --app-border-accent: var(--cds-sys-border-glass-strong);
+  --app-text: var(--cds-sys-text-primary);
+  --app-text-secondary: var(--cds-sys-text-secondary);
+  --app-text-muted: var(--cds-sys-text-secondary);
+  --app-text-faint: var(--cds-sys-text-tertiary);
+  --app-accent: var(--cds-sys-accent-primary);
+  --app-accent-sky: var(--cds-sys-accent-secondary);
+  --app-accent-muted: var(--cds-sys-accent-tertiary-tint);
+  --app-scrollbar: var(--cds-ref-slate-600);
+  --app-overlay: var(--cds-sys-overlay-scrim);
+  --app-font-display: var(--cds-ref-font-archivo);
+  --app-font-mono: var(--cds-ref-font-mono);
 }
 
+[data-mode="light"],
 [data-theme="light"] {
   color-scheme: light;
-  --app-bg: #F8FAFC;
+  --app-bg: var(--cds-sys-canvas);
   --app-bg-accent-1: transparent;
   --app-bg-accent-2: transparent;
-  --app-shell: #FFFFFF;
-  --app-header: #FFFFFF;
-  --app-surface: #FFFFFF;
-  --app-surface-solid: #FFFFFF;
-  --app-surface-hover: #F1F5F9;
-  --app-border: #E2E8F0;
-  --app-border-accent: #CBD5E1;
-  --app-text: #0F172A;
-  --app-text-secondary: #334155;
-  --app-text-muted: #64748B;
-  --app-text-faint: #94A3B8;
-  --app-accent: #0D9488;
-  --app-accent-sky: #0284C7;
-  --app-accent-muted: rgba(13, 148, 136, 0.12);
-  --app-scrollbar: #CBD5E1;
-  --app-overlay: rgba(15, 23, 42, 0.35);
-  --app-font-display: Inter, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --app-font-mono: "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  --app-shell: var(--cds-sys-surface-chrome);
+  --app-header: var(--cds-sys-surface-topbar);
+  --app-surface: var(--cds-sys-surface-glass);
+  --app-surface-solid: var(--cds-sys-surface-solid);
+  --app-surface-hover: var(--cds-sys-surface-hover);
+  --app-border: var(--cds-sys-border-glass);
+  --app-border-accent: var(--cds-sys-border-glass-strong);
+  --app-text: var(--cds-sys-text-primary);
+  --app-text-secondary: var(--cds-sys-text-secondary);
+  --app-text-muted: var(--cds-sys-text-secondary);
+  --app-text-faint: var(--cds-sys-text-tertiary);
+  --app-accent: var(--cds-sys-accent-primary);
+  --app-accent-sky: var(--cds-sys-accent-secondary);
+  --app-accent-muted: var(--cds-sys-accent-tertiary-tint);
+  --app-scrollbar: var(--cds-ref-slate-400);
+  --app-overlay: var(--cds-sys-overlay-scrim);
+  --app-font-display: var(--cds-ref-font-archivo);
+  --app-font-mono: var(--cds-ref-font-mono);
 }
 
 html, body, #root {
@@ -83,18 +77,8 @@ body {
   min-width: 0;
 }
 
-/* Zero motion — product requirement */
-*,
-*::before,
-*::after {
-  animation: none !important;
-  transition: none !important;
-  scroll-behavior: auto !important;
-}
-
+/* Clair components own their motion; keep page chrome calm */
 .pulse-dot {
-  animation: none !important;
-  box-shadow: none !important;
   background: var(--app-accent);
 }
 

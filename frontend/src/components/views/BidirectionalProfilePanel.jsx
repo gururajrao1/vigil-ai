@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
-import { Badge, Card, Spinner } from '../ui';
+import { Badge, Button, Card, Spinner } from '../ui';
 
 const TIER_ORDER = ['Critical', 'High', 'Moderate', 'Mild'];
-const TIER_STYLE = {
-  Critical: 'border-rose-500/40 bg-rose-500/10 text-rose-200',
-  High: 'border-orange-500/40 bg-orange-500/10 text-orange-200',
-  Moderate: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
-  Mild: 'border-slate-600/40 bg-slate-800/40 text-slate-300',
+const TIER_TONE = {
+  Critical: 'err',
+  High: 'warn',
+  Moderate: 'info',
+  Mild: 'muted',
 };
 
 /**
@@ -56,13 +56,9 @@ export default function BidirectionalProfilePanel({ mode, query, onClose }) {
             <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
             <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-400 hover:bg-slate-800"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={onClose} aria-label="Close profile panel">
             Close
-          </button>
+          </Button>
         </div>
 
         <div className="p-4 space-y-4">
@@ -95,31 +91,34 @@ function DrugTiers({ data, onOpenSignal }) {
         const rows = tiers[tier] || [];
         if (!rows.length) return null;
         return (
-          <div key={tier} className={`rounded-xl border p-3 ${TIER_STYLE[tier]}`}>
+          <Card key={tier} className="p-3" variant="flat">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wide">{tier}</span>
-              <span className="text-[10px] opacity-80">{rows.length}</span>
+              <Badge tone={TIER_TONE[tier] || 'muted'} value={tier} />
+              <span className="text-[10px] text-[var(--cds-sys-text-tertiary)]">{rows.length}</span>
             </div>
             <ul className="space-y-1.5">
               {rows.map((r) => (
                 <li key={r.id}>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => onOpenSignal(r.id)}
-                    className="w-full text-left rounded-lg px-2 py-1.5 hover:bg-black/20 transition"
+                    className="w-full justify-start text-left h-auto py-1.5"
                   >
-                    <div className="text-sm text-slate-100 capitalize">{r.symptom || r.meddra_pt}</div>
-                    <div className="flex flex-wrap gap-2 text-[10px] text-slate-400 mt-0.5">
-                      <span>PRR {r.prr?.toFixed?.(1) ?? r.prr}</span>
-                      {r.strength && <Badge kind="strength" value={r.strength} />}
-                      {r.sdr_flag && <Badge value="SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" />}
-                      <span>{r.post_count} reports</span>
+                    <div className="min-w-0">
+                      <div className="text-sm capitalize">{r.symptom || r.meddra_pt}</div>
+                      <div className="flex flex-wrap gap-2 text-[10px] text-[var(--cds-sys-text-tertiary)] mt-0.5">
+                        <span>PRR {r.prr?.toFixed?.(1) ?? r.prr}</span>
+                        {r.strength && <Badge kind="strength" value={r.strength} />}
+                        {r.sdr_flag && <Badge value="SDR" tone="err" />}
+                        <span>{r.post_count} reports</span>
+                      </div>
                     </div>
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
-          </div>
+          </Card>
         );
       })}
       {total === 0 && (
@@ -144,28 +143,29 @@ function EventDrugList({ data, onOpenSignal }) {
       <ol className="space-y-2">
         {drugs.map((r, i) => (
           <li key={r.id}>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => onOpenSignal(r.id)}
-              className="w-full text-left rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 hover:border-teal-600/40 transition"
+              className="w-full justify-start text-left h-auto py-2.5"
             >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] tabular-nums text-slate-600 w-5">{i + 1}.</span>
-                <span className="text-sm font-medium text-sky-200 capitalize">{r.drug}</span>
-                {r.tier && (
-                  <span className={`ml-auto text-[10px] rounded px-1.5 py-0.5 border ${TIER_STYLE[r.tier] || TIER_STYLE.Mild}`}>
-                    {r.tier}
-                  </span>
-                )}
+              <div className="min-w-0 w-full">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] tabular-nums text-[var(--cds-sys-text-tertiary)] w-5">{i + 1}.</span>
+                  <span className="text-sm font-medium capitalize">{r.drug}</span>
+                  {r.tier && (
+                    <Badge tone={TIER_TONE[r.tier] || 'muted'} value={r.tier} className="ml-auto" />
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 text-[10px] text-[var(--cds-sys-text-tertiary)] mt-1 pl-7">
+                  <span>PRR {r.prr?.toFixed?.(1) ?? r.prr}</span>
+                  {r.ror != null && <span>ROR {Number(r.ror).toFixed(1)}</span>}
+                  {r.strength && <Badge kind="strength" value={r.strength} />}
+                  {r.sdr_flag && <Badge value="SDR" tone="err" />}
+                  <span>{r.post_count} reports</span>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2 text-[10px] text-slate-500 mt-1 pl-7">
-                <span>PRR {r.prr?.toFixed?.(1) ?? r.prr}</span>
-                {r.ror != null && <span>ROR {Number(r.ror).toFixed(1)}</span>}
-                {r.strength && <Badge kind="strength" value={r.strength} />}
-                {r.sdr_flag && <Badge value="SDR" className="bg-rose-500/15 text-rose-300 border-rose-500/30" />}
-                <span>{r.post_count} reports</span>
-              </div>
-            </button>
+            </Button>
           </li>
         ))}
       </ol>

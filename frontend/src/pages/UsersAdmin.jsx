@@ -98,32 +98,33 @@ export default function UsersAdmin() {
         <CardHeader title="Create user" subtitle="New accounts can sign in immediately with the password you set." />
         <form onSubmit={create} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <input
-            className="app-input lg:col-span-1"
+            className="lg:col-span-1"
             placeholder="Email"
             type="email"
             required
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
+            aria-label="Email"
           />
           <input
-            className="app-input"
             placeholder="Password"
             type="password"
             required
             minLength={6}
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
+            aria-label="Password"
           />
           <input
-            className="app-input"
             placeholder="Full name"
             value={form.full_name}
             onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+            aria-label="Full name"
           />
           <select
-            className="app-input"
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
+            aria-label="Role"
           >
             {ROLES.map((r) => (
               <option key={r} value={r}>{r}</option>
@@ -163,11 +164,12 @@ export default function UsersAdmin() {
                     <td className="py-2.5 pr-3 text-[var(--app-text-muted)]">{u.full_name || '—'}</td>
                     <td className="py-2.5 pr-3">
                       <select
-                        className="app-input text-xs py-1"
+                        className="text-xs py-1"
                         value={u.role}
                         disabled={u.id === user?.id}
                         title={u.id === user?.id ? 'Cannot change your own role here' : 'Change role'}
                         onChange={(e) => changeRole(u.id, e.target.value)}
+                        aria-label={`Role for ${u.email}`}
                       >
                         {ROLES.map((r) => (
                           <option key={r} value={r}>{r}</option>

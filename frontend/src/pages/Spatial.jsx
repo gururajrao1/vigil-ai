@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
-import { Badge, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 import GeographicResolutionTag from '../modules/normalization/GeographicResolutionTag';
 
 // Spatial (geographic) cluster detection — a Kulldorff-style Poisson scan statistic.
@@ -118,10 +118,9 @@ export default function Spatial({ embedded = false }) {
                   ))}
                 </div>
               </div>
-              <button onClick={() => nav('/signals?spatial=1')}
-                      className="mt-3 text-xs text-emerald-400 hover:text-emerald-300">
+              <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => nav('/signals?spatial=1')}>
                 View geo-cluster signals →
-              </button>
+              </Button>
             </Card>
           );
         })}

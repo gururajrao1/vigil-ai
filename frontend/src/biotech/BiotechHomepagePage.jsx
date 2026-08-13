@@ -4,6 +4,7 @@ import { api, wakeApi } from '../api';
 import { useAuth, useRefresh } from '../App';
 import BiotechHomepageRenderer from './BiotechHomepageRenderer';
 import { buildFallbackHomepage } from './fallbackLayout';
+import { BrandIcon, Spinner } from '@clairlabs-ai/prp-ui';
 import { BIOTECH_TOKENS as T } from './tokens';
 
 async function loadHomepage(focusDrug) {
@@ -22,39 +23,12 @@ async function loadHomepage(focusDrug) {
 function BootLoader({ label = 'Loading VigilAI' }) {
   return (
     <div
-      style={{
-        background: T.canvas,
-        color: T.muted,
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 20,
-        fontFamily: T.fontDisplay,
-      }}
+      className="flex min-h-[100vh] flex-col items-center justify-center gap-5 text-[var(--cds-sys-text-secondary)]"
+      style={{ background: T.canvas, fontFamily: T.fontDisplay }}
     >
-      <div
-        aria-hidden
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 4,
-          background: T.navy,
-          border: `1px solid ${T.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: T.mint,
-          fontWeight: 800,
-          fontSize: 16,
-          letterSpacing: '-0.04em',
-        }}
-      >
-        VA
-      </div>
-      <div className="vigil-boot-spinner" role="status" aria-label="Loading" />
-      <div style={{ fontSize: 13, letterSpacing: '0.04em', color: T.muted }}>{label}</div>
+      <BrandIcon aria-hidden>VA</BrandIcon>
+      <Spinner size="lg" label={label} />
+      <div className="text-[13px] tracking-wide">{label}</div>
     </div>
   );
 }

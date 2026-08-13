@@ -105,13 +105,16 @@ function AssessSection({ title, icon, children, accent = 'indigo', defaultOpen =
   const c = colours[accent] || colours.indigo;
   return (
     <div className={`rounded-lg border ${c.split(' ')[0]} bg-slate-950/30`}>
-      <button
+      <Button
+        type="button"
+        variant="ghost"
         onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium uppercase tracking-wide ${c.split(' ').slice(1).join(' ')} transition-colors`}
+        className="w-full justify-between px-3 py-2 text-xs font-medium uppercase tracking-wide h-auto"
+        aria-expanded={open}
       >
         <span>{icon} {title}</span>
-        <span className="text-slate-500 text-[10px]">{open ? '▲ collapse' : '▼ expand'}</span>
-      </button>
+        <span className="text-[10px] opacity-60">{open ? '▲ collapse' : '▼ expand'}</span>
+      </Button>
       {open && (
         <div className="px-3 pb-3 pt-1 text-sm text-slate-200 leading-relaxed border-t border-slate-800/60">
           {children}
@@ -249,26 +252,28 @@ function CopilotPanel({ sig, assessment, assessing, onDraft, recClass }) {
 
       <div className="mt-4">
         {!showAsk ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setShowAsk(true)}
-            className="text-xs text-indigo-300 hover:text-indigo-200 underline underline-offset-2"
           >
             Ask a follow-up question →
-          </button>
+          </Button>
         ) : (
           <div className="rounded-lg border border-indigo-600/30 bg-slate-950/40 p-3">
             <div className="text-[11px] uppercase tracking-wide text-indigo-300 mb-2">Ask a follow-up</div>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {sampleQs.map((q) => (
-                <button
+                <Button
                   key={q}
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => ask(q)}
-                  className="text-[10px] px-2 py-1 rounded border border-slate-600/50 text-slate-300 hover:border-indigo-500/40 hover:text-indigo-200"
                 >
                   {q}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="flex gap-2">
@@ -672,16 +677,14 @@ function LifecyclePanel({ sig, onUpdated }) {
           {!showForm ? (
             <div className="flex items-center gap-2 flex-wrap">
               {nextStates.filter((s) => s !== 'rejected').map((s) => (
-                <button key={s} onClick={() => { setToState(s); setShowForm(true); }}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-600/30 transition-colors">
+                <Button key={s} size="sm" variant="outline" onClick={() => { setToState(s); setShowForm(true); }}>
                   Move → {LC_STATE_LABELS[s] || s}
-                </button>
+                </Button>
               ))}
               {nextStates.includes('rejected') && (
-                <button onClick={() => { setToState('rejected'); setShowForm(true); }}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium bg-rose-600/15 hover:bg-rose-600/25 text-rose-300 border border-rose-600/25 transition-colors">
+                <Button size="sm" variant="danger" onClick={() => { setToState('rejected'); setShowForm(true); }}>
                   Not a concern
-                </button>
+                </Button>
               )}
             </div>
           ) : (
@@ -690,7 +693,7 @@ function LifecyclePanel({ sig, onUpdated }) {
                 Move to <span className={`font-medium ${toState === 'rejected' ? 'text-rose-300' : 'text-teal-300'}`}>{LC_STATE_LABELS[toState] || toState}</span>
               </div>
               <input type="text" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Owner (who is handling this)"
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-teal-600" />
+                className="w-full px-3 py-1.5 text-sm" />
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -700,15 +703,20 @@ function LifecyclePanel({ sig, onUpdated }) {
                     ? 'Medical rationale required (≥40 chars) for closed/rejected'
                     : 'Notes (optional)'
                 }
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-teal-600 resize-none"
+                className="w-full px-3 py-1.5 text-sm resize-none"
               />
               {err && <div className="text-rose-400 text-xs">{err}</div>}
               <div className="flex gap-2">
-                <button onClick={() => { setShowForm(false); setErr(''); }} className="px-3 py-1 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 text-xs">Cancel</button>
-                <button disabled={advancing} onClick={advance}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition disabled:opacity-50 ${toState === 'rejected' ? 'bg-rose-600/30 text-rose-200 border border-rose-600/40 hover:bg-rose-600/40' : 'bg-teal-600/30 text-teal-200 border border-teal-600/40 hover:bg-teal-600/40'}`}>
+                <Button size="sm" variant="outline" onClick={() => { setShowForm(false); setErr(''); }}>Cancel</Button>
+                <Button
+                  size="sm"
+                  variant={toState === 'rejected' ? 'danger' : 'gradient'}
+                  disabled={advancing}
+                  loading={advancing}
+                  onClick={advance}
+                >
                   {advancing ? 'Saving…' : 'Confirm'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -730,10 +738,9 @@ function AuditButton({ signalId }) {
   };
 
   if (!audit) return (
-    <button type="button" onClick={verify} disabled={loading}
-      className="text-xs rounded-lg px-2.5 py-1.5 border border-slate-700 bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors">
-      {loading ? '🔐 Verifying…' : '🔐 Verify chain'}
-    </button>
+    <Button type="button" size="sm" variant="outline" onClick={verify} disabled={loading} loading={loading}>
+      {loading ? 'Verifying…' : 'Verify chain'}
+    </Button>
   );
   if (audit.error) return <span className="text-xs text-rose-400">✗ Audit failed</span>;
   const ok = audit.verification?.valid;

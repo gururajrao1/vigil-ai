@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { Badge, Card, CardHeader } from '../components/ui';
+import { Badge, Button, Card, CardHeader } from '../components/ui';
 import OmniSearchGateway from '../modules/search/OmniSearchGateway';
 import UniverseVersusSubsetFilter from '../modules/search/UniverseVersusSubsetFilter';
 import ATCClassExplorer from '../modules/search/ATCClassExplorer';
@@ -79,14 +79,15 @@ export default function OmniSearch({ embedded = false }) {
         <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
           <span>Try:</span>
           {['Janumet', 'Chennai adverse events', 'Bangalore', 'diabetic', 'ozmpic', 'Coumadin'].map((ex) => (
-            <button
+            <Button
               key={ex}
               type="button"
-              className="rounded border border-slate-700 px-1.5 py-0.5 text-slate-300 hover:border-slate-500"
+              size="sm"
+              variant="outline"
               onClick={() => run(ex)}
             >
               {ex}
-            </button>
+            </Button>
           ))}
         </div>
         {err && <p className="mt-3 text-sm text-rose-300">{err}</p>}

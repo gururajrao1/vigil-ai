@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { api, getToken } from '../api';
 import { useProject } from '../projectContext';
-import { Card, CardHeader, Spinner } from '../components/ui';
+import { Button, Card, CardHeader, Spinner } from '../components/ui';
 
 const STEPS = [
   { n: 1, label: 'Hypothesis' },
@@ -322,7 +322,7 @@ export default function Story({ embedded = false }) {
             <div className="grid gap-3">
               <label className="text-xs text-[var(--app-text-muted)] block">
                 Event (MedDRA PT / symptom)
-                <select className="app-input mt-1 w-full" value={event}
+                <select className="mt-1 w-full" value={event}
                   onChange={(e) => onEventChange(e.target.value)} disabled={!candidates.length}>
                   {candidates.map((c) => (
                     <option key={c.event} value={c.event}>{c.event} ({c.n_drugs} drugs)</option>
@@ -332,14 +332,14 @@ export default function Story({ embedded = false }) {
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs text-[var(--app-text-muted)] block">
                   Drug A
-                  <select className="app-input mt-1 w-full" value={drugA}
+                  <select className="mt-1 w-full" value={drugA}
                     onChange={(e) => onDrugAChange(e.target.value)} disabled={!drugOptions.length}>
                     {drugOptions.map((d) => <option key={`a-${d}`} value={d}>{d}</option>)}
                   </select>
                 </label>
                 <label className="text-xs text-[var(--app-text-muted)] block">
                   Drug B
-                  <select className="app-input mt-1 w-full" value={drugB}
+                  <select className="mt-1 w-full" value={drugB}
                     onChange={(e) => onDrugBChange(e.target.value)} disabled={!drugOptions.length}>
                     {drugOptions.filter((d) => d !== drugA).map((d) => (
                       <option key={`b-${d}`} value={d}>{d}</option>
@@ -350,29 +350,26 @@ export default function Story({ embedded = false }) {
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
               {STEPS.map((s) => (
-                <button
+                <Button
                   key={s.n}
                   type="button"
+                  size="sm"
+                  variant={step === s.n ? 'gradient' : 'ghost'}
                   onClick={() => setStep(s.n)}
-                  className={`rounded-lg px-3 py-1.5 text-xs border transition ${
-                    step === s.n
-                      ? 'bg-teal-500/20 border-teal-500/50 text-teal-200'
-                      : 'border-[var(--app-border)] text-[var(--app-text-muted)]'
-                  }`}
                 >
                   {s.n}. {s.label}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="flex gap-2">
-              <button type="button" className="app-btn app-btn-primary text-sm" disabled={step <= 1}
+              <Button type="button" variant="outline" disabled={step <= 1}
                 onClick={() => setStep((s) => Math.max(1, s - 1))}>
                 Previous
-              </button>
-              <button type="button" className="app-btn app-btn-primary text-sm" disabled={step >= 4}
+              </Button>
+              <Button type="button" variant="gradient" disabled={step >= 4}
                 onClick={() => setStep((s) => Math.min(4, s + 1))}>
                 Next Step
-              </button>
+              </Button>
             </div>
             {err && <p className="text-sm text-rose-400">{err}</p>}
           </Card>
@@ -393,10 +390,10 @@ export default function Story({ embedded = false }) {
               {step === 4 && (
                 <div className="mt-3 space-y-3">
                   <p className="text-sm leading-relaxed text-[var(--app-text-secondary)]">{stepPayload.summary}</p>
-                  <button type="button" className="app-btn app-btn-primary text-sm"
+                  <Button type="button" variant="gradient"
                     onClick={() => downloadPdf().catch((e) => setErr(e.message))}>
                     Download PDF report
-                  </button>
+                  </Button>
                 </div>
               )}
             </Card>

@@ -123,14 +123,15 @@ export default function MCN({ embedded = false }) {
         </form>
         <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-500">
           {['Chennai', 'Madras', 'Bengaluru', 'Bangalore', 'diabetic', 'Kyiv', 'Peking'].map((ex) => (
-            <button
+            <Button
               key={ex}
               type="button"
-              className="rounded border border-slate-700 px-1.5 py-0.5 text-slate-300 hover:border-slate-500"
+              size="sm"
+              variant="outline"
               onClick={() => { setQuery(ex); }}
             >
               {ex}
-            </button>
+            </Button>
           ))}
         </div>
         {err && <p className="mt-3 text-sm text-rose-300">{err}</p>}

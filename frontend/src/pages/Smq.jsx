@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
-import { Badge, Card, CardHeader, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
 
 const VIEWS = [
   { id: 'active', label: 'Active in corpus' },
@@ -45,17 +45,18 @@ export default function Smq({ embedded = false }) {
 )}
       <div className="flex flex-wrap items-center gap-2">
         {VIEWS.map((v) => (
-          <button key={v.id} type="button" onClick={() => setView(v.id)}
-                  className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${
-                    view === v.id
-                      ? 'bg-cyan-600/20 border-cyan-500/40 text-cyan-200'
-                      : 'bg-slate-900/60 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}>
+          <Button
+            key={v.id}
+            type="button"
+            size="sm"
+            variant={view === v.id ? 'gradient' : 'ghost'}
+            onClick={() => setView(v.id)}
+          >
             {v.label}
-            <span className="ml-1.5 text-slate-500">
+            <span className="ml-1.5 opacity-60">
               ({v.id === 'active' ? groups.length : definitions.length})
             </span>
-          </button>
+          </Button>
         ))}
         <span className="text-[11px] text-slate-600 ml-1">
           Active = syndromes with reports in your data · Catalog = all bundled SMQ definitions
@@ -122,16 +123,14 @@ export default function Smq({ embedded = false }) {
                 </div>
                 <div className="mt-2 flex items-center gap-3">
                   {(def.narrow.length + def.broad.length) > 8 && (
-                    <button type="button" onClick={() => toggleExpanded(def.key)}
-                            className="text-[11px] text-cyan-400 hover:text-cyan-300">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => toggleExpanded(def.key)}>
                       {isOpen ? 'Show fewer PTs' : `Show all ${def.narrow.length + def.broad.length} member PTs`}
-                    </button>
+                    </Button>
                   )}
                   {active && (
-                    <button type="button" onClick={() => nav(`/signals?smq=${def.key}`)}
-                            className="text-[11px] text-slate-400 hover:text-slate-200">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => nav(`/signals?smq=${def.key}`)}>
                       View signals →
-                    </button>
+                    </Button>
                   )}
                 </div>
               </Card>
@@ -191,9 +190,9 @@ function SmqActiveCard({ g, expanded, onToggle, onDrugClick }) {
       </table>
       </div>
       {g.drugs.length > 12 && (
-        <button type="button" onClick={onToggle} className="mt-2 text-xs text-cyan-400 hover:text-cyan-300">
+        <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={onToggle}>
           {expanded ? 'Show fewer drugs' : `Show all ${g.drugs.length} drugs`}
-        </button>
+        </Button>
       )}
     </Card>
   );
