@@ -6,7 +6,7 @@
 
 **Live app:** https://vigil-ai-eight.vercel.app  
 **API:** Render (`/api` proxied from Vercel) · wake `/api/health` once after idle (~30–60s cold start on free tier)
-**Corpus (production Postgres):** ~1.3k unique posts across projects · default **General PV** workspace shows ~1.1k (project filter, not a smaller DB)
+**Corpus (production Postgres):** ~2.3k unique posts across projects · default **General PV** workspace shows ~1.1k (project filter, not a smaller DB)
 
 Deeper handouts: **[`docs/VIGILAI_APPLICATION_HANDBOOK.md`](docs/VIGILAI_APPLICATION_HANDBOOK.md)** (full where/how/what/why + architecture diagrams + keyword packs) · [`docs/VIGILAI_COMPLETE_GUIDE.md`](docs/VIGILAI_COMPLETE_GUIDE.md) · [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) · [`docs/DEPLOY_FREE.md`](docs/DEPLOY_FREE.md)
 
