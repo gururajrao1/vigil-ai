@@ -4,7 +4,8 @@
 #
 # Notes:
 # - Free instances sleep after ~15 min idle (cold start 30–60s)
-# - Prefer Neon/Supabase DATABASE_URL; SQLite on free disk is ephemeral
+# - DATABASE_URL: prefer Supabase pooler (port 6543) or Render Postgres.
+#   Neon free egress is easy to blow with FAERS stream-ingest — see docs/CUTOVER_SUPABASE.md
 
 services:
   - type: web
@@ -17,7 +18,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        sync: false   # Neon Postgres (set in dashboard/API) — persists posts across Render sleep
+        sync: false   # Supabase pooler URI (or Render Postgres) — set in dashboard
       - key: JWT_SECRET
         generateValue: true
       - key: SEED_ADMIN_EMAIL
