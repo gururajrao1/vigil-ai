@@ -3,6 +3,11 @@
 `init_db()` calls `create_all` (creates missing tables) then `migrate_schema`
 (adds any missing columns to existing tables). This means new model fields can
 be added in models.py without ever wiping the database. Data is always preserved.
+
+Cloud ``DATABASE_URL`` values often include ``?sslmode=require``. Sync engines
+(psycopg2) keep those libpq flags; async callers must use
+``app.db.pg_url.normalize_database_url(..., is_async=True)`` /
+``create_async_engine_normalized`` so asyncpg never sees ``sslmode``.
 """
 from __future__ import annotations
 
@@ -12,10 +17,22 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from .config import settings
+from .db.pg_url import normalize_database_url
 
 logger = logging.getLogger("vigilai.database")
 
-_is_sqlite = settings.database_url.startswith("sqlite")
+# Sync engine: preserve sslmode for Neon/Render/RDS (psycopg2 / libpq)
+_raw_db_url = settings.database_url
+_is_sqlite = _raw_db_url.startswith("sqlite")
+try:
+    _sync_url = (
+        _raw_db_url
+        if _is_sqlite
+        else normalize_database_url(_raw_db_url, is_async=False)
+    )
+except ValueError:
+    _sync_url = _raw_db_url
+
 connect_args = {"check_same_thread": False, "timeout": 60} if _is_sqlite else {}
 
 # Neon/Postgres: recycle + pre-ping so idle SSL drops don't 500 /api/signals.
@@ -28,7 +45,7 @@ if not _is_sqlite:
         max_overflow=10,
     )
 
-engine = create_engine(settings.database_url, **_engine_kwargs)
+engine = create_engine(_sync_url, **_engine_kwargs)
 
 if _is_sqlite:
     @event.listens_for(engine, "connect")

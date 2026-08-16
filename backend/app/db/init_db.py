@@ -28,7 +28,9 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from .pg_url import create_async_engine_normalized
 
 LOGGER = logging.getLogger("vigilai.db.init")
 
@@ -49,30 +51,6 @@ def _configure_logging() -> None:
     LOGGER.addHandler(handler)
     LOGGER.setLevel(logging.INFO)
     LOGGER.propagate = False
-
-
-def _to_async_database_url(raw: str) -> str:
-    """Normalize DATABASE_URL to an asyncpg SQLAlchemy URL."""
-    url = make_url(raw.strip())
-    driver = (url.drivername or "").lower()
-
-    if driver in {"postgresql+asyncpg", "postgres+asyncpg"}:
-        return url.render_as_string(hide_password=False)
-
-    if driver in {"postgresql", "postgres", "postgresql+psycopg2", "postgresql+psycopg"}:
-        url = url.set(drivername="postgresql+asyncpg")
-        return url.render_as_string(hide_password=False)
-
-    if driver.startswith("sqlite"):
-        raise ValueError(
-            "OMOP Phase 1 DDL requires PostgreSQL (partitioning + materialized views). "
-            f"Got unsupported dialect: {driver!r}"
-        )
-
-    raise ValueError(
-        f"Unsupported DATABASE_URL dialect {driver!r}. "
-        "Use postgresql://… or postgresql+asyncpg://…"
-    )
 
 
 def _strip_sql_comments(sql: str) -> str:
@@ -283,11 +261,9 @@ async def init_omop_database(database_url: str | None = None) -> None:
             "postgresql+asyncpg://vigilai:vigilai@127.0.0.1:5432/vigilai"
         )
 
-    async_url = _to_async_database_url(raw_url)
-    safe_url = make_url(async_url).render_as_string(hide_password=True)
+    engine = create_async_engine_normalized(raw_url, echo=False)
+    safe_url = make_url(str(engine.url)).render_as_string(hide_password=True)
     LOGGER.info("Connecting to %s", safe_url)
-
-    engine = create_async_engine(async_url, pool_pre_ping=True, echo=False)
     try:
         for filename in DDL_FILES:
             path = SCHEMA_DIR / filename

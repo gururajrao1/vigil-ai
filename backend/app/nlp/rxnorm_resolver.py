@@ -14,8 +14,9 @@ from typing import Any, List, Optional, Sequence
 
 from pydantic import BaseModel, Field
 from sqlalchemy import text
-from sqlalchemy.engine import make_url
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
+from ..db.pg_url import create_async_engine_normalized
 
 LOGGER = logging.getLogger("vigilai.nlp.rxnorm_resolver")
 
@@ -63,35 +64,6 @@ class RxNormResolution(BaseModel):
 
 def _normalize(s: str) -> str:
     return _WS_RE.sub(" ", (s or "").strip().lower())
-
-
-def _to_async_url(raw: str) -> str:
-    url = make_url(raw.strip())
-    driver = (url.drivername or "").lower()
-    if "asyncpg" in driver:
-        pass
-    elif driver in {"postgresql", "postgres", "postgresql+psycopg2", "postgresql+psycopg"}:
-        url = url.set(drivername="postgresql+asyncpg")
-    elif driver.startswith("sqlite"):
-        if "aiosqlite" not in driver:
-            url = url.set(drivername="sqlite+aiosqlite")
-    else:
-        raise ValueError(f"Unsupported DATABASE_URL dialect: {driver!r}")
-    query = dict(url.query) if url.query else {}
-    for key in list(query.keys()):
-        if key.lower() in {"sslmode", "ssl", "channel_binding"}:
-            query.pop(key, None)
-    return url.set(query=query).render_as_string(hide_password=False)
-
-
-def _async_connect_args(async_url: str) -> dict:
-    url = make_url(async_url)
-    if "asyncpg" not in (url.drivername or "").lower():
-        return {}
-    host = (url.host or "").lower()
-    if host in {"localhost", "127.0.0.1", "::1", ""}:
-        return {}
-    return {"ssl": True}
 
 
 def _levenshtein_ratio(a: str, b: str) -> float:
@@ -181,12 +153,7 @@ class RxNormResolver:
                 raw = ""
         if not raw:
             return None
-        async_url = _to_async_url(raw)
-        self._engine = create_async_engine(
-            async_url,
-            pool_pre_ping=True,
-            connect_args=_async_connect_args(async_url),
-        )
+        self._engine = create_async_engine_normalized(raw)
         self._session_factory = async_sessionmaker(self._engine, expire_on_commit=False)
         self._own_engine = True
         return self._engine

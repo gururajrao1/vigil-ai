@@ -19,7 +19,13 @@ const NOVELTY_OPTIONS = [
   { value: 'unknown', label: '? Unknown' },
 ];
 
-export default function Signals({ embedded = false, contextDrug, contextRxcui }) {
+export default function Signals({
+  embedded = false,
+  contextDrug,
+  contextRxcui,
+  contextSymptom,
+  hideProductSearch = false,
+}) {
   const { tick } = useRefresh();
   const { project } = useProject();
   const nav = useNavigate();
@@ -94,7 +100,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
     if (classEffect === '1' || classEffect === 'true') setClassEffectOnly(true);
   }, [searchParams]);
 
-  // Module 3 — when Omni-Search context resolves a drug, seed Detect filters without reload
+  // Module 3 / Phase 5 — Omni-Search context seeds Detect filters (no second jump box)
   useEffect(() => {
     if (contextDrug) {
       setDrugQ(contextDrug);
@@ -103,6 +109,14 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
       setPage(1);
     }
   }, [contextDrug, contextRxcui]);
+
+  useEffect(() => {
+    if (contextSymptom != null) {
+      setSymptomQ(contextSymptom);
+      setEventDraft(contextSymptom);
+      setPage(1);
+    }
+  }, [contextSymptom]);
 
   // Debounce free-text jump box → API `q` (and clear dedicated drug filter when using q)
   useEffect(() => {
@@ -247,6 +261,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
         </div>
       )}
 
+      {!hideProductSearch && (
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <input
@@ -292,6 +307,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
           aria-label="Search adverse events"
         />
       </div>
+      )}
 
       <div className="app-filter-bar justify-between">
         <div className="flex gap-2 flex-wrap">

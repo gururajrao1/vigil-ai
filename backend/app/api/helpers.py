@@ -356,6 +356,29 @@ def _project_scope(col, project_id: int | None):
     return or_(col == project_id, col.is_(None), col == 0)
 
 
+def _norm_sentiment(label: str | None) -> str:
+    """Fold case so FAERS bridge 'negative' merges with social NLP 'NEGATIVE'."""
+    raw = (label or "NEUTRAL").strip().upper()
+    if raw in {"NEGATIVE", "POSITIVE", "NEUTRAL"}:
+        return raw
+    return "NEUTRAL"
+
+
+def _fold_platform(platform: str | None) -> str:
+    """Collapse noisy feed variants (google_news/…) into stable buckets for charts."""
+    p = (platform or "unknown").strip() or "unknown"
+    low = p.lower()
+    if low.startswith("google_news"):
+        return "google_news"
+    if low.startswith("faers"):
+        return "faers"
+    if low.startswith("maude"):
+        return "maude"
+    if low in {"twitter", "x", "x_twitter"}:
+        return "twitter"
+    return p
+
+
 def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
     raw_q = db.query(RawPost)
     if project_id is not None:
@@ -380,14 +403,22 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
     if project_id is not None:
         rows_q = rows_q.filter(_project_scope(RawPost.project_id, project_id))
     rows = rows_q.all()
-    platform_counts = Counter(raw.platform for _, raw in rows)
-    sentiment_counts = Counter(p.sentiment_label for p, _ in rows)
+    platform_counts = Counter(_fold_platform(raw.platform) for _, raw in rows)
+    sentiment_counts = Counter(_norm_sentiment(p.sentiment_label) for p, _ in rows)
     region_counts = Counter((raw.region or "Global") for _, raw in rows)
     country_counts = Counter(raw.country for _, raw in rows if raw.country)
-    language_counts = Counter((raw.lang_name or "English") for _, raw in rows)
+    language_counts = Counter((raw.lang_name or raw.lang or "English") for _, raw in rows)
     translated_count = sum(1 for _, raw in rows if raw.translated)
 
+    # Full SOC counter (do NOT truncate here — Overview used to show
+    # len(most_common(10)) and looked "frozen" at 10 forever).
     soc_counts = Counter(s.meddra_soc for s in signals if s.meddra_soc)
+    try:
+        from ..nlp.meddra import SOC as _MEDDRA_SOC_CATALOG
+
+        soc_catalog_size = len(_MEDDRA_SOC_CATALOG)
+    except Exception:
+        soc_catalog_size = 27
 
     top_drugs = Counter()
     top_symptoms = Counter()
@@ -412,6 +443,28 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
     if project_id is not None:
         alert_q = alert_q.filter(_project_scope(Alert.project_id, project_id))
 
+    # Regulatory corpus breakdown — Overview "Posts ingested" is raw_posts only;
+    # OMOP FAERS staging can grow without moving that counter (common confusion).
+    faers_posts = raw_q.filter(RawPost.platform.in_(("faers", "faers_bulk", "faers_live"))).count()
+    maude_posts = raw_q.filter(RawPost.platform.in_(("maude", "maude_live"))).count()
+    social_posts = max(0, total_raw - faers_posts - maude_posts)
+    omop_persons = omop_drugs = omop_conditions = None
+    try:
+        from sqlalchemy import text as sa_text
+
+        omop_persons = db.execute(sa_text("SELECT COUNT(*) FROM omop_person")).scalar()
+        omop_drugs = db.execute(sa_text("SELECT COUNT(*) FROM omop_drug_exposure")).scalar()
+        omop_conditions = db.execute(
+            sa_text("SELECT COUNT(*) FROM omop_condition_occurrence")
+        ).scalar()
+    except Exception:
+        pass
+
+    critical_n = int(severity_counts.get("Critical") or 0)
+    high_n = int(severity_counts.get("High") or 0)
+    region_n = len(region_counts)
+    non_english = sum(v for k, v in language_counts.items() if (k or "").lower() not in {"english", "en", ""})
+
     return {
         "total_posts": total_raw,
         "processed_posts": total_processed,
@@ -421,19 +474,47 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         "alert_count": alert_q.count(),
         "spike_count": spikes,
         "translated_posts": translated_count,
+        "non_english_posts": non_english,
         "country_count": len(country_counts),
         "language_count": len(language_counts),
+        "region_count": region_n,
+        "soc_count": len(soc_counts),
+        "soc_catalog_size": soc_catalog_size,
+        "priority_signals": critical_n + high_n,
         "strength_distribution": dict(strength_counts),
         "severity_distribution": dict(severity_counts),
-        "platform_distribution": dict(platform_counts),
+        "platform_distribution": dict(platform_counts.most_common(16)),
         "sentiment_distribution": dict(sentiment_counts),
         "region_distribution": dict(region_counts),
         "country_distribution": dict(country_counts.most_common(12)),
-        "language_distribution": dict(language_counts),
-        "soc_distribution": dict(soc_counts.most_common(10)),
+        "language_distribution": dict(language_counts.most_common(16)),
+        # Full map for accurate soc_count; charts should slice client-side.
+        "soc_distribution": dict(soc_counts),
         "top_drugs": top_drugs.most_common(8),
         "top_symptoms": top_symptoms.most_common(8),
+        "top_platforms": platform_counts.most_common(8),
         "project_id": project_id,
+        "regulatory": {
+            "faers_posts": faers_posts,
+            "maude_posts": maude_posts,
+            "social_posts": social_posts,
+            "omop_person": omop_persons,
+            "omop_drug_exposure": omop_drugs,
+            "omop_condition_occurrence": omop_conditions,
+            "note": (
+                "Overview Posts ingested = total_posts (raw_posts). "
+                "Translated posts only rise when social NLP marks translated=true "
+                "(FAERS/MAUDE ICSRs are English regulatory narratives). "
+                "region_count caps at the macro-region taxonomy (~7); use country_count "
+                "for geographic growth. soc_count is distinct MedDRA SOCs on Signal rows."
+            ),
+        },
+        "metric_notes": {
+            "translated_posts": "Social-listening NLP only; FAERS/MAUDE bulk bridges set translated=false.",
+            "region_count": "Macro-region buckets (typically ≤7); grows with countries, not region labels.",
+            "soc_count": "Distinct MedDRA SOC labels on recomputed Signal rows (catalog ≈27).",
+            "priority_signals": "Critical + High severity from WHO-UMC grade_severity.",
+        },
     }
 
 
@@ -451,7 +532,7 @@ def overview_timeseries(db: Session, project_id: int | None = None) -> dict:
         daily_total[d] += 1
         if p.ae_flag:
             daily_ae[d] += 1
-        if p.sentiment_label == "NEGATIVE":
+        if _norm_sentiment(p.sentiment_label) == "NEGATIVE":
             daily_neg[d] += 1
 
     dates = sorted(daily_total.keys())

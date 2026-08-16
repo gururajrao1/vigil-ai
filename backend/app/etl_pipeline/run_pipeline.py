@@ -22,12 +22,11 @@ from typing import Any, Optional, Sequence
 
 from dotenv import load_dotenv
 from sqlalchemy import text
-from sqlalchemy.engine import make_url
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from .ingest_faers import ingest_faers
 from .load_athena_vocab import load_athena_vocab
 from .load_sider import load_sider
+from ..db.pg_url import create_async_engine_normalized
 
 LOGGER = logging.getLogger("vigilai.etl.run_pipeline")
 
@@ -60,16 +59,6 @@ def _configure_logging(verbose: bool = False) -> None:
     LOGGER.propagate = False
 
 
-def _to_async_url(raw: str) -> str:
-    url = make_url(raw.strip())
-    driver = (url.drivername or "").lower()
-    if "asyncpg" in driver:
-        return url.render_as_string(hide_password=False)
-    if driver in {"postgresql", "postgres", "postgresql+psycopg2", "postgresql+psycopg"}:
-        return url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
-    raise ValueError(f"Unsupported DATABASE_URL dialect: {driver!r}")
-
-
 async def refresh_signal_summary(*, database_url: Optional[str] = None) -> dict[str, Any]:
     """Ensure staging-backed ``omop_signal_summary``, then CONCURRENTLY refresh."""
     load_dotenv()
@@ -77,7 +66,7 @@ async def refresh_signal_summary(*, database_url: Optional[str] = None) -> dict[
     if not raw:
         raise EnvironmentError("DATABASE_URL is required for matview refresh")
 
-    engine = create_async_engine(_to_async_url(raw), pool_pre_ping=True)
+    engine = create_async_engine_normalized(raw)
     mode = "concurrent"
     try:
         async with engine.begin() as conn:

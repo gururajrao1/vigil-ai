@@ -33,14 +33,35 @@ export default function Overview({ embedded = false }) {
   if (!stats) return <Spinner label="Loading dashboard…" />;
 
   const empty = stats.total_posts === 0;
-  const sentimentData = Object.entries(stats.sentiment_distribution || {}).map(([k, v]) => ({ name: k, value: v }));
+  // Fold legacy lowercase FAERS labels if an older API host still returns them.
+  const sentimentMerged = {};
+  Object.entries(stats.sentiment_distribution || {}).forEach(([k, v]) => {
+    const key = String(k || 'NEUTRAL').toUpperCase();
+    sentimentMerged[key] = (sentimentMerged[key] || 0) + Number(v || 0);
+  });
+  const sentimentData = Object.entries(sentimentMerged).map(([k, v]) => ({ name: k, value: v }));
   const strengthData = Object.entries(stats.strength_distribution || {}).map(([k, v]) => ({ name: k, value: v }));
   const drugData = (stats.top_drugs || []).map(([name, value]) => ({ name, value }));
   const symptomData = (stats.top_symptoms || []).map(([name, value]) => ({ name, value }));
   const regionData = Object.entries(stats.region_distribution || {}).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  const socData = Object.entries(stats.soc_distribution || {}).map(([name, value]) => ({ name, value }));
+  // Chart: top 12 SOCs; card uses stats.soc_count (full distinct — never truncate server-side).
+  const socData = Object.entries(stats.soc_distribution || {})
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 12);
   const langData = Object.entries(stats.language_distribution || {}).map(([name, value]) => ({ name, value }));
+  const platformData = (stats.top_platforms
+    || Object.entries(stats.platform_distribution || {}).sort((a, b) => b[1] - a[1]).slice(0, 8)
+  ).map(([name, value]) => ({ name, value }));
   const REGION_COLORS = ['#38bdf8', '#a78bfa', '#f43f5e', '#10b981', '#f59e0b', '#ec4899', '#22d3ee'];
+
+  const sev = stats.severity_distribution || {};
+  const criticalN = sev.Critical || 0;
+  const priorityN = stats.priority_signals ?? (criticalN + (sev.High || 0));
+  const socCount = stats.soc_count ?? Object.keys(stats.soc_distribution || {}).length;
+  const socCatalog = stats.soc_catalog_size || 27;
+  const reg = stats.regulatory || {};
+  const faersHeavy = (reg.faers_posts || 0) > Math.max(100, (stats.total_posts || 0) * 0.4);
 
   return (
     <div className="space-y-6">
@@ -51,9 +72,17 @@ export default function Overview({ embedded = false }) {
         </Card>
       )}
 
+      {faersHeavy && (
+        <Card className="p-3 border-amber-600/30 bg-amber-600/10 text-amber-100/90 text-xs leading-relaxed">
+          Corpus is FAERS/MAUDE-heavy ({reg.faers_posts || 0} FAERS · {reg.maude_posts || 0} MAUDE · {reg.social_posts ?? '—'} social).
+          {' '}Translated posts only move when social NLP translates non-English text — regulatory ICSRs stay English.
+          {' '}Macro-regions cap around 7 buckets; watch <b>Countries</b> and <b>FAERS posts</b> for geographic/corpus growth.
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Posts ingested" value={stats.total_posts} sub={`${stats.processed_posts} processed`} />
-        <StatCard label="Adverse events" value={stats.ae_posts} sub={`${(stats.ae_rate * 100).toFixed(1)}% AE rate`} accent="text-rose-300" />
+        <StatCard label="Adverse events" value={stats.ae_posts} sub={`${((stats.ae_rate || 0) * 100).toFixed(1)}% AE rate`} accent="text-rose-300" />
         <StatCard label="Safety signals" value={stats.signal_count} sub={`${stats.strength_distribution?.STRONG || 0} strong`} accent="text-sky-300" />
         <StatCard label="Active alerts" value={stats.alert_count} accent="text-amber-300" />
         <StatCard label="Spikes detected" value={stats.spike_count} sub="emerging trends" accent="text-violet-300" />
@@ -61,10 +90,30 @@ export default function Overview({ embedded = false }) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Critical signals" value={stats.severity_distribution?.Critical || 0} sub="high-severity" accent="text-rose-400" />
-        <StatCard label="Translated posts" value={stats.translated_posts || 0} sub="non-English → EN" accent="text-sky-300" />
-        <StatCard label="Regions covered" value={Object.keys(stats.region_distribution || {}).length} sub="worldwide reach" accent="text-violet-300" />
-        <StatCard label="Organ classes" value={Object.keys(stats.soc_distribution || {}).length} sub="MedDRA SOC" accent="text-amber-300" />
+        <StatCard
+          label="Priority signals"
+          value={priorityN}
+          sub={`${criticalN} Critical · ${sev.High || 0} High`}
+          accent="text-rose-400"
+        />
+        <StatCard
+          label="Translated posts"
+          value={stats.translated_posts || 0}
+          sub={`social NLP · ${stats.non_english_posts || 0} non-EN`}
+          accent="text-sky-300"
+        />
+        <StatCard
+          label="FAERS posts"
+          value={reg.faers_posts ?? 0}
+          sub={`${reg.maude_posts || 0} MAUDE · ${reg.social_posts ?? 0} social`}
+          accent="text-violet-300"
+        />
+        <StatCard
+          label="Organ classes"
+          value={socCount}
+          sub={`of ~${socCatalog} MedDRA SOCs`}
+          accent="text-amber-300"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -96,7 +145,7 @@ export default function Overview({ embedded = false }) {
         </Card>
 
         <Card className="p-2">
-          <CardHeader title="Sentiment mix" subtitle="Across all processed posts" />
+          <CardHeader title="Sentiment mix" subtitle="NEGATIVE / NEUTRAL / POSITIVE (case-normalized)" />
           <div className="h-64 mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -112,6 +161,21 @@ export default function Overview({ embedded = false }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-2">
+          <CardHeader title="Corpus by source" subtitle="FAERS/MAUDE vs social — folded feed variants" />
+          <div className="h-64 mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={platformData} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} width={90} />
+                <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} />
+                <Bar dataKey="value" fill="#38bdf8" radius={[0, 4, 4, 0]} name="Posts" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
         <Card className="p-2">
           <CardHeader title="Top implicated drugs" subtitle="Click a bar → Safety Signals filtered to that product" />
           <div className="h-64 mt-2">
@@ -136,7 +200,9 @@ export default function Overview({ embedded = false }) {
             </ResponsiveContainer>
           </div>
         </Card>
+      </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-2">
           <CardHeader title="Top implicated adverse events" subtitle="Click a bar → Detect grid filtered to that AE (searchEvent deep-link)" />
           <div className="h-64 mt-2">
@@ -155,7 +221,6 @@ export default function Overview({ embedded = false }) {
                   onClick={(d) => {
                     const name = d?.name || d?.payload?.name;
                     if (!name) return;
-                    // Deep-link token for the Detect grid (searchEvent) + symptom filter for API
                     goSignals({
                       searchEvent: String(name).toUpperCase(),
                       symptom: name,

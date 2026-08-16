@@ -9,15 +9,17 @@ import { api } from '../api';
 
 /**
  * Global pharmacovigilance clinical state (Phase 5).
- * Omni-Search / Detect update this context; SignalDataGrid re-renders without a full reload.
+ * One Omni-Search drives OMOP PRR grid + Detect corpus filters (no second jump box).
  */
 const PharmacovigilanceContext = createContext({
   activeSearchTerm: '',
+  eventFilter: '',
   resolvedConcept: null,
   signalData: [],
   isLoading: false,
   searchError: null,
   executeSearch: async () => {},
+  setEventFilter: () => {},
   // Back-compat aliases (Module 3 / Omni lens)
   resolvedRxCUI: null,
   resolvedMedDRAPT: null,
@@ -53,6 +55,7 @@ function buildResolvedConcept(payload) {
 
 export function PharmacovigilanceProvider({ children }) {
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
+  const [eventFilter, setEventFilter] = useState('');
   const [resolvedConcept, setResolvedConcept] = useState(null);
   const [signalData, setSignalData] = useState([]);
   const [omopSignals, setOmopSignals] = useState(null);
@@ -64,6 +67,7 @@ export function PharmacovigilanceProvider({ children }) {
 
   const clearClinicalState = useCallback(() => {
     setActiveSearchTerm('');
+    setEventFilter('');
     setResolvedConcept(null);
     setSignalData([]);
     setOmopSignals(null);
@@ -92,14 +96,24 @@ export function PharmacovigilanceProvider({ children }) {
     setResolvedRxCUI(concept?.rxcui || null);
     setResolvedMedDRAPT(meddraPt);
     setComparisonBrands(Array.isArray(brands) ? brands : []);
+    setSearchError(null);
   }, []);
 
-  const executeSearch = useCallback(async (query) => {
+  const executeSearch = useCallback(async (query, { eventAe } = {}) => {
     const q = String(query || '').trim();
+    const ae = eventAe !== undefined ? String(eventAe || '').trim() : undefined;
+    if (ae !== undefined) setEventFilter(ae);
+
     if (!q) {
-      setSearchError('Enter a brand, INN, or clinical term to search.');
+      // AE-only refine of the Detect table (no new drug resolve)
+      if (ae !== undefined) {
+        setSearchError(null);
+        return { mode: 'event_filter', eventFilter: ae };
+      }
+      setSearchError('Enter a brand, INN, device, vaccine, or clinical term.');
       return null;
     }
+
     setIsLoading(true);
     setSearchError(null);
     setActiveSearchTerm(q);
@@ -109,12 +123,24 @@ export function PharmacovigilanceProvider({ children }) {
       return payload;
     } catch (err) {
       const message = err?.message || String(err);
-      setSearchError(message);
+      // Symptom / slang → filter Detect by AE instead of hard-failing the page
+      if (/adverse event|meddra|symptom/i.test(message)) {
+        setEventFilter(q);
+        setActiveSearchTerm('');
+        setResolvedConcept(null);
+        setSignalData([]);
+        setOmopSignals(null);
+        setResolvedRxCUI(null);
+        setResolvedMedDRAPT(q);
+        setSearchError(null);
+        return { mode: 'ae_detect_filter', term: q };
+      }
+      // Still seed Detect corpus search with the typed product term
       setSignalData([]);
       setOmopSignals(null);
       setResolvedConcept(null);
-      // Keep the typed term so the search box and Detect filter stay aligned
       setResolvedRxCUI(null);
+      setSearchError(message);
       throw err;
     } finally {
       setIsLoading(false);
@@ -132,7 +158,10 @@ export function PharmacovigilanceProvider({ children }) {
     } = payload;
     setActiveSearchTerm(term || '');
     if (rxcui !== undefined) setResolvedRxCUI(rxcui);
-    if (meddraPt !== undefined) setResolvedMedDRAPT(meddraPt);
+    if (meddraPt !== undefined) {
+      setResolvedMedDRAPT(meddraPt);
+      if (meddraPt) setEventFilter(meddraPt);
+    }
     if (brands !== undefined) setComparisonBrands(Array.isArray(brands) ? brands : []);
     if (omop !== undefined && omop !== null) {
       applyPayload(term, omop);
@@ -162,11 +191,13 @@ export function PharmacovigilanceProvider({ children }) {
   const value = useMemo(
     () => ({
       activeSearchTerm,
+      eventFilter,
       resolvedConcept,
       signalData,
       isLoading,
       searchError,
       executeSearch,
+      setEventFilter,
       resolvedRxCUI,
       resolvedMedDRAPT,
       comparisonBrands,
@@ -178,6 +209,7 @@ export function PharmacovigilanceProvider({ children }) {
     }),
     [
       activeSearchTerm,
+      eventFilter,
       resolvedConcept,
       signalData,
       isLoading,

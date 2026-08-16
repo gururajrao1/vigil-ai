@@ -19,7 +19,40 @@ from ..nlp.text_normalize import canonical_event, fold_key
 logger = logging.getLogger("vigilai.normalize_cleanup")
 
 
-def scrub_entities_json(db: Session, project_id: Optional[int] = None) -> dict:
+def repair_sentiment_case(db: Session, project_id: Optional[int] = None) -> dict:
+    """Uppercase sentiment_label so FAERS 'negative' merges with social 'NEGATIVE'."""
+    from sqlalchemy import text
+
+    # Bulk UPDATE — ORM row loops are too slow at FAERS scale (10k+).
+    if project_id is not None:
+        sql = text(
+            """
+            UPDATE processed_posts AS p
+            SET sentiment_label = UPPER(TRIM(p.sentiment_label))
+            FROM raw_posts AS r
+            WHERE p.raw_id = r.id
+              AND r.project_id = :pid
+              AND p.sentiment_label IS NOT NULL
+              AND p.sentiment_label <> UPPER(TRIM(p.sentiment_label))
+              AND LOWER(TRIM(p.sentiment_label)) IN ('negative', 'positive', 'neutral')
+            """
+        )
+        result = db.execute(sql, {"pid": project_id})
+    else:
+        sql = text(
+            """
+            UPDATE processed_posts
+            SET sentiment_label = UPPER(TRIM(sentiment_label))
+            WHERE sentiment_label IS NOT NULL
+              AND sentiment_label <> UPPER(TRIM(sentiment_label))
+              AND LOWER(TRIM(sentiment_label)) IN ('negative', 'positive', 'neutral')
+            """
+        )
+        result = db.execute(sql)
+    fixed = int(result.rowcount or 0)
+    db.commit()
+    logger.info("repair_sentiment_case fixed=%s", fixed)
+    return {"sentiment_labels_fixed": fixed}
     """Rewrite drugs / symptoms / conditions inside entities_json."""
     q = db.query(ProcessedPost)
     if project_id is not None:
