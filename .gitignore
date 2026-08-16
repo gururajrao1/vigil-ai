@@ -10,7 +10,6 @@ backend/*.db-shm
 backend/data/*.db
 backend/data/*.dump
 backend/data/*.sql
-backend/data/backups/
 
 
 # Secrets — never commit

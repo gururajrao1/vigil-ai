@@ -53,8 +53,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Phase 2 FAERS → posts bridge     | `ingest_faers`, `also_posts`, `faers_`, Overview posts | `python -m app.etl_pipeline.ingest_faers --faers-json …` |
 | openFDA bulk download (drug+device) | `download_openfda`, `download.json`, FAERS, MAUDE partitions (~2k files) | `GET /api/etl/openfda/partitions` · `POST /api/etl/openfda/download` · `python -m app.etl_pipeline.download_openfda` |
 | openFDA **stream-ingest** (no full download) | `stream_ingest_openfda`, CDN partition GET → posts+OMOP | `POST /api/etl/openfda/stream-ingest` · `GET /api/etl/openfda/stream-ingest/{job_id}` · CLI `stream_ingest_openfda` |
-| Local 24k FAERS self-ingest (done) | two openFDA JSON files (~12k×2) → OMOP + posts bridge; corpus ~27k posts | `python -m app.etl_pipeline.ingest_faers --faers-json …\faers\openfda --batch-size 1000` then recompute |
-| Neon corpus backup / restore | `dump_pg_to_sqlite`, `restore_sqlite_to_pg`, `backup_vigilai_corpus` | `backend/data/vigilai_neon_backup.db` · `backend/data/backups/vigilai_*` · [PRESERVE_NEON_DATA](./PRESERVE_NEON_DATA.md) |
+| Backlog — local 24k FAERS self-ingest | two local openFDA JSON files (~12k×2); OMOP may already be loaded; posts bridge deferred | `python -m app.etl_pipeline.ingest_faers --faers-json …\faers\openfda --batch-size 1000 --recompute-signals` (when ready) |
 | Phase 2 CLI ETL + matview        | `run_pipeline`, `load_athena_vocab`, `ingest_faers`, `load_sider`, `omop_signal_summary` | `python -m app.etl_pipeline.run_pipeline` (backend) |
 | Phase 4 Signals PRR/ROR API      | `/api/v1/signals/`, `calculate_prr_ror`, `OmniSearchService` | `GET /api/v1/signals/{query}` · `/docs` |
 | Phase 5 Signals SPA context      | `PharmacovigilanceContext`, `OmniSearchBox`, `SignalDataGrid` | `/signals` (Detect) |
@@ -826,7 +825,6 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | PV demo pack        | VAERS + FAERS bulk samples + pregnancy/DDI-friendly ICSRs                | Instant remine / DDI / pregnancy / REM demos |
 | Data Forge          | Synthetic narratives + quality loop                                      | Zero-PHI stress testing                      |
 | Network registry    | Live connectors vs licensed **surrogates**                               | Honest architecture                          |
-| Corpus backup pack  | Postgres→SQLite dump + external FAERS inventory (`backup_vigilai_corpus`) | Survive Neon egress lock / Supabase cutover |
 
 
 ---
@@ -1346,9 +1344,7 @@ openFDA does **not** stream millions of ICSRs through the query API alone (rate 
 
 **Why Overview metrics looked “stuck” after OMOP:** **Posts ingested** = `COUNT(raw_posts)`, not OMOP person/exposure counts. Loading FAERS into OMOP alone leaves Overview flat. Stream-ingest defaults `also_posts=true`. Check `GET /api/dashboard/stats` → `regulatory.faers_posts` / `maude_posts` / `omop_*` for the split.
 
-**Local 24k FAERS self-ingest (completed):** both on-disk openFDA JSON files under `%USERPROFILE%\Data\vigilai\faers\openfda` were ingested with the posts bridge (`events_processed=24000`, ~11k net-new FAERS posts after dedupe). Overview **Posts ingested** should read **~27k** (`regulatory.faers_posts` ≈ 24k). After ingest, run `recompute_signals` (prefer `use_fda=False` for speed on large corpora) so Safety signals / alerts / spikes / SOC counts refresh from PRR/ROR/χ² — they do **not** move from post inserts alone.
-
-**Corpus backup (do not commit `.db` files):** `python scripts/backup_vigilai_corpus.py` writes `backend/data/backups/vigilai_<stamp>/` (SQLite dump + external-file inventory). Canonical restore dump: `backend/data/vigilai_neon_backup.db`. See [`PRESERVE_NEON_DATA.md`](./PRESERVE_NEON_DATA.md) / [`CUTOVER_SUPABASE.md`](./CUTOVER_SUPABASE.md).
+**Backlog (deferred):** local ~24k FAERS self-ingest from the two on-disk openFDA JSON files (`…\faers\openfda`). Prefer stream-ingest from CDN for growing Overview metrics; run the local bridge later with `ingest_faers --faers-json … --batch-size 1000 --recompute-signals`.
 
 **Optional — download then ingest** (only if you want a local mirror):
 

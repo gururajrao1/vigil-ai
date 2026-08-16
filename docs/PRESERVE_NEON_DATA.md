@@ -1,72 +1,71 @@
 # Preserve Neon data (client demo) — do NOT wipe Neon
 
-Your corpus lives on Neon (and in local SQLite backups). Free **network transfer**
-exhaustion suspends compute; it does **not** delete tables. Login 500s are a
-“locked door,” not lost data.
+Your corpus is **still on Neon**. Free **network transfer** exhaustion **suspends compute**; it does **not** delete tables. Login 500s are “locked door,” not lost data.
+
+Right now every connection fails with:
+
+```text
+Your project has exceeded the data transfer quota. Upgrade your plan to increase limits.
+```
+
+There is **no offline dump** in this repo we can restore from. The only safe way to keep every row for a client demo is to **unlock Neon**, then optionally copy out.
 
 ---
 
-## Path A — Keep Neon (recommended while Launch is unlocked)
+## Path A — Fastest for tomorrow’s demo (recommended)
 
-1. Neon Console → project on **Launch** (or unlock if Free quota blocked egress).
-2. Keep Render `DATABASE_URL` on the **same** Neon pooled URL.
-3. Hard-refresh https://vigil-ai-eight.vercel.app — Overview **Posts ingested**
-   should match `GET /api/dashboard/stats` → `total_posts` (currently **~27k** after
-   the local 24k FAERS bridge).
+**Upgrade the Neon project to Launch** (pay-as-you-go; ~$0 unless you leave heavy compute on).
 
-No app code change required for Path A.
+1. Open [Neon Console](https://console.neon.tech) → org that owns the VigilAI project (`autumn-forest…` / DB `vigilai`).
+2. **Billing / Upgrade** → **Launch**.
+3. If Neon was created via **Vercel Storage**: Vercel → project → **Storage** → Neon → **Change Configuration** → Launch (Vercel-managed billing).
+4. Wait 1–2 minutes; retry https://vigil-ai-api.onrender.com/api/health then login.
+5. Keep Render `DATABASE_URL` pointing at the **same** Neon pooled URL — no app code change.
+
+You keep **all** posts, signals, OMOP, users. Then hard-refresh the SPA and run **Recompute** once (FAERS entity fix is already on `main`) so signals finally include FAERS.
+
+Estimated cost for a short demo window: usually **well under a few dollars** if scale-to-zero stays on.
 
 ---
 
-## Local backups (already on this machine — gitignored)
+## Local backup (already taken while Launch was unlocked)
 
-| Path | What |
-|------|------|
-| `backend/data/vigilai_neon_backup.db` | Full Postgres → SQLite dump (~94 MB / ~395k rows) |
-| `backend/data/backups/vigilai_<stamp>/` | Pack: `vigilai_db.sqlite` + `manifest.json` (counts + FAERS JSON inventory) |
+Full corpus dump on this machine (do not commit to git):
 
-Refresh after major ingest/recompute:
+```text
+backend/data/vigilai_neon_backup.db
+```
+
+~372k rows / ~74 MB including `raw_posts` (16447), `signals`, OMOP exposures, users, etc.
+
+Restore into Supabase after you create a project:
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe scripts\backup_vigilai_corpus.py
-.\.venv\Scripts\python.exe scripts\dump_pg_to_sqlite.py --out data\vigilai_neon_backup.db
+# Put pooler URI in a file (do not commit):
+# supabase_url.txt → postgresql://postgres.REF:PASS@….pooler.supabase.com:6543/postgres?sslmode=require
+$env:DATABASE_URL = (Get-Content .\supabase_url.txt -Raw).Trim()
+.\.venv\Scripts\python.exe scripts\restore_sqlite_to_pg.py --sqlite data/vigilai_neon_backup.db
 ```
 
-External multi‑GB openFDA JSON stays under `%USERPROFILE%\Data\vigilai` (inventoried by path/size only).
+Then set the same URI on Render `DATABASE_URL` and restart.
 
----
-
-## Path B — Temporary new DB (Supabase) without losing data
-
-1. Create Supabase project → **pooler** URI port **6543** + `sslmode=require`.
-2. Restore **before** pointing Render at empty Supabase:
-
-```powershell
-cd backend
-$env:DATABASE_URL = (Get-Content .\supabase_url.txt -Raw).Trim()   # do not commit
-.\.venv\Scripts\python.exe scripts\restore_sqlite_to_pg.py --sqlite data\vigilai_neon_backup.db
-```
-
-3. Set the same URI on Render `DATABASE_URL` → restart.
-4. Verify login + `/api/dashboard/stats` (`total_posts` ≈ 27k) then recompute if signals look stale.
-
-See also [`CUTOVER_SUPABASE.md`](./CUTOVER_SUPABASE.md).
 
 ---
 
 ## What NOT to do
 
-- Do **not** switch Render to an empty Supabase DB before restore.
-- Do **not** delete the Neon project until restore + live stats are verified.
-- Do **not** expect Safety signals / Organ classes to jump from post inserts alone — run **Recompute** (DMA). Prefer `use_fda=False` on large corpora so openFDA fan-out does not hang for hours.
+- Do **not** create an empty Supabase DB and switch Render to it before dumping Neon — that presents an empty product.
+- Do **not** delete the Neon project.
+- Do **not** keep retrying huge stream-ingests on Free Neon after unlock without Launch (you will hit 5 GB egress again).
 
 ---
 
-## Demo checklist
+## After unlock — demo checklist
 
-1. `/api/health` → `status: ok`
-2. Login (`admin@vigilai.dev` / `admin123`)
-3. Overview: **Posts ingested > 16k**, FAERS posts / Countries from live SQL (no hardcoded tiles)
-4. After recompute: signals / alerts / spikes / priority / SOC counts refresh from PRR/ROR/χ²
-5. Hard-refresh https://vigil-ai-eight.vercel.app
+1. Login works (`admin@vigilai.dev` / `admin123` or your seeded users).
+2. Overview shows ~16k posts / FAERS breakdown (if still on same DB).
+3. **Recompute** signals (admin) so FAERS string-entity fix lands in DMA.
+4. Hard-refresh https://vigil-ai-eight.vercel.app.
+
+If Launch is upgraded and login still 500s, say so — next step is verify Render’s `DATABASE_URL` still matches the unlocked Neon project.
