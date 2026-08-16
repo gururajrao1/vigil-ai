@@ -491,9 +491,18 @@ def _flush_posts_sync(
                 drugs = [left.replace("MAUDE:", "").strip()]
                 symptoms = [right.strip()] if right.strip() else ["device malfunction"]
             entities = {
-                "drugs": drugs[:8],
-                "symptoms": symptoms[:8],
-                "conditions": symptoms[:8],
+                "drugs": [
+                    {"text": d, "normalized": d, "generic": d}
+                    for d in drugs[:8]
+                ],
+                "symptoms": [
+                    {"text": s, "normalized": s, "pt": s}
+                    for s in symptoms[:8]
+                ],
+                "conditions": [
+                    {"text": s, "normalized": s}
+                    for s in symptoms[:8]
+                ],
             }
             content_src = f"{title}\n{body}".strip().lower()
             content_hash = hashlib.sha256(content_src.encode("utf-8")).hexdigest()

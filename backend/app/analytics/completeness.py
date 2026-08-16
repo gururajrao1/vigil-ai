@@ -131,8 +131,16 @@ def dimensions_for_post(
     drugs = entities.get("drugs") or []
     symptoms = entities.get("symptoms") or []
     conditions = entities.get("conditions") or []
+
+    def _norm_key(item) -> str:
+        if isinstance(item, str):
+            return item
+        if isinstance(item, dict):
+            return str(item.get("normalized") or item.get("pt") or item.get("text") or "")
+        return ""
+
     non_negated_symptoms = [
-        s for s in symptoms if not negation.get(s.get("normalized", ""), False)
+        s for s in symptoms if not negation.get(_norm_key(s), False)
     ]
 
     label = (sentiment.get("label") or "").upper()
