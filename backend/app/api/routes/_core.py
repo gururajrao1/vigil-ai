@@ -1382,6 +1382,8 @@ def list_signals(
     symptom: str | None = None,
     q: str | None = None,
     full: bool = False,
+    limit: int = Query(200, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
     """List signals for the active project.
@@ -1389,6 +1391,9 @@ def list_signals(
     Default payload is a compact list row (flags + badge tooltips). Pass
     ``full=true`` only when a caller needs nested evidence blobs; detail views
     should use ``GET /signals/{id}`` instead.
+
+    ``limit`` defaults to 200 so browsers / proxies do not choke on a multi‑MB
+    unpaginated dump (which surfaces as client timeouts / HTTP 500s).
     """
     from sqlalchemy import or_
 
@@ -1497,7 +1502,15 @@ def list_signals(
                 or fold_key(s.get("symptom") or "") in sk
             )
         ]
-    return {"signals": out, "compact": not full}
+    total = len(out)
+    page = out[offset : offset + limit]
+    return {
+        "signals": page,
+        "compact": not full,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 # --------------------------- labeling-gap summary -------------------------- #
