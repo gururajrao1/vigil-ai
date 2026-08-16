@@ -254,16 +254,20 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         .filter(ProcessedPost.ae_flag.is_(True))
     )
     if project_id is not None:
-        from .api.helpers import _project_scope
+        from sqlalchemy import or_
 
-        ae_q = ae_q.filter(_project_scope(RawPost.project_id, project_id))
+        ae_q = ae_q.filter(
+            or_(RawPost.project_id == project_id, RawPost.project_id.is_(None), RawPost.project_id == 0)
+        )
     ae_rows = ae_q.all()
 
     sig_q = db.query(Signal)
     if project_id is not None:
-        from .api.helpers import _project_scope
+        from sqlalchemy import or_
 
-        sig_q = sig_q.filter(_project_scope(Signal.project_id, project_id))
+        sig_q = sig_q.filter(
+            or_(Signal.project_id == project_id, Signal.project_id.is_(None), Signal.project_id == 0)
+        )
     prior = {
         (s.drug, s.symptom): {
             "detected_at": s.detected_at,
@@ -277,6 +281,25 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         }
         for s in sig_q.all()
     }
+
+    # End the read transaction. FAERS-scale corpora spend minutes in pure Python
+    # DMA afterward; Neon/proxy idle SSL kills leave DELETE/INSERT failing.
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    def _db_keepalive() -> None:
+        from sqlalchemy import text as _sa_text
+
+        try:
+            db.execute(_sa_text("SELECT 1"))
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            db.execute(_sa_text("SELECT 1"))
 
     # Corpus baseline geographic distribution (counts of ALL AE reports by country
     # and region). This defines each area's EXPECTED share of reports, against which
@@ -299,7 +322,9 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     # Map processed_post id -> posted_at for all AE posts (comparator pool for Cox PH)
     all_ae_post_times: Dict[int, datetime] = {}
 
-    for processed, raw in ae_rows:
+    for i, (processed, raw) in enumerate(ae_rows):
+        if i and i % 1500 == 0:
+            _db_keepalive()
         if raw.posted_at:
             all_ae_post_times[processed.id] = raw.posted_at
         entities = json.loads(processed.entities_json or "{}")
@@ -460,6 +485,18 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     # Wipe prior signal rows for this scope. Alerts FK → signals.id has no ON DELETE
     # CASCADE (legacy SQLite→Postgres), and orphan alerts may have NULL/mismatched
     # project_id — so delete by signal_id first, then by project, then signals.
+    _db_keepalive()
+    # Force a fresh TCP/SSL socket before the destructive wipe — idle Neon
+    # connections often die during the multi-minute DMA pass above.
+    try:
+        db.connection().invalidate()
+    except Exception:
+        pass
+    try:
+        db.rollback()
+    except Exception:
+        pass
+    _db_keepalive()
     if project_id is not None:
         sig_ids = [
             row[0]
