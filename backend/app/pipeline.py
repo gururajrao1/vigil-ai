@@ -312,29 +312,14 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         # Product → entity flags (device entities override a mislabeled raw.product_type)
         drug_flags: Dict[str, dict] = {}
         for d in entities.get("drugs", []):
-            # FAERS/MAUDE bulk bridge historically stored bare strings; accept both shapes.
-            if isinstance(d, str):
-                surface = d
-            elif isinstance(d, dict):
-                surface = d.get("normalized") or d.get("text") or d.get("generic") or ""
-            else:
-                continue
-            canon = canonical_product(surface)
+            canon = canonical_product(d.get("normalized") or d.get("text") or "")
             if not canon:
                 continue
-            is_dev = False
-            atc_val = None
-            gmdn_val = None
-            if isinstance(d, dict):
-                is_dev = (
-                    bool(d.get("is_device"))
-                    or d.get("product_type") == "device"
-                    or is_known_device(canon)
-                )
-                atc_val = d.get("atc")
-                gmdn_val = d.get("gmdn")
-            else:
-                is_dev = is_known_device(canon)
+            is_dev = (
+                bool(d.get("is_device"))
+                or d.get("product_type") == "device"
+                or is_known_device(canon)
+            )
             # Raw rows tagged device only imply device for known-device products —
             # never promote co-mentioned drugs (e.g. Accutane on a device thread).
             if ptype_raw == "device" and is_known_device(canon):
@@ -343,40 +328,27 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
             if prev is None or (is_dev and not prev.get("is_device")):
                 drug_flags[canon] = {
                     "is_device": is_dev,
-                    "atc": None if is_dev else atc_val,
-                    "gmdn": gmdn_val,
+                    "atc": None if is_dev else d.get("atc"),
+                    "gmdn": d.get("gmdn"),
                 }
-            elif atc_val and not drug_flags[canon].get("is_device"):
-                drug_flags[canon]["atc"] = atc_val
+            elif d.get("atc") and not drug_flags[canon].get("is_device"):
+                drug_flags[canon]["atc"] = d["atc"]
         for canon, flags in drug_flags.items():
             if flags.get("atc") and not flags.get("is_device"):
                 drug_atc_map[canon] = flags["atc"]
         symptoms = []
         for s in entities.get("symptoms", []):
-            if isinstance(s, str):
-                surface = s
-                soc = None
-                soc_code = None
-            elif isinstance(s, dict):
-                surface = s.get("pt") or s.get("normalized") or s.get("text") or ""
-                soc = s.get("soc")
-                soc_code = s.get("soc_code")
-            else:
+            if negation.get(s["normalized"], False):
                 continue
-            # Negation map may key on raw surface or normalized form
-            if negation.get(surface, False) or negation.get((surface or "").lower(), False):
-                continue
-            if isinstance(s, dict) and negation.get(s.get("normalized") or "", False):
-                continue
-            ev = canonical_event(surface)
+            ev = canonical_event(s.get("pt") or s.get("normalized") or s.get("text") or "")
             if not ev:
                 continue
             symptoms.append(ev)
             if ev not in sym_meddra:
                 sym_meddra[ev] = {
                     "pt": ev,
-                    "soc": soc,
-                    "soc_code": soc_code,
+                    "soc": s.get("soc"),
+                    "soc_code": s.get("soc_code"),
                 }
         for drug, flags in drug_flags.items():
             for symptom in symptoms:
@@ -879,23 +851,13 @@ def knowledge_graph(db: Session, project_id: int | None = None) -> dict:
         proc_q = proc_q.filter(RawPost.project_id == project_id)
     for processed, _raw in proc_q.all():
         entities = json.loads(processed.entities_json or "{}")
-        drugs = set()
-        for d in entities.get("drugs", []):
-            if isinstance(d, str):
-                surface = d
-            elif isinstance(d, dict):
-                surface = d.get("normalized") or d.get("text") or ""
-            else:
-                continue
-            canon = canonical_product(surface)
-            if canon:
-                drugs.add(canon)
-        conds = set()
-        for c in entities.get("conditions", []):
-            if isinstance(c, str) and c.strip():
-                conds.add(c.strip())
-            elif isinstance(c, dict) and c.get("normalized"):
-                conds.add(c["normalized"])
+        drugs = {
+            canon
+            for d in entities.get("drugs", [])
+            for canon in [canonical_product(d.get("normalized") or d.get("text") or "")]
+            if canon
+        }
+        conds = {c["normalized"] for c in entities.get("conditions", []) if c.get("normalized")}
         for d in drugs:
             for c in conds:
                 cond_counter[(d, c)] = cond_counter.get((d, c), 0) + 1

@@ -39,25 +39,14 @@ def extract_post_products_events(
     drugs: List[str] = []
     seen_d: set[str] = set()
     for d in entities.get("drugs", []):
-        if isinstance(d, str):
-            surface = d
-            is_dev = is_known_device(canonical_product(d) or "")
-            # recompute after canon below
-        elif isinstance(d, dict):
-            surface = d.get("normalized") or d.get("text") or ""
-        else:
-            continue
-        canon = canonical_product(surface)
+        canon = canonical_product(d.get("normalized") or d.get("text") or "")
         if not canon or canon in seen_d:
             continue
-        if isinstance(d, dict):
-            is_dev = (
-                bool(d.get("is_device"))
-                or d.get("product_type") == "device"
-                or is_known_device(canon)
-            )
-        else:
-            is_dev = is_known_device(canon)
+        is_dev = (
+            bool(d.get("is_device"))
+            or d.get("product_type") == "device"
+            or is_known_device(canon)
+        )
         if ptype_raw == "device" and is_known_device(canon):
             is_dev = True
         # Skip pure devices for DDI; keep for masking reports
@@ -67,17 +56,9 @@ def extract_post_products_events(
     events: List[str] = []
     seen_e: set[str] = set()
     for s in entities.get("symptoms", []):
-        if isinstance(s, str):
-            surface = s
-            neg_key = s
-        elif isinstance(s, dict):
-            surface = s.get("pt") or s.get("normalized") or s.get("text") or ""
-            neg_key = s.get("normalized") or surface
-        else:
+        if negation.get(s.get("normalized"), False):
             continue
-        if negation.get(neg_key, False):
-            continue
-        ev = canonical_event(surface)
+        ev = canonical_event(s.get("pt") or s.get("normalized") or s.get("text") or "")
         if not ev or ev in seen_e:
             continue
         seen_e.add(ev)
