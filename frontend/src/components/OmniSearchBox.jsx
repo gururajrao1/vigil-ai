@@ -83,114 +83,83 @@ export function ResolutionBadge({ concept, className = '' }) {
   );
 }
 
-const EXAMPLES = ['Janumet', 'janumett', 'Ozempic', 'metformin', 'MMR', 'pacemaker'];
+const EXAMPLES = ['Janumet', 'janumett', 'Ozempic', 'brain fog', 'metformin'];
 
 /**
- * Unified Omni-Search — product resolve + optional AE filter for Detect.
- * Replaces the old separate "Jump to…" / "filter by event" bars on Detect.
+ * Omni-Search box for Detect — brand, slang, or clinical term → executeSearch.
  */
 export default function OmniSearchBox({
-  placeholder = 'Drug, brand, vaccine, device, or misspelling… e.g. Janumet, MMR, catheter',
+  placeholder = 'Search brand, INN, misspelling, or clinical term…',
   examples = EXAMPLES,
   className = '',
-  showEventFilter = true,
 }) {
   const {
     activeSearchTerm,
-    eventFilter,
     resolvedConcept,
     isLoading,
     searchError,
     executeSearch,
-    setEventFilter,
   } = usePharmacovigilance();
   const [q, setQ] = useState(activeSearchTerm || '');
-  const [ae, setAe] = useState(eventFilter || '');
   const inputId = useId();
-  const aeId = useId();
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (activeSearchTerm !== q) setQ(activeSearchTerm || '');
+    if (activeSearchTerm && activeSearchTerm !== q) {
+      setQ(activeSearchTerm);
+    }
+    // Sync from context when another surface (Omni lens) updates the term
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSearchTerm]);
 
-  useEffect(() => {
-    if (eventFilter !== ae) setAe(eventFilter || '');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventFilter]);
-
-  const submit = async (value = q, eventAe = ae) => {
+  const submit = async (value = q) => {
     const term = String(value || '').trim();
-    const eventVal = String(eventAe || '').trim();
-    if (isLoading) return;
+    if (!term || isLoading) return;
     setQ(term);
-    setAe(eventVal);
     try {
-      await executeSearch(term, { eventAe: eventVal });
+      await executeSearch(term);
     } catch {
-      // Error surfaced via searchError; Detect still receives activeSearchTerm when set
+      // Error surfaced via searchError in context
     }
   };
 
   return (
     <div className={`w-full ${className}`}>
+      <label htmlFor={inputId} className="sr-only">
+        Omni-Search clinical query
+      </label>
       <form
-        className="flex flex-col gap-3"
+        className="flex flex-col gap-3 sm:flex-row sm:items-stretch"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-          <div className="relative flex-1 min-w-0">
-            <label htmlFor={inputId} className="sr-only">
-              Product / Omni-Search query
-            </label>
-            <input
-              ref={inputRef}
-              id={inputId}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={placeholder}
-              disabled={isLoading}
-              autoComplete="off"
-              className="w-full rounded-xl border border-[var(--cds-sys-border-subtle)] bg-[var(--cds-sys-bg-base)] px-4 py-3.5 text-base text-[var(--cds-sys-text-primary)] placeholder:text-[var(--cds-sys-text-tertiary)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--cds-sys-accent-primary)]/40 focus:border-[var(--cds-sys-accent-primary)]/50 disabled:opacity-60"
-            />
-            {isLoading && (
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-                <Spinner label="" size="sm" />
-              </div>
-            )}
-          </div>
-          {showEventFilter && (
-            <div className="sm:w-56 shrink-0">
-              <label htmlFor={aeId} className="sr-only">
-                Optional adverse event filter
-              </label>
-              <input
-                id={aeId}
-                type="search"
-                value={ae}
-                onChange={(e) => {
-                  setAe(e.target.value);
-                  setEventFilter(e.target.value);
-                }}
-                placeholder="Optional: filter by AE…"
-                disabled={isLoading}
-                className="w-full h-full min-h-[3.25rem] rounded-xl border border-[var(--cds-sys-border-subtle)] bg-[var(--cds-sys-bg-base)] px-3 py-3 text-sm text-[var(--cds-sys-text-primary)] placeholder:text-[var(--cds-sys-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--cds-sys-accent-primary)]/40 disabled:opacity-60"
-              />
+        <div className="relative flex-1 min-w-0">
+          <input
+            ref={inputRef}
+            id={inputId}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={placeholder}
+            disabled={isLoading}
+            autoComplete="off"
+            className="w-full rounded-xl border border-[var(--cds-sys-border-subtle)] bg-[var(--cds-sys-bg-base)] px-4 py-3.5 text-base text-[var(--cds-sys-text-primary)] placeholder:text-[var(--cds-sys-text-tertiary)] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--cds-sys-accent-primary)]/40 focus:border-[var(--cds-sys-accent-primary)]/50 disabled:opacity-60"
+          />
+          {isLoading && (
+            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+              <Spinner label="" size="sm" />
             </div>
           )}
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={isLoading || (!String(q || '').trim() && !String(ae || '').trim())}
-            className="sm:px-6 sm:min-w-[7.5rem]"
-          >
-            {isLoading ? 'Searching…' : 'Search'}
-          </Button>
         </div>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={isLoading || !String(q || '').trim()}
+          className="sm:px-6 sm:min-w-[7.5rem]"
+        >
+          {isLoading ? 'Searching…' : 'Search'}
+        </Button>
       </form>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--cds-sys-text-tertiary)]">
@@ -202,12 +171,11 @@ export default function OmniSearchBox({
             size="sm"
             variant="outline"
             disabled={isLoading}
-            onClick={() => submit(ex, ae)}
+            onClick={() => submit(ex)}
           >
             {ex}
           </Button>
         ))}
-        <span className="ml-1 opacity-70">· one search updates OMOP scores and Detect below</span>
       </div>
 
       {searchError && (

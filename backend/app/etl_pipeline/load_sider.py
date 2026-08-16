@@ -24,9 +24,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
-
-from ..db.pg_url import create_async_engine_normalized
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 LOGGER = logging.getLogger("vigilai.etl.load_sider")
 
@@ -48,6 +47,18 @@ def _configure_logging(verbose: bool = False) -> None:
     LOGGER.addHandler(handler)
     LOGGER.setLevel(logging.DEBUG if verbose else logging.INFO)
     LOGGER.propagate = False
+
+
+def _to_async_url(raw: str) -> str:
+    url = make_url(raw.strip())
+    driver = (url.drivername or "").lower()
+    if "asyncpg" in driver:
+        return url.render_as_string(hide_password=False)
+    if driver in {"postgresql", "postgres", "postgresql+psycopg2", "postgresql+psycopg"}:
+        return url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
+    if driver.startswith("sqlite"):
+        raise ValueError("load_sider requires PostgreSQL (asyncpg)")
+    raise ValueError(f"Unsupported DATABASE_URL dialect: {driver!r}")
 
 
 def _stable_concept_id(*parts: str) -> int:
@@ -317,7 +328,7 @@ async def load_sider(
             path = ensure_surrogate_tsv()
 
     pairs = read_sider_pairs(path)
-    engine: AsyncEngine = create_async_engine_normalized(raw)
+    engine: AsyncEngine = create_async_engine(_to_async_url(raw), pool_pre_ping=True)
     inserted = updated = skipped = 0
     cache: Dict[Tuple[str, str], int] = {}
 

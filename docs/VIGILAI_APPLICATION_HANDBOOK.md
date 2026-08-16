@@ -49,11 +49,6 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/terminology?tab=mcn`                       |
 | OMOP SPA / signals by RxCUI      | `OMOP`, `RxCUI`, `/api/v1/signals`        | `/signals` (Detect)                          |
 | FAERS / SIDER ETL → OMOP         | `ETL`, `FAERS`, `SIDER`, `trigger_dataset_sync` | `GET /api/etl/sync/{faers\|sider\|athena_vocab}` |
-| Overview corpus metrics (live)   | `dashboard/stats`, `soc_count`, `priority_signals`, `regulatory.faers_posts` | `/dashboard` · `GET /api/dashboard/stats` |
-| Phase 2 FAERS → posts bridge     | `ingest_faers`, `also_posts`, `faers_`, Overview posts | `python -m app.etl_pipeline.ingest_faers --faers-json …` |
-| openFDA bulk download (drug+device) | `download_openfda`, `download.json`, FAERS, MAUDE partitions (~2k files) | `GET /api/etl/openfda/partitions` · `POST /api/etl/openfda/download` · `python -m app.etl_pipeline.download_openfda` |
-| openFDA **stream-ingest** (no full download) | `stream_ingest_openfda`, CDN partition GET → posts+OMOP | `POST /api/etl/openfda/stream-ingest` · `GET /api/etl/openfda/stream-ingest/{job_id}` · CLI `stream_ingest_openfda` |
-| Backlog — local 24k FAERS self-ingest | two local openFDA JSON files (~12k×2); OMOP may already be loaded; posts bridge deferred | `python -m app.etl_pipeline.ingest_faers --faers-json …\faers\openfda --batch-size 1000 --recompute-signals` (when ready) |
 | Phase 2 CLI ETL + matview        | `run_pipeline`, `load_athena_vocab`, `ingest_faers`, `load_sider`, `omop_signal_summary` | `python -m app.etl_pipeline.run_pipeline` (backend) |
 | Phase 4 Signals PRR/ROR API      | `/api/v1/signals/`, `calculate_prr_ror`, `OmniSearchService` | `GET /api/v1/signals/{query}` · `/docs` |
 | Phase 5 Signals SPA context      | `PharmacovigilanceContext`, `OmniSearchBox`, `SignalDataGrid` | `/signals` (Detect) |
@@ -770,7 +765,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Phase 5 Signals SPA**    | `PharmacovigilanceContext` + OmniSearchBox + SignalDataGrid (Universe/Subset toggles, SDR row highlight)                      | Instant Detect updates without full reload               | `/signals` |
 | **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/terminology?tab=mcn` |
 | **OMOP SPA**               | CDM v5.4 CONCEPT/PERSON/DRUG_EXPOSURE/CONDITION_OCCURRENCE + shared clinical context from Omni-Search                          | One RxCUI drives Detect PRR/ROR without page reload      | `/signals` Detect · `GET /api/v1/signals/{rxcui}` |
-| **ETL pipeline**           | Streaming FAERS → OMOP **and** `raw_posts`; openFDA **stream-ingest** from CDN (~2k parts, no full disk mirror); optional partition download; MAUDE → posts; SIDER; Athena CONCEPT; matview refresh; MCN F1 gate | Fill staging + Overview posts + DMA matview | `POST /api/etl/openfda/stream-ingest` · `download_openfda` · `ingest_faers` / `ingest_maude` · `run_pipeline` |
+| **ETL pipeline**           | Streaming FAERS → OMOP; SIDER in-label baseline (`is_expected_baseline` / `is_in_label`); Athena CONCEPT bulk load; Phase 2 CLI + `omop_signal_summary` CONCURRENTLY refresh; MCN F1 gate | Fill staging + filter known label AEs + refresh DMA matview | `GET /api/etl/sync/*` · `python -m app.etl_pipeline.run_pipeline` · FastMCP `trigger_dataset_sync` |
 | **DDI**                    | Co-mention pairs vs chance + clinical risk flags                                                                               | Polypharmacy AE patterns                             | `/lenses?tab=ddi`        |
 | **Pregnancy**              | Exposure + congenital / perinatal events                                                                                       | Special-population PV                                | `/lenses?tab=pregnancy`  |
 | **SMQ**                    | Pool PTs into syndrome signals                                                                                                 | Catch fragmented reporting                           | `/lenses?tab=smq`        |
@@ -833,24 +828,6 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 
 ## 9. Signal science (how numbers work)
 
-### 9.0 Dashboard corpus cards (Overview)
-
-`GET /api/dashboard/stats` drives **Dashboard → Corpus metrics**. These are live SQL aggregations over `raw_posts` / `processed_posts` / `Signal` — not React mock constants.
-
-| Card | Source field | Moves when… | Stays flat when… |
-| ---- | ------------ | ----------- | ---------------- |
-| Posts ingested | `total_posts` | Any bridge into `raw_posts` | OMOP-only load (no posts) |
-| Adverse events | `ae_posts` | AE-gated or FAERS/MAUDE bridge (`ae_flag`) | Non-AE social chatter only |
-| Safety signals / alerts / spikes | `signal_*` / `alert_count` | After `recompute_signals` | Posts inserted without recompute |
-| Countries | `country_count` | Distinct `occurcountry` / social country | All ICSRs default to one country |
-| Priority signals | `priority_signals` (Critical+High) | Severity grades on recompute | Most new pairs are Low/Medium |
-| Translated posts | `translated_posts` | Social NLP marks `translated=true` | FAERS/MAUDE bulk (`translated=false`) |
-| FAERS posts | `regulatory.faers_posts` | openFDA stream-ingest / FAERS crawl | Social-only corpus |
-| Organ classes | `soc_count` | Distinct `Signal.meddra_soc` (full set) | Surrogate lexicon already covered |
-
-**Bug fixed (2026-08):** `soc_distribution` was truncated with `most_common(10)`, so the Organ classes card always showed **10** even when 18+ SOCs existed. API now returns the full map + `soc_count`.
-
-**Bug fixed (sentiment):** FAERS bulk bridge wrote `sentiment_label="negative"` while social NLP uses `NEGATIVE`, so the sentiment pie showed two negative wedges. Bridge now writes `NEGATIVE`; `dashboard_stats` folds case; `POST /api/normalize/labels` repairs existing rows.
 
 
 ### 9.1 2×2 disproportionality
@@ -1231,7 +1208,7 @@ React Detect surface for Omni-Search → PRR grid without full page reloads.
 | Piece | Role |
 | ----- | ---- |
 | `PharmacovigilanceContext` | `activeSearchTerm`, `resolvedConcept`, `signalData`, `isLoading`; `executeSearch(query)` → `GET /api/v1/signals/{query}` |
-| `OmniSearchBox` | Single Detect search: product resolve + optional AE filter (replaces the old Jump-to bar) |
+| `OmniSearchBox` | Prominent search + **ResolutionBadge** (generics, ATC, confidence) |
 | `SignalDataGrid` | PRR/ROR/EB05 table; red highlight when PRR &gt; 2 and CI low &gt; 1; Universe vs Subset brand toggles |
 | `SignalsView` | Composes search + grid + legacy Detect table seeded from the same context |
 
@@ -1315,68 +1292,12 @@ Offline-first ingestion into OMOP CDM v5.4 staging (`backend/app/etl_pipeline/`)
 
 1. `python -m app.etl_pipeline.load_athena_vocab --concept-csv /path/CONCEPT.csv` — filters RxNorm / RxNorm Extension / MedDRA / SNOMED into `omop_concept` (COPY / batch upsert, BIGINT).
 2. `python -m app.etl_pipeline.load_sider --sider-tsv /path/meddra_all_label_se.tsv` — maps STITCH/UMLS + MedDRA PTs; sets `is_in_label` / `is_expected_baseline=TRUE`.
-3. `python -m app.etl_pipeline.ingest_faers --faers-json /path/faers.json` — streaming batches of **5,000**; maps drugs/reactions to concepts; `ON CONFLICT (person_id)` idempotent; **also bridges each ICSR into `raw_posts` / `processed_posts`** (`external_id=faers_{safetyreportid}`, same shape as live FAERS crawl) so Overview **Posts ingested** rises. Use `--skip-posts` for OMOP-only; `--recompute-signals` to rebuild DMA `Signal` rows after the posts bridge.
+3. `python -m app.etl_pipeline.ingest_faers --faers-json /path/faers.json` — streaming batches of **5,000**; maps drugs/reactions to concepts; `ON CONFLICT (person_id)` idempotent.
 4. `python -m app.etl_pipeline.run_pipeline` — runs 1→2→3 then `REFRESH MATERIALIZED VIEW CONCURRENTLY omop_signal_summary`.
-
-### 10.7b openFDA bulk partitions — drug (FAERS) + device (MAUDE)
-
-openFDA does **not** stream millions of ICSRs through the query API alone (rate limits). Full corpora are published as **partitioned JSON** listed in the master index:
-
-* Index: `https://api.fda.gov/download.json`
-* Drugs: `results.drug.event.partitions[]` (~1.7k parts, ~20M records)
-* Devices: `results.device.event.partitions[]` (~365 parts, ~25M records)
-
-**List (API):** `GET /api/etl/openfda/partitions?domain=both`  
-
-**Preferred — stream-ingest (no full disk mirror):** each of the ~2132 partition URLs from `download.json` is HTTP-GETed, parsed, and flushed into Overview **`raw_posts`** (this is what moves **Posts ingested**) plus OMOP for drug partitions. You do **not** need to download everything first.
-
-```powershell
-# API (background job — recommended)
-# POST /api/etl/openfda/stream-ingest
-# { "domain": "both", "max_partitions": 20, "event_limit": 100000, "also_posts": true, "recompute_signals": true }
-# Poll GET /api/etl/openfda/stream-ingest/{job_id}
-
-# CLI
-.\.venv\Scripts\python.exe -m app.etl_pipeline.stream_ingest_openfda --domain both `
-  --max-partitions 20 --event-limit 100000 --recompute-signals
-# --max-partitions 0 = all ~2k files (long-running on Render / local)
-```
-
-**Why Overview metrics looked “stuck” after OMOP:** **Posts ingested** = `COUNT(raw_posts)`, not OMOP person/exposure counts. Loading FAERS into OMOP alone leaves Overview flat. Stream-ingest defaults `also_posts=true`. Check `GET /api/dashboard/stats` → `regulatory.faers_posts` / `maude_posts` / `omop_*` for the split.
-
-**Backlog (deferred):** local ~24k FAERS self-ingest from the two on-disk openFDA JSON files (`…\faers\openfda`). Prefer stream-ingest from CDN for growing Overview metrics; run the local bridge later with `ingest_faers --faers-json … --batch-size 1000 --recompute-signals`.
-
-**Optional — download then ingest** (only if you want a local mirror):
-
-```powershell
-# POST /api/etl/openfda/download  { "domain": "both", "out_dir": "C:/…/openfda", "workers": 4 }
-# or: python -m app.etl_pipeline.download_openfda --domain both --out-dir C:\…\openfda
-```
-
-Layout after download:
-
-```text
-openfda/drug/event/*.json     # FAERS ICSRs (same shape as /drug/event)
-openfda/device/event/*.json   # MAUDE MDRs  (same shape as /device/event)
-```
-
-```powershell
-# Drugs → OMOP + Overview posts
-.\.venv\Scripts\python.exe -m app.etl_pipeline.ingest_faers `
-  --faers-json "C:\Users\Gururaja\Data\vigilai\openfda\drug\event" `
-  --batch-size 1000 --limit 100000 --recompute-signals
-
-# Devices → Overview posts (MAUDE)
-.\.venv\Scripts\python.exe -m app.etl_pipeline.ingest_maude `
-  --maude-json "C:\Users\Gururaja\Data\vigilai\openfda\device\event" `
-  --batch-size 1000 --limit 100000 --recompute-signals
-```
-
-Optional `OPENFDA_API_KEY` in `.env` raises rate limits on `api.fda.gov` calls; CDN GETs from `download.open.fda.gov` need no key. Partition URLs can change when openFDA refreshes the catalog.
 
 **DDL / ORM companions:** `backend/app/db/schemas/omop_v5_4_ddl.sql`, `performance_views.sql`, `models.py`, `init_db.py`. Staging tables remain `omop_*` for the SPA; the matview joins `omop_drug_exposure` × `omop_condition_occurrence`.
 
-**Schema patch:** `concept_id` (and related OMOP concept FKs) are **BIGINT** — see `backend/app/db/init_db.sql` and `migrate_schema()`. Surrogate hashes stay ≤ 2_099_999_999 so they also fit signed INT32. Cloud `DATABASE_URL` values with `?sslmode=require` are normalized for asyncpg via `app.db.pg_url` (no manual URL edits).
+**Schema patch:** `concept_id` (and related OMOP concept FKs) are **BIGINT** — see `backend/app/db/init_db.sql` and `migrate_schema()`. Surrogate hashes stay ≤ 2_099_999_999 so they also fit signed INT32.
 
 **FastMCP:** `trigger_dataset_sync(dataset_name)` with `faers` \| `sider` \| `athena_vocab`.
 
@@ -1386,13 +1307,7 @@ Optional `OPENFDA_API_KEY` in `.env` raises rate limits on `api.fda.gov` calls; 
 | SIDER baselines=0 | TSV missing | First sync writes `data/etl/sider_4_1_meddra_all_se_surrogate.tsv` |
 | Benchmark `pass_gate=false` | MCN catalog drift | Re-check Mantra/CADEC sample vs linker |
 | Matview empty after CLI load | Refresh skipped / view on wrong tables | Re-run `run_pipeline` (recreates staging-backed `omop_signal_summary` if needed) |
-| CLI OOM on large FAERS dump | Batch too large | Keep `--batch-size 5000` (default); install optional `ijson` for streaming |
-| OMOP filled but Overview posts flat | Posts bridge skipped / OMOP-only load | Use `POST /api/etl/openfda/stream-ingest` with `also_posts=true`, or `ingest_faers` without `--skip-posts` |
-| Metrics “same” after 15k+ OMOP | Overview ≠ OMOP | Compare `stats.regulatory.omop_person` vs `total_posts` / `faers_posts` |
-| `sslmode` TypeError on asyncpg | Stale deploy without `pg_url` | Redeploy API; do not strip `sslmode` from Neon URL by hand |
-| `download.json` 502 | Network / FDA outage | Retry; use `--list-only` locally; no key required |
-| Device file is bare `.json` not `.zip` | openFDA mixed packaging | `download_openfda` / stream-ingest auto-detect zip vs raw JSON |
-| Don’t want to download ~2k partitions | Disk mirror optional | Prefer stream-ingest (CDN → DB); download only if you need offline files |
+| CLI OOM on large FAERS dump | Batch too large | Keep `--faers-batch-size 5000` (default); install optional `ijson` for streaming |
 
 ---
 
@@ -1957,11 +1872,6 @@ Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 | ------------ | ------------- | ----------- |
 | Yellow notes with NumericValueOutOfRange | Postgres INTEGER overflow on concept_id | Redeploy API (BIGINT migrate + reseed) |
 | Detect OMOP table empty after sync | Thin staging | `GET /api/etl/sync/faers?force_fixture=true` then retry Janumet |
-| Overview Organ classes stuck at 10 | API truncated `soc_distribution` to top-10 | Redeploy API; UI uses `soc_count` (full distinct SOCs) |
-| Sentiment pie shows `negative` + `NEGATIVE` | FAERS bridge wrote lowercase label | Redeploy; stats fold case; `POST /api/normalize/labels` repairs rows |
-| Translated / Regions look frozen after FAERS | Expected: FAERS `translated=false`; regions ≤7 macro buckets | Watch Countries, FAERS posts, Priority (Critical+High), `soc_count` |
-| Critical barely moves while posts explode | Severity needs IME-class event + Certain/Probable causality | See Priority signals card; recompute after ingest |
-| Metrics look “weird” on live site after local fixes | Render/Vercel still on old build | `git push origin main` + `npx vercel --prod` from `frontend/` |
 | SIDER filter empty | Baseline not loaded | `GET /api/etl/sync/sider` or `python -m app.etl_pipeline.load_sider` |
 | `omop_signal_summary` stale | Matview not refreshed after ETL | `python -m app.etl_pipeline.run_pipeline --skip-athena --skip-sider --skip-faers` (refresh only) |
 | MCN F1 gate fail | Catalog/gold mismatch | `GET /api/etl/mcn-benchmark` · check Mantra/CADEC sample |

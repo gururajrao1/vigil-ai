@@ -959,17 +959,15 @@ def ingest_dedupe_content(
 @router.post("/normalize/labels")
 def normalize_labels(db: Session = Depends(get_db)):
     """Collapse casing/fragment AE labels (Air/air/aller) without full reprocess."""
-    from ...nlp.normalize_cleanup import repair_sentiment_case, scrub_signal_labels
+    from ...nlp.normalize_cleanup import scrub_signal_labels
     from ...projects.rdf_graph import _FILTER_OPTS_CACHE, _GRAPH_CACHE, _GRAPH_SIG
     from ...projects.scope import current_project_id
 
-    pid = current_project_id()
-    sentiment = repair_sentiment_case(db, project_id=pid)
-    scrub = scrub_signal_labels(db, project_id=pid)
+    scrub = scrub_signal_labels(db, project_id=current_project_id())
     _GRAPH_CACHE.clear()
     _GRAPH_SIG.clear()
     _FILTER_OPTS_CACHE.clear()
-    return {**scrub, **sentiment}
+    return scrub
 
 
 # --------------------------- product ontology ------------------------------ #

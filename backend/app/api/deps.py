@@ -10,14 +10,47 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
+    create_async_engine,
 )
-
-from ..db.pg_url import create_async_engine_normalized
 
 LOGGER = logging.getLogger("vigilai.api.deps")
 
 _ENGINE: Optional[AsyncEngine] = None
 _SESSION_FACTORY: Optional[async_sessionmaker[AsyncSession]] = None
+
+
+def _to_async_url(raw: str) -> str:
+    url = make_url(raw.strip())
+    driver = (url.drivername or "").lower()
+    if "asyncpg" in driver:
+        pass
+    elif driver in {"postgresql", "postgres", "postgresql+psycopg2", "postgresql+psycopg"}:
+        url = url.set(drivername="postgresql+asyncpg")
+    elif driver.startswith("sqlite"):
+        if "aiosqlite" not in driver:
+            url = url.set(drivername="sqlite+aiosqlite")
+    else:
+        raise ValueError(f"Unsupported DATABASE_URL dialect for async sessions: {driver!r}")
+
+    # asyncpg does not honor libpq sslmode the same way — drop it; use connect_args
+    query = dict(url.query) if url.query else {}
+    for key in list(query.keys()):
+        if key.lower() in {"sslmode", "ssl", "channel_binding"}:
+            query.pop(key, None)
+    url = url.set(query=query)
+    return url.render_as_string(hide_password=False)
+
+
+def _connect_args_for(async_url: str) -> dict:
+    """Neon / Render / cloud Postgres need TLS; local Docker usually does not."""
+    url = make_url(async_url)
+    if "asyncpg" not in (url.drivername or "").lower():
+        return {}
+    host = (url.host or "").lower()
+    if host in {"localhost", "127.0.0.1", "::1", ""}:
+        return {}
+    # True enables default SSL context (works with Neon)
+    return {"ssl": True}
 
 
 def get_database_url() -> str:
@@ -39,23 +72,22 @@ def init_async_engine(database_url: Optional[str] = None) -> async_sessionmaker[
     if not raw:
         raise RuntimeError("DATABASE_URL is not configured")
 
-    kwargs: dict = {}
-    if not raw.startswith("sqlite"):
+    async_url = _to_async_url(raw)
+    kwargs: dict = {
+        "pool_pre_ping": True,
+        "connect_args": _connect_args_for(async_url),
+    }
+    if not async_url.startswith("sqlite"):
         kwargs.update(pool_size=5, max_overflow=10, pool_recycle=280)
 
-    _ENGINE = create_async_engine_normalized(raw, **kwargs)
+    _ENGINE = create_async_engine(async_url, **kwargs)
     _SESSION_FACTORY = async_sessionmaker(
         _ENGINE,
         class_=AsyncSession,
         expire_on_commit=False,
         autoflush=False,
     )
-    LOGGER.info(
-        "Async SQLAlchemy engine ready (%s)",
-        make_url(_ENGINE.url.render_as_string(hide_password=False)).drivername
-        if hasattr(_ENGINE.url, "render_as_string")
-        else "postgresql+asyncpg",
-    )
+    LOGGER.info("Async SQLAlchemy engine ready (%s)", make_url(async_url).drivername)
     return _SESSION_FACTORY
 
 
@@ -83,6 +115,7 @@ async def get_async_db() -> AsyncGenerator[Optional[AsyncSession], None]:
     try:
         async with factory() as session:
             try:
+                # Probe connectivity early so handlers can fall back cleanly
                 await session.connection()
                 yield session
             except Exception as exc:  # noqa: BLE001

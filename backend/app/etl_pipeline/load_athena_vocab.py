@@ -24,8 +24,6 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine, make_url
 
-from ..db.pg_url import normalize_database_url
-
 LOGGER = logging.getLogger("vigilai.etl.load_athena_vocab")
 
 TARGET_VOCABS = frozenset({
@@ -83,14 +81,20 @@ def _sync_engine(database_url: Optional[str] = None) -> Engine:
         raise EnvironmentError(
             "DATABASE_URL is not set. Example: postgresql://user:pass@localhost:5432/vigilai"
         )
-    if raw.lower().startswith("sqlite"):
+    url = make_url(raw)
+    driver = (url.drivername or "").lower()
+    if "asyncpg" in driver:
+        url = url.set(drivername="postgresql+psycopg2")
+    elif driver in {"postgresql", "postgres"}:
+        # prefer psycopg2 for sync COPY-friendly path; fall back to bare postgresql
+        try:
+            import psycopg2  # noqa: F401
+            url = url.set(drivername="postgresql+psycopg2")
+        except ImportError:
+            url = url.set(drivername="postgresql")
+    if driver.startswith("sqlite"):
         LOGGER.warning("SQLite detected — Athena bulk load is supported but COPY is skipped")
-        return create_engine(raw, pool_pre_ping=True)
-    # Keep sslmode for psycopg2 / libpq; never strip for sync engines
-    return create_engine(
-        normalize_database_url(raw, is_async=False),
-        pool_pre_ping=True,
-    )
+    return create_engine(url.render_as_string(hide_password=False), pool_pre_ping=True)
 
 
 def _parse_athena_date(value: Any) -> date:
