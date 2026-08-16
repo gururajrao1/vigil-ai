@@ -45,10 +45,13 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Syndrome pools                   | `SMQ`                                     | `/lenses?tab=smq`                            |
 | ATC class read-across            | `class effects`                           | `/lenses?tab=class`                          |
 | Brand → chemical Omni-Search     | `Omni-Search`, `Janumet`, `RxE`, `Universe` | `/signals` (Detect)                          |
+| Phase 3 biomedical resolvers     | `SapBERTEncoder`, `RxNormResolver`, `MedDRAResolver`, `OmniSearchService` | `backend/app/nlp/` · Detect Omni-Search |
 | Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/terminology?tab=mcn`                       |
 | OMOP SPA / signals by RxCUI      | `OMOP`, `RxCUI`, `/api/v1/signals`        | `/signals` (Detect)                          |
 | FAERS / SIDER ETL → OMOP         | `ETL`, `FAERS`, `SIDER`, `trigger_dataset_sync` | `GET /api/etl/sync/{faers\|sider\|athena_vocab}` |
 | Phase 2 CLI ETL + matview        | `run_pipeline`, `load_athena_vocab`, `ingest_faers`, `load_sider`, `omop_signal_summary` | `python -m app.etl_pipeline.run_pipeline` (backend) |
+| Phase 4 Signals PRR/ROR API      | `/api/v1/signals/`, `calculate_prr_ror`, `OmniSearchService` | `GET /api/v1/signals/{query}` · `/docs` |
+| Phase 5 Signals SPA context      | `PharmacovigilanceContext`, `OmniSearchBox`, `SignalDataGrid` | `/signals` (Detect) |
 | MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/terminology?tab=ontology` + Signal Detail  |
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
@@ -757,6 +760,9 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Predictive intel**       | Feature matrix, 4-gate playground, OMOP, privacy hygiene, BioIE                                                                | Phase 1–2 ClairLabs-aligned spine                    | `/lenses?tab=intel`      |
 | **Ontology**               | MedDRA LLT→SOC tree, ATC/ChEBI/SMILES card, GMDN/EMDN/SaMD badge, SOC-level disproportionality + alerts                         | Terminology identity + organ-class signal strengthening | `/terminology?tab=ontology` · Signal Detail |
 | **Omni-Search**            | Brand→chemical + OMOP AE table via shared clinical context                                                                    | International brand harmonisation + Detect filters       | `/signals` Detect |
+| **Phase 3 resolvers**      | SapBERT embeddings + RxNorm fuzzy/hierarchy + MedDRA vernacular/semantic → OMOP `concept_id`                                  | Normalize misspellings & slang in Signals search         | `app.nlp.omni_search_service` · `/signals` Detect |
+| **Phase 4 Signals API**    | Async `GET /api/v1/signals/{query}` → Omni-Search resolve + PRR/ROR/95% CI from `omop_signal_summary`                          | Detect AE table sorted by PRR                            | `/api/v1/signals/Janumet` · `app.api.services.statistics` |
+| **Phase 5 Signals SPA**    | `PharmacovigilanceContext` + OmniSearchBox + SignalDataGrid (Universe/Subset toggles, SDR row highlight)                      | Instant Detect updates without full reload               | `/signals` |
 | **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/terminology?tab=mcn` |
 | **OMOP SPA**               | CDM v5.4 CONCEPT/PERSON/DRUG_EXPOSURE/CONDITION_OCCURRENCE + shared clinical context from Omni-Search                          | One RxCUI drives Detect PRR/ROR without page reload      | `/signals` Detect · `GET /api/v1/signals/{rxcui}` |
 | **ETL pipeline**           | Streaming FAERS → OMOP; SIDER in-label baseline (`is_expected_baseline` / `is_in_label`); Athena CONCEPT bulk load; Phase 2 CLI + `omop_signal_summary` CONCURRENTLY refresh; MCN F1 gate | Fill staging + filter known label AEs + refresh DMA matview | `GET /api/etl/sync/*` · `python -m app.etl_pipeline.run_pipeline` · FastMCP `trigger_dataset_sync` |
@@ -1152,6 +1158,68 @@ Module 1 of the search stack. **Safety Signals → Detect** (`/signals`) runs Om
 | Subset empty but Universe filled | No selected brand reports (or brand not in corpus under that surface) | Tick other subset brands; search Detect for the brand |
 | Discontinued badge (Accutane) | Historical RxE status — ingredients still resolve | Expected for surveillance of legacy names |
 | HTTP 500 on Omni (with analytics) | Older DB missing OMOP staging tables / join error | Redeploy API (init_db + soft-fail analytics); retry; notes may say analytics unavailable |
+
+### 10.4b Phase 3 — Biomedical resolvers (`app.nlp`)
+
+Normalization layer that powers Detect Omni-Search when free text must become an OMOP ``concept_id``.
+
+| Module | Role |
+| ------ | ---- |
+| `sapbert_encoder.SapBERTEncoder` | `cambridgeltl/SapBERT-from-PubMedBERT-fulltext` via transformers+torch (CUDA if available); mean-pooled batch encode; n-gram fallback when HF weights absent |
+| `rxnorm_resolver.RxNormResolver` | Exact / pg_trgm / Levenshtein against `omop_concept` (RxNorm + RxNorm Extension); branded-drug → ingredients + ATC + peer brands (OMOP relationships or RxE) |
+| `meddra_resolver.MedDRAResolver` | Vernacular + lexicon + SapBERT/FAISS cosine over MedDRA PT names → `concept_id`, PT, SOC, similarity |
+| `omni_search_service.OmniSearchService` | Classifies **drug** vs **adverse_event**, calls the matching resolver, returns unified `OmniSearchHit` JSON |
+
+**Where:** imported by Detect Omni-Search / MCP adapters; run locally with async SQLAlchemy + `DATABASE_URL`.  
+**Cold-start:** first SapBERT load can take tens of seconds; set `VIGILAI_ALLOW_EMBED_DOWNLOAD=1` once to cache HF weights. Without torch/transformers the encoder stays on deterministic n-grams.  
+**Try:** `Janumet`, `janumett`, `brain fog`, `upset stomach`, `shaky hands`.
+
+| If you see… | Why | What to do |
+| ----------- | --- | ---------- |
+| `encoder.backend=ngram` | HF weights not cached / torch missing | Optional: install torch+transformers and allow one download |
+| Drug unmatched | Outside RxE + `omop_concept` | Sync Athena vocab / try `Janumet` |
+| AE similarity below floor | Colloquial phrase not in vernacular or embed index | Try `nausea`, `brain fog`; rebuild index after vocab load |
+| `concept_id` is a large hash | MedDRA row not in `omop_concept` yet | `GET /api/etl/sync/athena_vocab` or Phase 2 `load_athena_vocab` |
+
+### 10.4c Phase 4 — Signals disproportionality API
+
+Async FastAPI surface that connects Detect Omni-Search to OMOP counts and PRR/ROR.
+
+| Piece | Role |
+| ----- | ---- |
+| `app.api.services.statistics.calculate_prr_ror` | Reads `omop_signal_summary` (staging fallback); builds 2×2 A/B/C/D with Haldane–Anscombe +0.5; returns PRR, ROR, 95% CIs, Yates χ², strength |
+| `GET /api/v1/signals/{query}` | Omni-Search → drug `concept_id` → AE list **sorted by PRR**; **404** if query cannot resolve to a drug concept |
+| `app.main.create_app` | CORS (`localhost:3000` / `5173` + Vercel), async session DI, mounts `/api/v1` |
+
+**Where:** Safety Signals → Detect (`/signals`) via `api.omopSignalsByRxcui(query)`.  
+**Try:** `GET https://vigil-ai-api.onrender.com/api/v1/signals/Janumet` (or `/docs`).
+
+| If you see… | Why | What to do |
+| ----------- | --- | ---------- |
+| HTTP 404 | Omni-Search could not map the string to a drug | `Janumet`, `sitagliptin`, `Ozempic` |
+| 404 “resolved as an adverse event” | Query was a symptom PT | Use a brand/INN for this endpoint |
+| `adverse_events: []` with 200 | Matview / staging empty for that drug | Run FAERS sync or `run_pipeline`, then retry |
+| HTTP 503 Omni-Search unavailable | Resolver/DB session failure | Check `/api/health`; redeploy API |
+
+### 10.4d Phase 5 — Signals SPA & global clinical context
+
+React Detect surface for Omni-Search → PRR grid without full page reloads.
+
+| Piece | Role |
+| ----- | ---- |
+| `PharmacovigilanceContext` | `activeSearchTerm`, `resolvedConcept`, `signalData`, `isLoading`; `executeSearch(query)` → `GET /api/v1/signals/{query}` |
+| `OmniSearchBox` | Prominent search + **ResolutionBadge** (generics, ATC, confidence) |
+| `SignalDataGrid` | PRR/ROR/EB05 table; red highlight when PRR &gt; 2 and CI low &gt; 1; Universe vs Subset brand toggles |
+| `SignalsView` | Composes search + grid + legacy Detect table seeded from the same context |
+
+**Where:** Safety Signals → Detect (`/signals`).  
+**Try:** type `Janumet` or `janumett` — badge shows resolved ingredients; grid updates in place.
+
+| If you see… | Why | What to do |
+| ----------- | --- | ---------- |
+| Error under search box | API 404/503 or unresolved term | Use `Janumet`; wake `/api/health`; hard-refresh |
+| Empty grid after resolve | Thin matview | Sync FAERS / run pipeline |
+| Subset toggles don’t hide rows | Ingredient-level universe payload | Use brand **Search** on a peer chip |
 
 ### 10.5 Deep Medical Concept Normalization (MCN)
 
@@ -1807,6 +1875,38 @@ Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 | SIDER filter empty | Baseline not loaded | `GET /api/etl/sync/sider` or `python -m app.etl_pipeline.load_sider` |
 | `omop_signal_summary` stale | Matview not refreshed after ETL | `python -m app.etl_pipeline.run_pipeline --skip-athena --skip-sider --skip-faers` (refresh only) |
 | MCN F1 gate fail | Catalog/gold mismatch | `GET /api/etl/mcn-benchmark` · check Mantra/CADEC sample |
+
+### 19.15 Phase 3 resolvers look empty
+
+| What you see | Usually means | What to try |
+| ------------ | ------------- | ----------- |
+| Unmatched drug | Outside RxNorm / RxE | `Janumet`, `ozmpic`, `metformin` |
+| Unmatched AE | Below cosine floor / unknown slang | `brain fog`, `upset stomach`, `shaky hands` |
+| Slow first query | SapBERT cold-start | Wait once; later queries reuse the singleton |
+| `backend=ngram` only | No local HF weights | Expected offline; optional `VIGILAI_ALLOW_EMBED_DOWNLOAD=1` |
+
+Details: [§10.4b](#104b-phase-3--biomedical-resolvers-appnlp).
+
+### 19.16 Phase 4 Signals API looks empty
+
+| What you see | Usually means | What to try |
+| ------------ | ------------- | ----------- |
+| HTTP 404 on `/api/v1/signals/…` | Unresolved query or AE-only string | `Janumet` / `metformin` |
+| 200 + empty `adverse_events` | No co-reports in matview | `GET /api/etl/sync/faers?force_fixture=true` then refresh pipeline |
+| Missing PRR CI fields | Older client cache | Hard-refresh; confirm `prr_ci_low` in JSON |
+
+Details: [§10.4c](#104c-phase-4--signals-disproportionality-api).
+
+### 19.17 Phase 5 Detect Omni-Search / grid looks empty
+
+| What you see | Usually means | What to try |
+| ------------ | ------------- | ----------- |
+| No resolution badge | Search not run or failed | Submit `Janumet`; check error text under the box |
+| Grid empty, badge OK | No AE co-reports | Load PV demo + FAERS sync |
+| Red rows none | No SDR (PRR&gt;2 & CI_lo&gt;1) | Expected on thin data — not a UI bug |
+| Detect table below unchanged | Context term not applied yet | Refresh scores or re-run search |
+
+Details: [§10.4d](#104d-phase-5--signals-spa--global-clinical-context).
 
 ---
 

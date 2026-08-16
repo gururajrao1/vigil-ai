@@ -61,7 +61,10 @@ async function req(path, opts = {}, _attempt = 1) {
     } catch { /* ignore */ }
     if ([502, 503, 504].includes(res.status)) {
       msg = 'API gateway timeout while crawling (Render may still be working). Retry with one source; signals refresh in the background.';
-    } else if (res.status === 404 || /not found/i.test(msg)) {
+    } else if (
+      (res.status === 404 || /not found/i.test(msg))
+      && !/could not resolve|resolved as an adverse|query is required/i.test(msg)
+    ) {
       msg = 'Endpoint not found on API — hard-refresh the app (Ctrl+Shift+R). If it persists, the Render deploy may be stale.';
     }
     throw new Error(msg);
