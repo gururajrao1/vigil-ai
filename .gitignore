@@ -7,10 +7,6 @@ backend/vigilai.db
 backend/*.db
 backend/*.db-wal
 backend/*.db-shm
-backend/data/*.db
-backend/data/*.dump
-backend/data/*.sql
-
 
 # Secrets — never commit
 **/.env

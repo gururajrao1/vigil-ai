@@ -28,28 +28,30 @@ Estimated cost for a short demo window: usually **well under a few dollars** if 
 
 ---
 
-## Local backup (already taken while Launch was unlocked)
+## Path B — Unlock Neon, then copy to Supabase (keep a second copy)
 
-Full corpus dump on this machine (do not commit to git):
-
-```text
-backend/data/vigilai_neon_backup.db
-```
-
-~372k rows / ~74 MB including `raw_posts` (16447), `signals`, OMOP exposures, users, etc.
-
-Restore into Supabase after you create a project:
+Only after Path A works:
 
 ```powershell
 cd backend
-# Put pooler URI in a file (do not commit):
-# supabase_url.txt → postgresql://postgres.REF:PASS@….pooler.supabase.com:6543/postgres?sslmode=require
-$env:DATABASE_URL = (Get-Content .\supabase_url.txt -Raw).Trim()
-.\.venv\Scripts\python.exe scripts\restore_sqlite_to_pg.py --sqlite data/vigilai_neon_backup.db
+# Install Postgres client tools if needed (pg_dump / pg_restore).
+
+# 1) Dump from Neon (use DIRECT host if pooler struggles with long dumps;
+#    still requires Launch so quota allows the transfer).
+$env:PGPASSWORD = "<neon_password>"
+pg_dump -Fc -h <neon-host> -U <user> -d vigilai -f vigilai_neon.dump
+
+# 2) Restore into Supabase (pooler or direct — follow Supabase import docs).
+pg_restore --clean --if-exists --no-owner --no-acl -d "<supabase_uri>" vigilai_neon.dump
 ```
 
-Then set the same URI on Render `DATABASE_URL` and restart.
+Or use the existing helper (any Postgres → Postgres):
 
+```powershell
+.\.venv\Scripts\python.exe scripts\migrate_pg_to_neon.py --src-file neon_url.txt --dst-file supabase_url.txt
+```
+
+Then point Render `DATABASE_URL` at Supabase **only after** row counts match.
 
 ---
 

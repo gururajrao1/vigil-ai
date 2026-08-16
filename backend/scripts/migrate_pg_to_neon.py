@@ -32,13 +32,6 @@ _TABLE_ORDER = [
     "alerts",
     "audit_logs",
     "forge_records",
-    "signal_snapshots",
-    "omop_concept",
-    "omop_person",
-    "omop_drug_exposure",
-    "omop_condition_occurrence",
-    "omop_device_exposure",
-    "omop_drug_condition_baseline",
 ]
 
 
