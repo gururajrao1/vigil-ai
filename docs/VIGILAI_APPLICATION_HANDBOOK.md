@@ -1961,7 +1961,7 @@ Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 | Sentiment pie shows `negative` + `NEGATIVE` | FAERS bridge wrote lowercase label | Redeploy; stats fold case; `POST /api/normalize/labels` repairs rows |
 | Translated / Regions look frozen after FAERS | Expected: FAERS `translated=false`; regions ≤7 macro buckets | Watch Countries, FAERS posts, Priority (Critical+High), `soc_count` |
 | Critical barely moves while posts explode | Severity needs IME-class event + Certain/Probable causality | See Priority signals card; recompute after ingest |
-| Login / API 500, Neon transfer quota | Free egress exhausted | Cut over `DATABASE_URL` to Supabase pooler — [`CUTOVER_SUPABASE.md`](./CUTOVER_SUPABASE.md) |
+| Signals/alerts stuck after FAERS bulk | FAERS entities were bare strings; DMA expected dicts | Redeployed fix; click **Recompute** / `POST /api/recompute` |
 | SIDER filter empty | Baseline not loaded | `GET /api/etl/sync/sider` or `python -m app.etl_pipeline.load_sider` |
 | `omop_signal_summary` stale | Matview not refreshed after ETL | `python -m app.etl_pipeline.run_pipeline --skip-athena --skip-sider --skip-faers` (refresh only) |
 | MCN F1 gate fail | Catalog/gold mismatch | `GET /api/etl/mcn-benchmark` · check Mantra/CADEC sample |

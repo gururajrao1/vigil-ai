@@ -1,32 +1,50 @@
 # Free / low-cost deploy
 
-Production stack:
+Production stack (Railway sunset):
 
 - **Frontend:** Vercel — https://vigil-ai-eight.vercel.app  
 - **Backend:** Render free Web Service (Docker) — https://vigil-ai-api.onrender.com  
   Proxied as `/api/*` from Vercel ([`frontend/vercel.json`](../frontend/vercel.json))  
-- **Database:** **Supabase free Postgres** (`DATABASE_URL`, pooler port **6543**) — preferred after Neon free **network-transfer** exhaustion  
+- **Database:** Neon free Postgres (`DATABASE_URL`) — persists corpus across Render sleep  
 - **Auth:** JWT roles admin / analyst / viewer (`backend/app/rbac.py`)
 
-> **Neon sunset for this project:** Free egress (~5 GB/month) was exhausted; DB reads/writes (including login) return 500. Do not point `DATABASE_URL` at Neon until you upgrade Neon or the quota resets.  
-> Cutover steps: [`CUTOVER_SUPABASE.md`](./CUTOVER_SUPABASE.md).  
-> Blueprint: [`render.yaml`](../render.yaml). Generic PG copy: `backend/scripts/migrate_pg_to_neon.py` (works for any Postgres→Postgres).
+> Railway was the previous API+Postgres host. Do not rely on it after the trial ends.
+> Blueprint: [`render.yaml`](../render.yaml). Migrate scripts: `backend/scripts/migrate_pg_to_neon.py`.
 
 ## Empty dashboards / cold start?
 
 Render free instances **sleep after ~15 minutes idle**. First request can take 30–60s.
 
-1. Open https://vigil-ai-api.onrender.com/api/health once.  
-2. Then browse as usual — Postgres (Supabase) keeps posts/signals while the API sleeps.
+1. Open https://vigil-ai-api.onrender.com/api/health once (or use the app’s wake path).  
+2. Then browse as usual — Neon keeps posts/signals while the API sleeps.
 
-## 1) Backend (Render + Supabase)
+Postgres on Neon persists across deploys and sleep. Deploys do **not** wipe the corpus.
 
-1. Create a Supabase project → copy the **pooler** URI (`…pooler.supabase.com:6543/postgres?sslmode=require`). See [`CUTOVER_SUPABASE.md`](./CUTOVER_SUPABASE.md).  
-2. Render → **vigil-ai-api** → Environment → set `DATABASE_URL` to that URI.  
-3. Redeploy / restart the service. `init_db()` seeds admin users on empty DB.  
-4. Confirm `/api/health` and login (`admin@vigilai.dev` / `admin123`).
+To merge unique rows from a local `backend/vigilai.db` into Neon:
 
-Optional paid path: Render Postgres Starter → same `DATABASE_URL` swap.
+```powershell
+cd backend
+# Set DATABASE_URL to Neon pooled URL, then:
+.\.venv\Scripts\python.exe scripts\merge_sqlite_into_pg.py
+# Then POST /api/recompute as admin/analyst
+```
+
+To copy Railway (or any) Postgres → Neon before cutting over:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe scripts\migrate_pg_to_neon.py --src-file railway_public_url.txt --dst-file neon_url.txt
+```
+
+## 1) Backend (Render + Neon)
+
+1. Create a Neon project → copy the **pooled** `postgresql://…` URL (`sslmode=require`).  
+2. Render Dashboard → Blueprint / GitHub connect using [`render.yaml`](../render.yaml), **or** update existing service `vigil-ai-api`.  
+3. Set env vars on the service:
+   - `DATABASE_URL` = Neon pooled URL  
+   - `JWT_SECRET`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`  
+   - `USE_TRANSFORMER_NER=false`, `AUTO_SEED_DEMO=true` (as in blueprint)  
+4. Confirm https://vigil-ai-api.onrender.com/api/health and login.
 
 ## 2) Frontend (Vercel)
 
@@ -34,7 +52,7 @@ Optional paid path: Render Postgres Starter → same `DATABASE_URL` swap.
 
 ```powershell
 cd frontend
-npx vercel --prod
+vercel --prod
 ```
 
 ## 3) Demo credentials
@@ -51,12 +69,6 @@ Public Register → **viewer** only. Admins promote users on `/users`.
 
 Before presenting, open `/api/health` once so Render is warm, then walk homepage → Login → Signals (General PV).
 
-## Why not Neon free?
+## Sunset Railway
 
-| Quota | What happened |
-|-------|----------------|
-| Storage 0.5 GB/project | Fine (~0.16 GB used) |
-| Network transfer ~5 GB/mo | **Exceeded** → compute/DB connections refused → login 500 |
-| CU-hours | Was still low |
-
-Supabase free is a better fit for a Render-hosted API that streams FAERS; still watch egress when bulk-ingesting.
+After verifying Vercel → Render → Neon end-to-end, cancel or leave the Railway project idle so the 14-day cliff does not surprise you. Keep Neon as the source of truth.
