@@ -254,16 +254,12 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         .filter(ProcessedPost.ae_flag.is_(True))
     )
     if project_id is not None:
-        from .api.helpers import _project_scope
-
-        ae_q = ae_q.filter(_project_scope(RawPost.project_id, project_id))
+        ae_q = ae_q.filter(RawPost.project_id == project_id)
     ae_rows = ae_q.all()
 
     sig_q = db.query(Signal)
     if project_id is not None:
-        from .api.helpers import _project_scope
-
-        sig_q = sig_q.filter(_project_scope(Signal.project_id, project_id))
+        sig_q = sig_q.filter(Signal.project_id == project_id)
     prior = {
         (s.drug, s.symptom): {
             "detected_at": s.detected_at,
