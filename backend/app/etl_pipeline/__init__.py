@@ -1,9 +1,12 @@
 """Automated Data Ingestion & Validation Pipeline for VigilAI OMOP staging.
 
-Pipelines:
-* ``faers`` — openFDA FAERS JSON → PERSON / DRUG_EXPOSURE / CONDITION_OCCURRENCE
-* ``sider`` — SIDER 4.1-style TSV → expected in-label baseline pairs
-* ``athena_vocab`` — re-seed CONCEPT from RxE + MCN surrogates (BIGINT-safe)
+Legacy session-based helpers (``faers`` / ``sider`` / ``athena_vocab``) remain for
+FastMCP + API. Phase 2 CLI modules:
+
+* ``load_athena_vocab`` — Athena CONCEPT → ``omop_concept``
+* ``load_sider`` — SIDER 4.1 → in-label ``omop_drug_condition_baseline``
+* ``ingest_faers`` — streaming FAERS JSON → person / drug / condition
+* ``run_pipeline`` — orchestrator + ``REFRESH MATERIALIZED VIEW CONCURRENTLY``
 
 Offline-first: live downloads degrade to bundled fixtures without crashing.
 """
@@ -81,3 +84,12 @@ __all__ = [
     "ingest_sider_baseline",
     "sync_athena_vocab_surrogates",
 ]
+
+
+def run_phase2_pipeline(**kwargs: Any) -> dict[str, Any]:
+    """Async Phase 2 orchestrator wrapper for programmatic callers."""
+    import asyncio
+
+    from .run_pipeline import run_pipeline
+
+    return asyncio.run(run_pipeline(**kwargs))

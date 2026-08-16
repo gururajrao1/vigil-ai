@@ -48,6 +48,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Medical Concept Normalization    | `MCN`, `SapBERT`, `FAISS`, `Madras`       | `/terminology?tab=mcn`                       |
 | OMOP SPA / signals by RxCUI      | `OMOP`, `RxCUI`, `/api/v1/signals`        | `/signals` (Detect)                          |
 | FAERS / SIDER ETL → OMOP         | `ETL`, `FAERS`, `SIDER`, `trigger_dataset_sync` | `GET /api/etl/sync/{faers\|sider\|athena_vocab}` |
+| Phase 2 CLI ETL + matview        | `run_pipeline`, `load_athena_vocab`, `ingest_faers`, `load_sider`, `omop_signal_summary` | `python -m app.etl_pipeline.run_pipeline` (backend) |
 | MedDRA hierarchy / ChEBI / GMDN  | `ontology`, `LLT`, `SOC`, `SMILES`, `EMDN` | `/terminology?tab=ontology` + Signal Detail  |
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
@@ -758,7 +759,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | **Omni-Search**            | Brand→chemical + OMOP AE table via shared clinical context                                                                    | International brand harmonisation + Detect filters       | `/signals` Detect |
 | **MCN**                    | SapBERT embed + FAISS UMLS link → MedDRA/SNOMED dual map; synonym cohort N; GeoNames city aliases                              | Consumer slang & municipal alias → regulatory codes      | `/terminology?tab=mcn` |
 | **OMOP SPA**               | CDM v5.4 CONCEPT/PERSON/DRUG_EXPOSURE/CONDITION_OCCURRENCE + shared clinical context from Omni-Search                          | One RxCUI drives Detect PRR/ROR without page reload      | `/signals` Detect · `GET /api/v1/signals/{rxcui}` |
-| **ETL pipeline**           | Streaming FAERS → OMOP; SIDER in-label baseline (`is_expected_baseline`); Athena-vocab surrogate seed; MCN F1 gate            | Fill staging + filter known label AEs + validate MCN     | `GET /api/etl/sync/*` · FastMCP `trigger_dataset_sync` |
+| **ETL pipeline**           | Streaming FAERS → OMOP; SIDER in-label baseline (`is_expected_baseline` / `is_in_label`); Athena CONCEPT bulk load; Phase 2 CLI + `omop_signal_summary` CONCURRENTLY refresh; MCN F1 gate | Fill staging + filter known label AEs + refresh DMA matview | `GET /api/etl/sync/*` · `python -m app.etl_pipeline.run_pipeline` · FastMCP `trigger_dataset_sync` |
 | **DDI**                    | Co-mention pairs vs chance + clinical risk flags                                                                               | Polypharmacy AE patterns                             | `/lenses?tab=ddi`        |
 | **Pregnancy**              | Exposure + congenital / perinatal events                                                                                       | Special-population PV                                | `/lenses?tab=pregnancy`  |
 | **SMQ**                    | Pool PTs into syndrome signals                                                                                                 | Catch fragmented reporting                           | `/lenses?tab=smq`        |
@@ -1219,6 +1220,15 @@ Offline-first ingestion into OMOP CDM v5.4 staging (`backend/app/etl_pipeline/`)
 | **athena_vocab** | Re-seeds CONCEPT from RxE + MCN surrogates (BIGINT-safe IDs) | `GET /api/etl/sync/athena_vocab` |
 | **MCN gate** | Mantra/CADEC gold strict+relaxed F1; colloquial CADEC/SMM4H reported separately | `GET /api/etl/mcn-benchmark` (gate F1 > 0.85) |
 
+**Phase 2 CLI (bulk / quarterly dumps):** from `backend/`, with `DATABASE_URL` set:
+
+1. `python -m app.etl_pipeline.load_athena_vocab --concept-csv /path/CONCEPT.csv` — filters RxNorm / RxNorm Extension / MedDRA / SNOMED into `omop_concept` (COPY / batch upsert, BIGINT).
+2. `python -m app.etl_pipeline.load_sider --sider-tsv /path/meddra_all_label_se.tsv` — maps STITCH/UMLS + MedDRA PTs; sets `is_in_label` / `is_expected_baseline=TRUE`.
+3. `python -m app.etl_pipeline.ingest_faers --faers-json /path/faers.json` — streaming batches of **5,000**; maps drugs/reactions to concepts; `ON CONFLICT (person_id)` idempotent.
+4. `python -m app.etl_pipeline.run_pipeline` — runs 1→2→3 then `REFRESH MATERIALIZED VIEW CONCURRENTLY omop_signal_summary`.
+
+**DDL / ORM companions:** `backend/app/db/schemas/omop_v5_4_ddl.sql`, `performance_views.sql`, `models.py`, `init_db.py`. Staging tables remain `omop_*` for the SPA; the matview joins `omop_drug_exposure` × `omop_condition_occurrence`.
+
 **Schema patch:** `concept_id` (and related OMOP concept FKs) are **BIGINT** — see `backend/app/db/init_db.sql` and `migrate_schema()`. Surrogate hashes stay ≤ 2_099_999_999 so they also fit signed INT32.
 
 **FastMCP:** `trigger_dataset_sync(dataset_name)` with `faers` \| `sider` \| `athena_vocab`.
@@ -1228,6 +1238,8 @@ Offline-first ingestion into OMOP CDM v5.4 staging (`backend/app/etl_pipeline/`)
 | FAERS `mode=fixture` | Live openFDA unreachable | Expected offline; fixtures still populate OMOP |
 | SIDER baselines=0 | TSV missing | First sync writes `data/etl/sider_4_1_meddra_all_se_surrogate.tsv` |
 | Benchmark `pass_gate=false` | MCN catalog drift | Re-check Mantra/CADEC sample vs linker |
+| Matview empty after CLI load | Refresh skipped / view on wrong tables | Re-run `run_pipeline` (recreates staging-backed `omop_signal_summary` if needed) |
+| CLI OOM on large FAERS dump | Batch too large | Keep `--faers-batch-size 5000` (default); install optional `ijson` for streaming |
 
 ---
 
@@ -1792,7 +1804,8 @@ Details: [§10.5](#105-deep-medical-concept-normalization-mcn).
 | ------------ | ------------- | ----------- |
 | Yellow notes with NumericValueOutOfRange | Postgres INTEGER overflow on concept_id | Redeploy API (BIGINT migrate + reseed) |
 | Detect OMOP table empty after sync | Thin staging | `GET /api/etl/sync/faers?force_fixture=true` then retry Janumet |
-| SIDER filter empty | Baseline not loaded | `GET /api/etl/sync/sider` |
+| SIDER filter empty | Baseline not loaded | `GET /api/etl/sync/sider` or `python -m app.etl_pipeline.load_sider` |
+| `omop_signal_summary` stale | Matview not refreshed after ETL | `python -m app.etl_pipeline.run_pipeline --skip-athena --skip-sider --skip-faers` (refresh only) |
 | MCN F1 gate fail | Catalog/gold mismatch | `GET /api/etl/mcn-benchmark` · check Mantra/CADEC sample |
 
 ---
