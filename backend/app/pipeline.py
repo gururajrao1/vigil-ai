@@ -322,11 +322,9 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     # Map processed_post id -> posted_at for all AE posts (comparator pool for Cox PH)
     all_ae_post_times: Dict[int, datetime] = {}
 
-    _n_ae = len(ae_rows)
     for i, (processed, raw) in enumerate(ae_rows):
         if i and i % 1500 == 0:
             _db_keepalive()
-            print(f"recompute: AE scan {i}/{_n_ae}", flush=True)
         if raw.posted_at:
             all_ae_post_times[processed.id] = raw.posted_at
         entities = json.loads(processed.entities_json or "{}")
