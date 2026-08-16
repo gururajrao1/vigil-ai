@@ -6,6 +6,7 @@ through ``OmniSearchService``, then scores co-reported adverse events via
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import List, Optional
 
@@ -55,6 +56,8 @@ class SignalAeRow(BaseModel):
     ror_ci_low: Optional[float] = None
     ror_ci_high: Optional[float] = None
     chi_square: Optional[float] = None
+    eb05: Optional[float] = None
+    ic025: Optional[float] = None
     strength: Optional[str] = None
     sdr_flag: bool = False
     contingency_a: Optional[float] = None
@@ -109,63 +112,33 @@ def _ae_row(ev: AeDisproportionality) -> SignalAeRow:
     )
 
 
-@router.get("/signals/{query}", response_model=SignalsQueryResponse)
-async def get_signals_by_query(
-    query: str,
-    db: AsyncSession = Depends(get_async_db),
-    min_count: int = Query(1, ge=1, le=100, description="Minimum A-cell count"),
+def _legacy_ae_row(row: dict) -> SignalAeRow:
+    return SignalAeRow(
+        condition_concept_id=str(row.get("condition_concept_id") or "") or None,
+        condition_name=row.get("condition_name"),
+        meddra_pt=row.get("meddra_pt") or row.get("condition_name"),
+        n_persons=int(row.get("n_persons") or 0),
+        n_occurrences=int(row.get("n_occurrences") or 0),
+        prr=row.get("prr"),
+        ror=row.get("ror"),
+        chi_square=row.get("chi_square"),
+        eb05=row.get("eb05"),
+        ic025=row.get("ic025"),
+        strength=row.get("strength"),
+        sdr_flag=bool(row.get("sdr_flag")),
+    )
+
+
+def _build_response(
+    *,
+    term: str,
+    omni: OmniSearchHit,
+    report: Optional[DrugDisproportionalityReport],
+    ae_rows: List[SignalAeRow],
+    notes: List[str],
+    source: str,
 ) -> SignalsQueryResponse:
-    """Resolve ``query`` via Omni-Search, then return AEs sorted by PRR.
-
-    Raises **404** when the string cannot be mapped to a drug OMOP concept.
-    Empty AE lists (thin matview) return **200** with teaching notes — not an error.
-    """
-    term = (query or "").strip()
-    if not term:
-        raise HTTPException(status_code=422, detail="query is required")
-
-    service = OmniSearchService(session=db)
-    try:
-        omni = await service.search(term)
-    except Exception as exc:  # noqa: BLE001
-        LOGGER.exception("OmniSearchService failed for %r", term)
-        raise HTTPException(
-            status_code=503,
-            detail=f"Omni-Search resolver unavailable: {exc}",
-        ) from exc
-    finally:
-        # Do not dispose the request-scoped session engine
-        pass
-
-    if not omni.matched or omni.concept_id is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                f"Could not resolve '{term}' to a clinical OMOP concept. "
-                "Try Janumet, sitagliptin, Ozempic, or a known MedDRA PT."
-            ),
-        )
-
-    # Signals dashboard expects a drug; AE-only hits get a clear 404 guidance
-    if omni.entity_kind == "adverse_event":
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                f"'{term}' resolved as an adverse event ({omni.preferred_term or omni.concept_name}), "
-                "not a drug. Search a brand or INN (e.g. Janumet) for PRR/ROR tables."
-            ),
-        )
-
-    concept_id = int(omni.concept_id)
-    try:
-        report = await calculate_prr_ror(concept_id, db, min_count=min_count)
-    except Exception as exc:  # noqa: BLE001
-        LOGGER.exception("calculate_prr_ror failed for concept_id=%s", concept_id)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Disproportionality calculation failed: {exc}",
-        ) from exc
-
+    concept_id = int(omni.concept_id or 0)
     resolved = ResolvedDrugMetadata(
         query=term,
         concept_id=concept_id,
@@ -178,20 +151,11 @@ async def get_signals_by_query(
         match_method=omni.match_method,
         confidence=float(omni.confidence or 0.0),
     )
-
-    ae_rows = [_ae_row(ev) for ev in report.adverse_events]
-    notes = list(report.notes)
-    notes.extend(omni.notes or [])
-    if not ae_rows:
-        notes.append(
-            "Resolved drug has no co-reported AEs in omop_signal_summary yet — "
-            "run FAERS ingest / ``run_pipeline`` then refresh the matview."
-        )
-
     ingredient_rxcuis: List[str] = []
     if omni.drug_resolution is not None:
         ingredient_rxcuis = list(omni.drug_resolution.ingredient_rxcuis or [])
 
+    n_exp = report.drug_total_exposures if report else sum(r.n_persons for r in ae_rows)
     return SignalsQueryResponse(
         query=term,
         resolved=resolved,
@@ -202,13 +166,145 @@ async def get_signals_by_query(
         resolved_rxcui=omni.rxcui,
         drug_name=omni.concept_name,
         ingredient_rxcuis=ingredient_rxcuis,
-        concept_ids=[concept_id],
+        concept_ids=[concept_id] if concept_id else [],
         comparison_brands=list(omni.brand_names or []),
-        n_exposures=report.drug_total_exposures,
-        n_persons=report.drug_total_exposures,
-        source=report.source,
+        n_exposures=n_exp,
+        n_persons=n_exp,
+        source=source,
         notes=notes,
     )
+
+
+def _sync_legacy_payload(term: str, lookup: str) -> dict:
+    """Module 3 sync OMOP / Signal-table path (psycopg2 / SQLite)."""
+    from ...analytics.omop_signals import get_signals_for_rxcui
+    from ...database import SessionLocal, init_db
+    from ...projects.scope import current_project_id
+
+    init_db()
+    db = SessionLocal()
+    try:
+        result = get_signals_for_rxcui(
+            db,
+            lookup,
+            project_id=current_project_id(),
+            ensure_concepts=True,
+        )
+        return result.model_dump() if hasattr(result, "model_dump") else dict(result)
+    finally:
+        db.close()
+
+
+@router.get("/signals/{query}", response_model=SignalsQueryResponse)
+async def get_signals_by_query(
+    query: str,
+    db: Optional[AsyncSession] = Depends(get_async_db),
+    min_count: int = Query(1, ge=1, le=100, description="Minimum A-cell count"),
+) -> SignalsQueryResponse:
+    """Resolve ``query`` via Omni-Search, then return AEs sorted by PRR.
+
+    Raises **404** when the string cannot be mapped to a drug OMOP concept.
+    Empty AE lists (thin matview) return **200** with teaching notes — not an error.
+    """
+    term = (query or "").strip()
+    if not term:
+        raise HTTPException(status_code=422, detail="query is required")
+
+    notes: List[str] = []
+    omni: Optional[OmniSearchHit] = None
+
+    try:
+        service = OmniSearchService(session=db)
+        omni = await service.search(term)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("OmniSearchService failed for %r: %s — retry offline", term, exc)
+        try:
+            omni = await OmniSearchService(session=None).search(term)
+            notes.append(f"Omni-Search used offline fallback ({type(exc).__name__}).")
+        except Exception as exc2:  # noqa: BLE001
+            LOGGER.exception("OmniSearchService offline fallback failed for %r", term)
+            raise HTTPException(
+                status_code=503,
+                detail=f"Omni-Search resolver unavailable: {exc2}",
+            ) from exc2
+
+    assert omni is not None
+
+    if not omni.matched or omni.concept_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Could not resolve '{term}' to a clinical OMOP concept. "
+                "Try Janumet, sitagliptin, Ozempic, or a known MedDRA PT."
+            ),
+        )
+
+    if omni.entity_kind == "adverse_event":
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"'{term}' resolved as an adverse event ({omni.preferred_term or omni.concept_name}), "
+                "not a drug. Search a brand or INN (e.g. Janumet) for PRR/ROR tables."
+            ),
+        )
+
+    concept_id = int(omni.concept_id)
+    report: Optional[DrugDisproportionalityReport] = None
+    ae_rows: List[SignalAeRow] = []
+    source = "omop_signal_summary"
+
+    if db is not None:
+        try:
+            report = await calculate_prr_ror(concept_id, db, min_count=min_count)
+            ae_rows = [_ae_row(ev) for ev in report.adverse_events]
+            source = report.source
+            notes.extend(report.notes)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("calculate_prr_ror failed (%s) — sync legacy fallback", exc)
+            notes.append(f"Matview PRR unavailable ({type(exc).__name__}); using sync OMOP path.")
+            report = None
+
+    if report is None or (db is None and not ae_rows):
+        lookup = omni.rxcui or term
+        try:
+            legacy = await asyncio.to_thread(_sync_legacy_payload, term, lookup)
+            ae_rows = [_legacy_ae_row(r) for r in (legacy.get("adverse_events") or [])]
+            ae_rows.sort(
+                key=lambda r: (r.prr or 0.0, r.n_persons or 0),
+                reverse=True,
+            )
+            source = str(legacy.get("source") or "omop_sync_fallback")
+            notes.extend(legacy.get("notes") or [])
+            if legacy.get("drug_name") and not omni.concept_name:
+                omni.concept_name = legacy.get("drug_name")
+            if legacy.get("comparison_brands") and not omni.brand_names:
+                omni.brand_names = list(legacy.get("comparison_brands") or [])
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.exception("Sync legacy signals fallback failed for %r", term)
+            notes.append(f"Sync OMOP fallback failed: {exc}")
+
+    notes.extend(omni.notes or [])
+    if not ae_rows:
+        notes.append(
+            "Resolved drug has no co-reported AEs yet — "
+            "run FAERS ingest / ``run_pipeline`` then refresh the matview."
+        )
+
+    try:
+        return _build_response(
+            term=term,
+            omni=omni,
+            report=report,
+            ae_rows=ae_rows,
+            notes=notes,
+            source=source,
+        )
+    except Exception as exc:  # noqa: BLE001 — never return bare 500 without detail
+        LOGGER.exception("Signals response build failed for %r", term)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Signals response serialization failed: {exc}",
+        ) from exc
 
 
 @router.post("/omop/concepts/seed")

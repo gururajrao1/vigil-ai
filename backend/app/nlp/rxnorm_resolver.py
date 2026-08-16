@@ -69,15 +69,29 @@ def _to_async_url(raw: str) -> str:
     url = make_url(raw.strip())
     driver = (url.drivername or "").lower()
     if "asyncpg" in driver:
-        return url.render_as_string(hide_password=False)
-    if driver in {"postgresql", "postgres", "postgresql+psycopg2", "postgresql+psycopg"}:
-        return url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
-    if driver.startswith("sqlite"):
-        # aiosqlite path for local offline tests
+        pass
+    elif driver in {"postgresql", "postgres", "postgresql+psycopg2", "postgresql+psycopg"}:
+        url = url.set(drivername="postgresql+asyncpg")
+    elif driver.startswith("sqlite"):
         if "aiosqlite" not in driver:
-            return url.set(drivername="sqlite+aiosqlite").render_as_string(hide_password=False)
-        return url.render_as_string(hide_password=False)
-    raise ValueError(f"Unsupported DATABASE_URL dialect: {driver!r}")
+            url = url.set(drivername="sqlite+aiosqlite")
+    else:
+        raise ValueError(f"Unsupported DATABASE_URL dialect: {driver!r}")
+    query = dict(url.query) if url.query else {}
+    for key in list(query.keys()):
+        if key.lower() in {"sslmode", "ssl", "channel_binding"}:
+            query.pop(key, None)
+    return url.set(query=query).render_as_string(hide_password=False)
+
+
+def _async_connect_args(async_url: str) -> dict:
+    url = make_url(async_url)
+    if "asyncpg" not in (url.drivername or "").lower():
+        return {}
+    host = (url.host or "").lower()
+    if host in {"localhost", "127.0.0.1", "::1", ""}:
+        return {}
+    return {"ssl": True}
 
 
 def _levenshtein_ratio(a: str, b: str) -> float:
@@ -167,7 +181,12 @@ class RxNormResolver:
                 raw = ""
         if not raw:
             return None
-        self._engine = create_async_engine(_to_async_url(raw), pool_pre_ping=True)
+        async_url = _to_async_url(raw)
+        self._engine = create_async_engine(
+            async_url,
+            pool_pre_ping=True,
+            connect_args=_async_connect_args(async_url),
+        )
         self._session_factory = async_sessionmaker(self._engine, expire_on_commit=False)
         self._own_engine = True
         return self._engine
