@@ -239,11 +239,22 @@ def _process_raw(db: Session, raw: RawPost, use_transformer: bool | None = None)
 # Signal recomputation
 # --------------------------------------------------------------------------- #
 def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = True,
-                      project_id: int | None = None) -> dict:
+                      project_id: int | None = None, *,
+                      fast: bool = False, with_overlays: bool | None = None) -> dict:
+    """Recompute disproportionality signals for the scoped corpus.
+
+    ``fast=True`` (or ``with_overlays=False``) keeps DMA (PRR/ROR/IC/EBGM/strength)
+    intact but skips heavy per-signal overlays (Cox HR, trust loops, benefit-risk)
+    and forces label-gap offline (no DailyMed HTTP). Prefer this for large local
+    FAERS recomputes; default path remains full-fidelity for production UI.
+    """
     from .projects.scope import current_project_id
 
     if project_id is None:
         project_id = current_project_id()
+    if with_overlays is None:
+        with_overlays = not fast
+    offline_label_gap = fast or not with_overlays
 
     # Heal legacy NULL-scoped signals so project-filtered UI can see them.
     heal_orphan_project_ids(db, default_project_id=project_id or 1)
@@ -254,12 +265,49 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         .filter(ProcessedPost.ae_flag.is_(True))
     )
     if project_id is not None:
-        ae_q = ae_q.filter(RawPost.project_id == project_id)
+        from sqlalchemy import or_
+
+        ae_q = ae_q.filter(
+            or_(RawPost.project_id == project_id, RawPost.project_id.is_(None), RawPost.project_id == 0)
+        )
     ae_rows = ae_q.all()
+
+    # Snapshot ORM fields into plain dicts BEFORE commit — expire_on_commit would
+    # otherwise force N+1 lazy reloads across Neon during the multi-minute DMA scan,
+    # which reliably dies with "server closed the connection unexpectedly".
+    ae_snap: List[dict] = []
+    for processed, raw in ae_rows:
+        ae_snap.append(
+            {
+                "processed_id": processed.id,
+                "entities_json": processed.entities_json or "{}",
+                "negation_json": processed.negation_json or "{}",
+                "sentiment_label": processed.sentiment_label,
+                "sentiment_score": processed.sentiment_score,
+                "ae_confidence": processed.ae_confidence,
+                "posted_at": raw.posted_at,
+                "country": raw.country,
+                "region": raw.region,
+                "title": raw.title,
+                "body": raw.body,
+                "author_hash": raw.author_hash,
+                "product_type": getattr(raw, "product_type", None) or "drug",
+                "raw_id": raw.id,
+            }
+        )
+    # Drop ORM identity map so we don't accidentally touch expired instances later.
+    try:
+        db.expunge_all()
+    except Exception:
+        pass
 
     sig_q = db.query(Signal)
     if project_id is not None:
-        sig_q = sig_q.filter(Signal.project_id == project_id)
+        from sqlalchemy import or_
+
+        sig_q = sig_q.filter(
+            or_(Signal.project_id == project_id, Signal.project_id.is_(None), Signal.project_id == 0)
+        )
     prior = {
         (s.drug, s.symptom): {
             "detected_at": s.detected_at,
@@ -274,12 +322,35 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         for s in sig_q.all()
     }
 
+    # End the read transaction. FAERS-scale corpora spend minutes in pure Python
+    # DMA afterward; Neon/proxy idle SSL kills leave DELETE/INSERT failing.
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    def _db_keepalive() -> None:
+        from sqlalchemy import text as _sa_text
+
+        try:
+            db.execute(_sa_text("SELECT 1"))
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            try:
+                db.connection().invalidate()
+            except Exception:
+                pass
+            db.execute(_sa_text("SELECT 1"))
+
     # Corpus baseline geographic distribution (counts of ALL AE reports by country
     # and region). This defines each area's EXPECTED share of reports, against which
     # the spatial scan statistic compares a signal's observed geographic spread.
     geo_baseline = {
-        "country": dict(Counter(raw.country for _p, raw in ae_rows if raw.country)),
-        "region": dict(Counter((raw.region or "Global") for _p, raw in ae_rows)),
+        "country": dict(Counter(r["country"] for r in ae_snap if r["country"])),
+        "region": dict(Counter((r["region"] or "Global") for r in ae_snap)),
     }
 
     reports: List[Tuple[str, str]] = []
@@ -295,31 +366,63 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     # Map processed_post id -> posted_at for all AE posts (comparator pool for Cox PH)
     all_ae_post_times: Dict[int, datetime] = {}
 
-    for processed, raw in ae_rows:
-        if raw.posted_at:
-            all_ae_post_times[processed.id] = raw.posted_at
-        entities = json.loads(processed.entities_json or "{}")
-        negation = json.loads(processed.negation_json or "{}")
-        ptype_raw = getattr(raw, "product_type", None) or "drug"
-        post_dims[processed.id] = dimensions_for_post(
-            text=f"{raw.title or ''} {raw.body or ''}",
-            entities=entities,
-            negation=negation,
-            sentiment={"label": processed.sentiment_label,
-                       "score": processed.sentiment_score},
-            country=raw.country,
-        )
+    _n_ae = len(ae_snap)
+    _is_sqlite = db.get_bind().dialect.name == "sqlite"
+    _scan_every = 500 if not with_overlays else 2500
+    print(
+        f"recompute: AE corpus snapshotted {_n_ae} rows "
+        f"(fast={fast} overlays={with_overlays})",
+        flush=True,
+    )
+    for i, row in enumerate(ae_snap):
+        if i and i % _scan_every == 0:
+            if not _is_sqlite:
+                _db_keepalive()
+            print(f"recompute: AE scan {i}/{_n_ae}", flush=True)
+        processed_id = row["processed_id"]
+        if row["posted_at"]:
+            all_ae_post_times[processed_id] = row["posted_at"]
+        entities = json.loads(row["entities_json"])
+        negation = json.loads(row["negation_json"])
+        ptype_raw = row["product_type"]
+        # Fast path: skip vigiGrade dimension extraction (heavy string work).
+        if with_overlays:
+            post_dims[processed_id] = dimensions_for_post(
+                text=f"{row['title'] or ''} {row['body'] or ''}",
+                entities=entities,
+                negation=negation,
+                sentiment={"label": row["sentiment_label"],
+                           "score": row["sentiment_score"]},
+                country=row["country"],
+            )
+        else:
+            post_dims[processed_id] = {}
         # Product → entity flags (device entities override a mislabeled raw.product_type)
         drug_flags: Dict[str, dict] = {}
         for d in entities.get("drugs", []):
-            canon = canonical_product(d.get("normalized") or d.get("text") or "")
+            # FAERS/MAUDE bulk bridge historically stored bare strings; accept both shapes.
+            if isinstance(d, str):
+                surface = d
+            elif isinstance(d, dict):
+                surface = d.get("normalized") or d.get("text") or d.get("generic") or ""
+            else:
+                continue
+            canon = canonical_product(surface)
             if not canon:
                 continue
-            is_dev = (
-                bool(d.get("is_device"))
-                or d.get("product_type") == "device"
-                or is_known_device(canon)
-            )
+            is_dev = False
+            atc_val = None
+            gmdn_val = None
+            if isinstance(d, dict):
+                is_dev = (
+                    bool(d.get("is_device"))
+                    or d.get("product_type") == "device"
+                    or is_known_device(canon)
+                )
+                atc_val = d.get("atc")
+                gmdn_val = d.get("gmdn")
+            else:
+                is_dev = is_known_device(canon)
             # Raw rows tagged device only imply device for known-device products —
             # never promote co-mentioned drugs (e.g. Accutane on a device thread).
             if ptype_raw == "device" and is_known_device(canon):
@@ -328,27 +431,40 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
             if prev is None or (is_dev and not prev.get("is_device")):
                 drug_flags[canon] = {
                     "is_device": is_dev,
-                    "atc": None if is_dev else d.get("atc"),
-                    "gmdn": d.get("gmdn"),
+                    "atc": None if is_dev else atc_val,
+                    "gmdn": gmdn_val,
                 }
-            elif d.get("atc") and not drug_flags[canon].get("is_device"):
-                drug_flags[canon]["atc"] = d["atc"]
+            elif atc_val and not drug_flags[canon].get("is_device"):
+                drug_flags[canon]["atc"] = atc_val
         for canon, flags in drug_flags.items():
             if flags.get("atc") and not flags.get("is_device"):
                 drug_atc_map[canon] = flags["atc"]
         symptoms = []
         for s in entities.get("symptoms", []):
-            if negation.get(s["normalized"], False):
+            if isinstance(s, str):
+                surface = s
+                soc = None
+                soc_code = None
+            elif isinstance(s, dict):
+                surface = s.get("pt") or s.get("normalized") or s.get("text") or ""
+                soc = s.get("soc")
+                soc_code = s.get("soc_code")
+            else:
                 continue
-            ev = canonical_event(s.get("pt") or s.get("normalized") or s.get("text") or "")
+            # Negation map may key on raw surface or normalized form
+            if negation.get(surface, False) or negation.get((surface or "").lower(), False):
+                continue
+            if isinstance(s, dict) and negation.get(s.get("normalized") or "", False):
+                continue
+            ev = canonical_event(surface)
             if not ev:
                 continue
             symptoms.append(ev)
             if ev not in sym_meddra:
                 sym_meddra[ev] = {
                     "pt": ev,
-                    "soc": s.get("soc"),
-                    "soc_code": s.get("soc_code"),
+                    "soc": soc,
+                    "soc_code": soc_code,
                 }
         for drug, flags in drug_flags.items():
             for symptom in symptoms:
@@ -360,20 +476,22 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
                     pair_device[key] = device_meta(drug, symptom)
                 else:
                     pair_product.setdefault(key, "drug")
-                # Heal mislabeled raw rows so future passes stay consistent.
-                if flags.get("is_device") and ptype_raw != "device":
-                    raw.product_type = "device"
                 meta = pair_meta.setdefault(
                     key, {"timestamps": [], "post_ids": [], "texts": [], "regions": [],
                           "countries": [], "authors": []})
-                meta["timestamps"].append(raw.posted_at or datetime.utcnow())
-                meta["post_ids"].append(processed.id)
-                meta["texts"].append((processed.ae_confidence, raw.body or ""))
-                meta["regions"].append(raw.region or "Global")
-                meta["authors"].append(raw.author_hash or "")
-                if raw.country:
-                    meta["countries"].append(raw.country)
+                meta["timestamps"].append(row["posted_at"] or datetime.utcnow())
+                meta["post_ids"].append(processed_id)
+                # Fast path: omit body text (causality still runs; WHO-UMC stays Unassessable).
+                if with_overlays:
+                    meta["texts"].append((row["ae_confidence"], row["body"] or ""))
+                else:
+                    meta["texts"].append((row["ae_confidence"], ""))
+                meta["regions"].append(row["region"] or "Global")
+                meta["authors"].append(row["author_hash"] or "")
+                if row["country"]:
+                    meta["countries"].append(row["country"])
 
+    print(f"recompute: DMA pairs={len(reports)} unique={len(pair_meta)}", flush=True)
     signals = compute_signals(reports)
 
     # Empirical calibration: fit the null from negative controls present in this corpus
@@ -428,6 +546,19 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     # Wipe prior signal rows for this scope. Alerts FK → signals.id has no ON DELETE
     # CASCADE (legacy SQLite→Postgres), and orphan alerts may have NULL/mismatched
     # project_id — so delete by signal_id first, then by project, then signals.
+    _db_keepalive()
+    # Force a fresh TCP/SSL socket before the destructive wipe — idle Neon
+    # connections often die during the multi-minute DMA pass above.
+    if db.get_bind().dialect.name != "sqlite":
+        try:
+            db.connection().invalidate()
+        except Exception:
+            pass
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        _db_keepalive()
     if project_id is not None:
         sig_ids = [
             row[0]
@@ -449,6 +580,7 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
     db.flush()
 
     stored = []
+    _pending_deps: list = []  # (Signal, carried_prior) awaiting flush → audit/alert
     for sig in signals:
         key = (sig["drug"], sig["symptom"])
         meta = pair_meta.get(key, {"timestamps": [], "post_ids": [], "texts": [],
@@ -460,13 +592,19 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
 
         causality = {"category": "Unassessable", "score": 0.0, "factors": [],
                      "uncertainty": "high"}
-        for _conf, text in meta["texts"]:
-            cand = assess_causality(text, sig["drug"], sig["symptom"],
-                                    fda_known=fda.get("available", False),
-                                    product_type=ptype)
-            if cand["score"] > causality["score"]:
-                causality = cand
-        if not meta["texts"]:
+        if with_overlays:
+            for _conf, text in meta["texts"]:
+                cand = assess_causality(text, sig["drug"], sig["symptom"],
+                                        fda_known=fda.get("available", False),
+                                        product_type=ptype)
+                if cand["score"] > causality["score"]:
+                    causality = cand
+            if not meta["texts"]:
+                causality = assess_causality("", sig["drug"], sig["symptom"],
+                                             fda_known=fda.get("available", False),
+                                             product_type=ptype)
+        else:
+            # Fast path: single empty-text pass (no body retained during AE scan).
             causality = assess_causality("", sig["drug"], sig["symptom"],
                                          fda_known=fda.get("available", False),
                                          product_type=ptype)
@@ -514,6 +652,7 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
                     sig["drug"], sig["symptom"],
                     pt=md.get("pt"), soc=md.get("soc_code"),
                     boxed_info=boxed,
+                    offline_only=offline_label_gap,
                 )
             except Exception:
                 label_gap = {
@@ -550,7 +689,7 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         # signal against the drug's therapeutic benefit (illustrative surrogate).
         # Applies to drugs + vaccines (indication/NNV framing); devices are skipped.
         benefit_risk = None
-        if ptype != "device":
+        if with_overlays and ptype != "device":
             benefit_risk = benefit_risk_assess(
                 sig["drug"], atc, sig["symptom"], md.get("pt"),
                 severity, causality["category"], sig["post_count"])
@@ -571,13 +710,16 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
         earliest = min(timestamps)
         carried = prior.get(key)
 
-        # Sybil-defense trust score — evaluates cohort for coordinated inauthentic posts.
-        from .analytics.trust import compute_trust as _compute_trust
-        _trust = _compute_trust(
-            author_hashes=meta.get("authors", []),
-            timestamps=timestamps,
-            texts=[t for _, t in meta.get("texts", []) if t],
-        )
+        if with_overlays:
+            # Sybil-defense trust score — evaluates cohort for coordinated inauthentic posts.
+            from .analytics.trust import compute_trust as _compute_trust
+            _trust = _compute_trust(
+                author_hashes=meta.get("authors", []),
+                timestamps=timestamps,
+                texts=[t for _, t in meta.get("texts", []) if t],
+            )
+        else:
+            _trust = {"trust_score": 1.0, "trust_label": "high"}
 
         # MaxSPRT sequential surveillance: compute over the trend series for this signal.
         # Expected per look = signal.expected / n_trend_looks (distributes the expected count
@@ -588,19 +730,25 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
             alpha=0.05,
         )
 
-        # Cox PH time-to-event surrogate (social-listening hazard ratio).
-        # Exposed  = this signal's own supporting posts.
-        # Unexposed = AE posts NOT in this signal's supporting-post set.
-        _signal_pid_set = set(meta["post_ids"])
-        _comparator_ts = [
-            ts for pid, ts in all_ae_post_times.items()
-            if pid not in _signal_pid_set
-        ]
-        _hr_result = compute_hazard_ratio(
-            signal_timestamps=meta["timestamps"],
-            comparator_timestamps=_comparator_ts,
-            anchor=earliest,
-        )
+        if with_overlays:
+            # Cox PH time-to-event surrogate (social-listening hazard ratio).
+            # Exposed  = this signal's own supporting posts.
+            # Unexposed = AE posts NOT in this signal's supporting-post set.
+            _signal_pid_set = set(meta["post_ids"])
+            _comparator_ts = [
+                ts for pid, ts in all_ae_post_times.items()
+                if pid not in _signal_pid_set
+            ]
+            _hr_result = compute_hazard_ratio(
+                signal_timestamps=meta["timestamps"],
+                comparator_timestamps=_comparator_ts,
+                anchor=earliest,
+            )
+        else:
+            _hr_result = {
+                "hr": None, "hr_ci": None, "hr_p": None,
+                "hr_elevated": False, "hr_json": {},
+            }
 
         row = Signal(
             project_id=project_id or _infer_project_id(db, meta.get("post_ids", [])),
@@ -700,8 +848,7 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
             lifecycle_updated_at=(carried["lifecycle_updated_at"] if carried else None),
         )
         db.add(row)
-        db.flush()
-        # Priority score depends on analytics fields computed above; set after flush.
+        # Priority score depends on analytics fields; does not need a DB id.
         row.priority_score = compute_priority({
             "strength": row.strength,
             "severity": row.severity,
@@ -711,21 +858,48 @@ def recompute_signals(db: Session, use_fda: bool = True, with_narrative: bool = 
             "maxsprt_crossed": row.maxsprt_crossed,
         })
         stored.append(row)
-        if carried is None:
-            db.add(AuditLog(actor="system", action="signal_detected",
-                            entity_type="signal", entity_id=row.id,
-                            detail=f"{row.drug} -> {row.meddra_pt or row.symptom} "
-                                   f"[{row.strength}{' SDR' if row.sdr_flag else ''}]"))
-        _maybe_alert(db, row)
+        _pending_deps.append((row, carried))
+        # Full path: flush every row (alerts need id immediately).
+        # Fast path: batch flush every 100, then attach audit/alerts.
+        _flush_every = 1 if with_overlays else 100
+        if len(_pending_deps) >= _flush_every:
+            db.flush()
+            for _row, _carried in _pending_deps:
+                if _carried is None:
+                    db.add(AuditLog(
+                        actor="system", action="signal_detected",
+                        entity_type="signal", entity_id=_row.id,
+                        detail=f"{_row.drug} -> {_row.meddra_pt or _row.symptom} "
+                               f"[{_row.strength}{' SDR' if _row.sdr_flag else ''}]"))
+                _maybe_alert(db, _row)
+            _pending_deps.clear()
+            if not with_overlays and len(stored) % 500 == 0:
+                print(f"recompute: stored {len(stored)}/{len(signals)} signals", flush=True)
+
+    if _pending_deps:
+        db.flush()
+        for _row, _carried in _pending_deps:
+            if _carried is None:
+                db.add(AuditLog(
+                    actor="system", action="signal_detected",
+                    entity_type="signal", entity_id=_row.id,
+                    detail=f"{_row.drug} -> {_row.meddra_pt or _row.symptom} "
+                           f"[{_row.strength}{' SDR' if _row.sdr_flag else ''}]"))
+            _maybe_alert(db, _row)
+        _pending_deps.clear()
 
     db.commit()
 
-    # Longitudinal casefile: persist weekly DMA snapshots for trajectory UI
-    try:
-        from .analytics.casefile import snapshot_signals
-        snapshot_signals(db, stored, project_id=project_id)
-    except Exception:
-        pass
+    # Longitudinal casefile: persist weekly DMA snapshots for trajectory UI.
+    # Skip on fast path — N× Neon round-trips for 10k+ signals can hang for hours.
+    if with_overlays:
+        try:
+            from .analytics.casefile import snapshot_signals
+            snapshot_signals(db, stored, project_id=project_id)
+        except Exception:
+            pass
+    else:
+        print(f"recompute: skip casefile snapshots (fast path, {len(stored)} signals)", flush=True)
 
     # Narratives: generate for the most important signals (keeps LLM usage bounded).
     if with_narrative and stored:
@@ -851,13 +1025,23 @@ def knowledge_graph(db: Session, project_id: int | None = None) -> dict:
         proc_q = proc_q.filter(RawPost.project_id == project_id)
     for processed, _raw in proc_q.all():
         entities = json.loads(processed.entities_json or "{}")
-        drugs = {
-            canon
-            for d in entities.get("drugs", [])
-            for canon in [canonical_product(d.get("normalized") or d.get("text") or "")]
-            if canon
-        }
-        conds = {c["normalized"] for c in entities.get("conditions", []) if c.get("normalized")}
+        drugs = set()
+        for d in entities.get("drugs", []):
+            if isinstance(d, str):
+                surface = d
+            elif isinstance(d, dict):
+                surface = d.get("normalized") or d.get("text") or ""
+            else:
+                continue
+            canon = canonical_product(surface)
+            if canon:
+                drugs.add(canon)
+        conds = set()
+        for c in entities.get("conditions", []):
+            if isinstance(c, str) and c.strip():
+                conds.add(c.strip())
+            elif isinstance(c, dict) and c.get("normalized"):
+                conds.add(c["normalized"])
         for d in drugs:
             for c in conds:
                 cond_counter[(d, c)] = cond_counter.get((d, c), 0) + 1

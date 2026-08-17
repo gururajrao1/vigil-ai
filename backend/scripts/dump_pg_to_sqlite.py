@@ -87,7 +87,17 @@ def _copy_table(src: Engine, dst: Engine, table: str) -> int:
         else:
             type_map[c["name"]] = "TEXT"
 
-    ddl_cols = ", ".join(f'"{c}" {type_map[c]}' for c in cols)
+    # SQLite needs INTEGER PRIMARY KEY for ORM autoincrement identity.
+    pk_cols = {c["name"] for c in insp_src.get_pk_constraint(table).get("constrained_columns") or []}
+    if not pk_cols and "id" in type_map:
+        pk_cols = {"id"}
+    ddl_parts = []
+    for c in cols:
+        decl = f'"{c}" {type_map[c]}'
+        if c in pk_cols and type_map[c] == "INTEGER" and len(pk_cols) == 1:
+            decl += " PRIMARY KEY"
+        ddl_parts.append(decl)
+    ddl_cols = ", ".join(ddl_parts)
     placeholders = ", ".join(f":{c}" for c in cols)
     with dst.begin() as dconn:
         dconn.execute(text(f'DROP TABLE IF EXISTS "{table}"'))
@@ -131,6 +141,11 @@ def main() -> None:
         help="SQLite path relative to backend/",
     )
     ap.add_argument("--src-file", default="")
+    ap.add_argument(
+        "--tables",
+        default="",
+        help="Comma-separated table subset (faster). Empty = all tables.",
+    )
     args = ap.parse_args()
 
     src_url = os.getenv("DATABASE_URL", "").strip()
@@ -149,10 +164,18 @@ def main() -> None:
     src = create_engine(src_url, future=True, pool_pre_ping=True)
     dst = create_engine(f"sqlite:///{out.as_posix()}", future=True)
 
+    wanted = {t.strip() for t in args.tables.split(",") if t.strip()} if args.tables else None
+    tables = _table_order(src)
+    if wanted is not None:
+        tables = [t for t in tables if t in wanted]
+        missing = wanted - set(tables)
+        if missing:
+            print(f"WARNING: tables not found: {sorted(missing)}", flush=True)
+
     total = 0
-    for table in _table_order(src):
+    for table in tables:
         total += _copy_table(src, dst, table)
-    print(f"Done. ~{total} rows → {out} ({out.stat().st_size // (1024*1024)} MB)", flush=True)
+    print(f"Done. ~{total} rows -> {out} ({out.stat().st_size // (1024*1024)} MB)", flush=True)
 
 
 if __name__ == "__main__":

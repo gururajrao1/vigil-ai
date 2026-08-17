@@ -9,16 +9,17 @@ FastMCP + API. Phase 2 CLI modules:
 * ``run_pipeline`` — orchestrator + ``REFRESH MATERIALIZED VIEW CONCURRENTLY``
 
 Offline-first: live downloads degrade to bundled fixtures without crashing.
+
+Imports of session-based helpers are **lazy** so CLI modules
+(``python -m app.etl_pipeline.ingest_faers``) do not construct the sync
+SQLAlchemy engine (or require ``psycopg2``) at import time.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy.orm import Session
-
-from .faers_ingestion import ingest_faers_to_omop
-from .sider_ingestion import ingest_sider_baseline
-from .athena_vocab import sync_athena_vocab_surrogates
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 SUPPORTED_DATASETS = ("faers", "sider", "athena_vocab")
 
@@ -26,12 +27,16 @@ SUPPORTED_DATASETS = ("faers", "sider", "athena_vocab")
 def trigger_dataset_sync(
     dataset_name: str,
     *,
-    db: Optional[Session] = None,
+    db: Optional["Session"] = None,
     project_id: Optional[int] = None,
     limit: int = 200,
     force_fixture: bool = False,
 ) -> dict[str, Any]:
     """Programmatic ETL entry used by FastMCP + API."""
+    from .athena_vocab import sync_athena_vocab_surrogates
+    from .faers_ingestion import ingest_faers_to_omop
+    from .sider_ingestion import ingest_sider_baseline
+
     name = (dataset_name or "").strip().lower()
     if name not in SUPPORTED_DATASETS:
         return {
@@ -77,13 +82,23 @@ def trigger_dataset_sync(
             db.close()
 
 
-__all__ = [
-    "SUPPORTED_DATASETS",
-    "trigger_dataset_sync",
-    "ingest_faers_to_omop",
-    "ingest_sider_baseline",
-    "sync_athena_vocab_surrogates",
-]
+def __getattr__(name: str) -> Any:
+    """Lazy re-exports for backwards-compatible ``from app.etl_pipeline import …``."""
+    if name == "ingest_faers_to_omop":
+        from .faers_ingestion import ingest_faers_to_omop
+
+        return ingest_faers_to_omop
+    if name == "ingest_sider_baseline":
+        from .sider_ingestion import ingest_sider_baseline
+
+        return ingest_sider_baseline
+    if name == "sync_athena_vocab_surrogates":
+        from .athena_vocab import sync_athena_vocab_surrogates
+
+        return sync_athena_vocab_surrogates
+    if name == "run_phase2_pipeline":
+        return run_phase2_pipeline
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def run_phase2_pipeline(**kwargs: Any) -> dict[str, Any]:
@@ -93,3 +108,13 @@ def run_phase2_pipeline(**kwargs: Any) -> dict[str, Any]:
     from .run_pipeline import run_pipeline
 
     return asyncio.run(run_pipeline(**kwargs))
+
+
+__all__ = [
+    "SUPPORTED_DATASETS",
+    "trigger_dataset_sync",
+    "ingest_faers_to_omop",
+    "ingest_sider_baseline",
+    "sync_athena_vocab_surrogates",
+    "run_phase2_pipeline",
+]
