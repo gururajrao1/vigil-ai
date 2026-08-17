@@ -57,6 +57,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
   // Pin a drug to the top when deep-linking from SMQ (keep full SMQ set visible)
   const [pinDrug, setPinDrug] = useState(searchParams.get('pin') || '');
   const [page, setPage] = useState(1);
+  const [serverTotal, setServerTotal] = useState(0);
   const PAGE_SIZE = 25;
 
   // Sync deep-link tokens from Dashboard / SMQ / chart clicks
@@ -115,16 +116,38 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
   }, [searchDraft]);
 
   useEffect(() => {
+    setPage(1);
+  }, [filter, region, product, spikingOnly, sdrOnly, pgxOnly, boxedOnly, mechanismOnly, classEffectOnly, acOnly, calibratedOnly, vaccineOnly, spatialOnly, wellDocOnly, hrElevatedOnly, maxsprtOnly, noveltyFilter, smq, drugQ, symptomQ, socQ, textQ]);
+
+  useEffect(() => {
     const t = setTimeout(() => setSymptomQ(eventDraft.trim()), 280);
     return () => clearTimeout(t);
   }, [eventDraft]);
 
   useEffect(() => {
-    const params = {};
+    const params = {
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+      sort: sortBy,
+    };
     if (filter !== 'ALL') params.strength = filter;
     if (region !== 'Global') params.region = region;
+    if (product !== 'ALL') params.product_type = product;
     if (spikingOnly) params.spiking = true;
+    if (sdrOnly) params.sdr = true;
+    if (pgxOnly) params.pgx = true;
+    if (boxedOnly) params.boxed = true;
+    if (mechanismOnly) params.mechanism = true;
+    if (classEffectOnly) params.class_effect = true;
+    if (acOnly) params.active_comparator = true;
+    if (calibratedOnly) params.calibrated = true;
+    if (vaccineOnly) params.aesi = true;
+    if (spatialOnly) params.spatial = true;
+    if (wellDocOnly) params.well_documented = true;
+    if (hrElevatedOnly) params.hr_elevated = true;
+    if (maxsprtOnly) params.maxsprt = true;
     if (noveltyFilter !== 'ALL') params.label_novelty = noveltyFilter;
+    if (smq !== 'ALL') params.smq = smq;
     if (textQ) params.q = textQ;
     else if (drugQ) params.drug = drugQ;
     if (symptomQ) params.symptom = symptomQ;
@@ -136,17 +159,13 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
       api.signals(params)
         .then((d) => {
           if (!cancelled) {
-            const list = d.signals || [];
-            setSignals(list);
-            // Surface mismatches (e.g. server total vs pages loaded) in the banner.
-            if (typeof d.total === 'number' && d.total > list.length) {
-              setLoadError(`Loaded ${list.length} of ${d.total} signals — retry if this looks incomplete.`);
-            }
+            setSignals(d.signals || []);
+            setServerTotal(typeof d.total === 'number' ? d.total : (d.signals || []).length);
+            setLoadError('');
           }
         })
         .catch((err) => {
           const msg = err?.message || 'Failed to load signals';
-          // Neon SSL drops / brief recompute races — one automatic retry.
           if (attempt < 2 && /500|SSL|timeout|gateway/i.test(msg)) {
             setTimeout(() => load(attempt + 1), 1200);
             return;
@@ -159,7 +178,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
     };
     load();
     return () => { cancelled = true; };
-  }, [tick, project?.id, filter, region, spikingOnly, noveltyFilter, drugQ, symptomQ, socQ, textQ]);
+  }, [tick, project?.id, page, sortBy, filter, region, product, spikingOnly, sdrOnly, pgxOnly, boxedOnly, mechanismOnly, classEffectOnly, acOnly, calibratedOnly, vaccineOnly, spatialOnly, wellDocOnly, hrElevatedOnly, maxsprtOnly, noveltyFilter, smq, drugQ, symptomQ, socQ, textQ]);
 
   const clearStoryContext = () => {
     setDrugQ('');
@@ -193,45 +212,21 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
 
   const pinNorm = (pinDrug || '').trim().toLowerCase();
 
-  // product-type + SDR + SMQ filtering and Bayesian sort are applied client-side.
-  const rows = (signals || [])
-    .filter((s) => product === 'ALL' || (s.product_type || 'drug') === product)
-    .filter((s) => !sdrOnly || s.sdr_flag)
-    .filter((s) => !pgxOnly || s.pgx_actionable)
-    .filter((s) => !boxedOnly || s.boxed_warning)
-    .filter((s) => !mechanismOnly || s.mechanism_plausible)
-    .filter((s) => !classEffectOnly || s.class_effect)
-    .filter((s) => !acOnly || s.stands_out_in_class)
-    .filter((s) => !calibratedOnly || s.calibrated_signal)
-    .filter((s) => !vaccineOnly || (s.is_vaccine && s.aesi))
-    .filter((s) => !spatialOnly || s.spatial_cluster)
-    .filter((s) => !wellDocOnly || s.well_documented)
-    .filter((s) => !hrElevatedOnly || s.hr_elevated)
-    .filter((s) => !maxsprtOnly || s.maxsprt_crossed)
-    .filter((s) => smq === 'ALL' || (s.smq || []).some((m) => m.smq === smq))
-    .sort((a, b) => {
-      // SMQ deep-link: pinned drug first, then remaining members of the syndrome
-      if (pinNorm) {
-        const aPin = (a.drug || '').toLowerCase() === pinNorm ? 0 : 1;
-        const bPin = (b.drug || '').toLowerCase() === pinNorm ? 0 : 1;
-        if (aPin !== bPin) return aPin - bPin;
-      }
-      // When novelty filter is active, float novel signals to top
-      if (noveltyFilter === 'novel') {
-        const aNovel = (a.label_novelty === 'novel') ? 0 : 1;
-        const bNovel = (b.label_novelty === 'novel') ? 0 : 1;
-        if (aNovel !== bNovel) return aNovel - bNovel;
-      }
-      return (b[sortBy] || 0) - (a[sortBy] || 0);
-    });
+  const rows = [...(signals || [])].sort((a, b) => {
+    if (pinNorm) {
+      const aPin = (a.drug || '').toLowerCase() === pinNorm ? 0 : 1;
+      const bPin = (b.drug || '').toLowerCase() === pinNorm ? 0 : 1;
+      if (aPin !== bPin) return aPin - bPin;
+    }
+    return 0;
+  });
+  const pageRows = rows;
 
   useEffect(() => { setPage(1); }, [
     filter, region, product, drugQ, symptomQ, textQ, socQ, smq, noveltyFilter, sortBy,
     sdrOnly, spikingOnly, pgxOnly, boxedOnly, mechanismOnly, classEffectOnly, acOnly,
     calibratedOnly, vaccineOnly, spatialOnly, wellDocOnly, hrElevatedOnly, maxsprtOnly, pinDrug,
   ]);
-
-  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -412,7 +407,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
             className="px-4 py-2 border-b border-slate-800"
             page={page}
             pageSize={PAGE_SIZE}
-            total={rows.length}
+            total={serverTotal}
             onPageChange={setPage}
             label="signals"
           />
@@ -601,7 +596,7 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
             className="px-4 py-2 border-t border-slate-800"
             page={page}
             pageSize={PAGE_SIZE}
-            total={rows.length}
+            total={serverTotal}
             onPageChange={setPage}
             label="signals"
           />

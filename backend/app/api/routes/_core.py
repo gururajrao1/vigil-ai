@@ -1381,6 +1381,9 @@ def list_signals(
     drug: str | None = None,
     symptom: str | None = None,
     q: str | None = None,
+    product_type: str | None = None,
+    sdr: bool | None = None,
+    sort: str | None = None,
     full: bool = False,
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
@@ -1448,6 +1451,10 @@ def list_signals(
         qset = qset.filter(Signal.label_novelty == label_novelty.lower())
     if lifecycle_status:
         qset = qset.filter(Signal.lifecycle_status == lifecycle_status.lower())
+    if product_type and product_type.lower() not in {"all", "*"}:
+        qset = qset.filter(Signal.product_type == product_type.lower())
+    if sdr:
+        qset = qset.filter(Signal.sdr_flag.is_(True))
     # Push text filters into SQL so Neon does not ship the full corpus then filter.
     if drug and drug.strip():
         qset = qset.filter(Signal.drug.ilike(f"%{drug.strip()}%"))
@@ -1464,7 +1471,7 @@ def list_signals(
             from ...normalization import expand_query
 
             expansion = expand_query(q.strip())
-            for t in (expansion.get("search_terms") or [])[:25]:
+            for t in (expansion.get("search_terms") or [])[:12]:
                 if t and len(t) >= 2:
                     terms.add(t)
             for pt in ((expansion.get("clinical") or {}).get("preferred_pts") or []):
@@ -1481,14 +1488,49 @@ def list_signals(
             ])
         qset = qset.filter(or_(*clauses))
 
-    signals = qset.order_by(Signal.prr.desc(), Signal.post_count.desc()).all()
+    sort_col = {
+        "prr": Signal.prr,
+        "eb05": Signal.eb05,
+        "ic025": Signal.ic025,
+        "post_count": Signal.post_count,
+        "priority_score": Signal.priority_score,
+    }.get((sort or "prr").lower(), Signal.prr)
+    ordered = qset.order_by(sort_col.desc(), Signal.post_count.desc())
     to_dict = signal_to_dict if full else signal_list_dict
+    needs_post = bool((region and region.lower() != "global") or smq)
+
+    if not needs_post:
+        # SQL page — do not load/serialize the full register per request.
+        total = qset.count()
+        rows = ordered.offset(offset).limit(limit).all()
+        out = [to_dict(s) for s in rows]
+        if drug:
+            dk = fold_key(drug)
+            out = [s for s in out if dk and (dk in fold_key(s.get("drug") or "") or fold_key(s.get("drug") or "") in dk)]
+        if symptom:
+            sk = fold_key(symptom)
+            out = [
+                s for s in out
+                if sk and (
+                    sk in fold_key(s.get("symptom") or "")
+                    or sk in fold_key((s.get("meddra") or {}).get("pt") or "")
+                    or fold_key(s.get("symptom") or "") in sk
+                )
+            ]
+        return {
+            "signals": out,
+            "compact": not full,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    signals = ordered.all()
     out = [to_dict(s) for s in signals]
     if region and region.lower() != "global":
         out = [s for s in out if region in (s.get("regions") or {})]
     if smq:
         out = [s for s in out if any(m.get("smq") == smq for m in (s.get("smq") or []))]
-    # Keep fold_key refinement for fuzzy drug/symptom matches after ILIKE prefilter.
     if drug:
         dk = fold_key(drug)
         out = [s for s in out if dk and (dk in fold_key(s.get("drug") or "") or fold_key(s.get("drug") or "") in dk)]

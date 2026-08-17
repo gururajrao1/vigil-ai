@@ -114,12 +114,12 @@ export const api = {
   sourceStats: () => req('/api/sources/stats'),
 
   signals: async (params = {}) => {
-    // Server defaults to limit=200 to avoid multi‑MB timeouts. Unless the caller
-    // asks for a single page (limit/offset), auto-fetch every page so Detect /
-    // Dashboard match signal_count (~900), not just the first 200.
-    const explicitPage = params.limit != null || params.offset != null;
+    // Default: one server page. Pass `{ all: true }` only when a view truly needs
+    // every row (avoid — 16k compact rows time out). Detect uses limit/offset.
+    const { all, ...rest } = params;
+    const explicitPage = rest.limit != null || rest.offset != null;
     const buildQuery = (extra = {}) => {
-      const merged = { ...params, ...extra };
+      const merged = { ...rest, ...extra };
       return new URLSearchParams(
         Object.fromEntries(
           Object.entries(merged).filter(
@@ -128,29 +128,28 @@ export const api = {
         )
       ).toString();
     };
-    if (explicitPage) {
-      const q = buildQuery();
+    if (explicitPage || !all) {
+      const q = buildQuery(explicitPage ? {} : { limit: rest.limit || 200, offset: rest.offset || 0 });
       return req(`/api/signals${q ? `?${q}` : ''}`);
     }
     const pageSize = 400;
     let offset = 0;
     let total = Infinity;
-    const all = [];
+    const allRows = [];
     let compact = true;
-    while (offset < total && all.length < total) {
+    while (offset < total && allRows.length < total) {
       const q = buildQuery({ limit: pageSize, offset });
       const d = await req(`/api/signals?${q}`);
       const batch = d.signals || [];
       compact = d.compact !== false;
       if (typeof d.total === 'number') total = d.total;
-      all.push(...batch);
+      allRows.push(...batch);
       if (batch.length === 0) break;
       offset += batch.length;
       if (batch.length < pageSize) break;
-      // Safety: never spin forever if total is missing/wrong.
-      if (all.length > 20000) break;
+      if (allRows.length > 20000) break;
     }
-    return { signals: all, total: typeof total === 'number' ? total : all.length, compact, limit: all.length, offset: 0 };
+    return { signals: allRows, total: typeof total === 'number' ? total : allRows.length, compact, limit: allRows.length, offset: 0 };
   },
   drugToEvents: (drug) => req(`/api/analytics/drug-to-events/${encodeURIComponent(drug)}`),
   eventToDrugs: (event) => req(`/api/analytics/event-to-drugs/${encodeURIComponent(event)}`),

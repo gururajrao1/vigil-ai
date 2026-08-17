@@ -62,8 +62,8 @@ export default function OmniSearch({ embedded = false }) {
         <div>
           <h2 className="text-xl font-bold text-slate-100">Omni-Search</h2>
           <p className="text-sm text-slate-400 mt-1">
-            One search box for brand / chemical / device / disease slang / city alias —
-            expands ontologies, then retrieves matching corpus reports.
+            One box: brand / chemical / slang / city alias. Used the way a safety scientist uses VigiLyze —
+            resolve the product, expand synonyms so N does not fragment, then retrieve the case series.
           </p>
         </div>
       )}
@@ -71,7 +71,7 @@ export default function OmniSearch({ embedded = false }) {
       <Card className="p-4">
         <CardHeader
           title="Unified search gateway"
-          subtitle="Janumet → chemicals + peer brands (Universe vs Subset); Chennai → also Madras; diabetic → Diabetes mellitus cohort N."
+          subtitle="Janumet → sitagliptin+metformin + peer brands (Universe vs Subset). Madras when you typed Chennai. diabetic → Diabetes mellitus so cohort N is honest."
         />
         <div className="mt-3">
           <OmniSearchGateway onResolved={(term) => run(term)} busy={busy} />

@@ -75,8 +75,10 @@ export default function MCN({ embedded = false }) {
             (same for Bangalore/Bengaluru). Aliases expand the search bag.
           </li>
           <li>
-            <strong className="text-slate-100">Clinical:</strong> diabetic + Type 2 diabetic mellitus + diabetes → one CUI;
-            sum patient counts (2+3+5 → N=10) before PRR/ROR so vertical frequency tables do not fragment.
+            <strong className="text-slate-100">Clinical (SapBERT / CADEC / SMM4H):</strong> patient slang
+            (“hard to stay awake”, “racing heart”) must map to one MedDRA PT before PRR. If you leave
+            “diabetic” / “Type 2 diabetic mellitus” / “diabetes” as three labels, N splits and a real
+            signal looks weak (Tutubalina & Miftahutdinov MCN; Liu et al. SapBERT).
           </li>
           <li>
             <strong className="text-slate-100">Brand (Omni-Search):</strong> Janumet → chemicals + peer brands as Universe vs Subset.
@@ -186,6 +188,17 @@ export default function MCN({ embedded = false }) {
               ))}
             </div>
           )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              to={`/signals?q=${encodeURIComponent(query.trim() || expansion?.search_terms?.[0] || '')}`}
+              className="text-xs text-cyan-400 hover:text-cyan-300"
+            >
+              Open expanded terms in Detect →
+            </Link>
+            <Link to="/lenses?tab=omni" className="text-xs text-cyan-400 hover:text-cyan-300">
+              Same expander in Omni-Search →
+            </Link>
+          </div>
         </Card>
       )}
 

@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from ..models import Alert, AuditLog, Signal
 
@@ -61,7 +61,23 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
     sig_q = db.query(Signal)
     if project_id is not None:
         sig_q = sig_q.filter(_project_scope(Signal.project_id, project_id))
-    signals = sig_q.all()
+    signals = sig_q.options(load_only(
+        Signal.id,
+        Signal.drug,
+        Signal.symptom,
+        Signal.meddra_pt,
+        Signal.strength,
+        Signal.severity,
+        Signal.sdr_flag,
+        Signal.spike_flag,
+        Signal.prr,
+        Signal.post_count,
+        Signal.completeness,
+        Signal.well_documented,
+        Signal.review_state,
+        Signal.earliest_post_at,
+        Signal.detected_at,
+    )).all()
     total = len(signals)
 
     # --- Latency ---
@@ -146,7 +162,7 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
     alert_q = db.query(Alert)
     if project_id is not None:
         alert_q = alert_q.filter(_project_scope(Alert.project_id, project_id))
-    alerts = alert_q.all()
+    alerts = alert_q.options(load_only(Alert.id, Alert.created_at)).all()
     per_day: Dict[str, int] = defaultdict(int)
     for a in alerts:
         d = (a.created_at or datetime.utcnow()).date().isoformat()

@@ -23,6 +23,7 @@ const PharmacovigilanceContext = createContext({
   resolvedMedDRAPT: null,
   comparisonBrands: [],
   omopSignals: null,
+  detectMatches: [],
   setFromOmniSearch: () => {},
   setResolvedMedDRAPT: () => {},
   setComparisonBrands: () => {},
@@ -56,6 +57,7 @@ export function PharmacovigilanceProvider({ children }) {
   const [resolvedConcept, setResolvedConcept] = useState(null);
   const [signalData, setSignalData] = useState([]);
   const [omopSignals, setOmopSignals] = useState(null);
+  const [detectMatches, setDetectMatches] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [resolvedRxCUI, setResolvedRxCUI] = useState(null);
@@ -67,6 +69,7 @@ export function PharmacovigilanceProvider({ children }) {
     setResolvedConcept(null);
     setSignalData([]);
     setOmopSignals(null);
+    setDetectMatches([]);
     setSearchError(null);
     setResolvedRxCUI(null);
     setResolvedMedDRAPT(null);
@@ -106,12 +109,16 @@ export function PharmacovigilanceProvider({ children }) {
     try {
       const payload = await api.omopSignalsByRxcui(q);
       applyPayload(q, payload);
+      api.signals({ q, limit: 80, sort: 'prr' })
+        .then((d) => setDetectMatches(Array.isArray(d?.signals) ? d.signals : []))
+        .catch(() => setDetectMatches([]));
       return payload;
     } catch (err) {
       const message = err?.message || String(err);
       setSearchError(message);
       setSignalData([]);
       setOmopSignals(null);
+      setDetectMatches([]);
       setResolvedConcept(null);
       // Keep the typed term so the search box and Detect filter stay aligned
       setResolvedRxCUI(null);
@@ -171,6 +178,7 @@ export function PharmacovigilanceProvider({ children }) {
       resolvedMedDRAPT,
       comparisonBrands,
       omopSignals,
+      detectMatches,
       setFromOmniSearch,
       setResolvedMedDRAPT,
       setComparisonBrands,
@@ -187,6 +195,7 @@ export function PharmacovigilanceProvider({ children }) {
       resolvedMedDRAPT,
       comparisonBrands,
       omopSignals,
+      detectMatches,
       setFromOmniSearch,
       clearClinicalState,
     ],

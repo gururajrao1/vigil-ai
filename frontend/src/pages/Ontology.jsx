@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useRefresh } from '../App';
 import { Badge, Button, Card, CardHeader, Spinner } from '../components/ui';
@@ -8,7 +9,7 @@ import DeviceTaxonomyBadge from '../hubs/DeviceTaxonomyBadge';
 
 const num = (v, d = 2) => (v === null || v === undefined ? '—' : Number(v).toFixed(d));
 
-function SocTable({ rows }) {
+function SocTable({ rows, onOpen }) {
   if (!rows.length) return null;
   return (
     <div className="overflow-x-auto">
@@ -27,7 +28,11 @@ function SocTable({ rows }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={`${r.product}|${r.soc}`} className="border-t border-slate-800/70">
+            <tr
+              key={`${r.product}|${r.soc}`}
+              className="border-t border-slate-800/70 cursor-pointer hover:bg-slate-900/50"
+              onClick={() => onOpen?.(r)}
+            >
               <td className="py-1.5 pr-3 text-slate-200">{r.product}</td>
               <td className="py-1.5 pr-3 text-slate-300" title={(r.members || []).map((m) => m.pt).join(', ')}>{r.soc}</td>
               <td className="py-1.5 pr-3 text-right tabular-nums text-slate-300">{r.observed_reports}</td>
@@ -56,6 +61,7 @@ function SocTable({ rows }) {
 /** Ontology lens — organ-class disproportionality plus a terminology playground. */
 export default function Ontology({ embedded = false }) {
   const { tick } = useRefresh();
+  const nav = useNavigate();
   const [data, setData] = useState(null);
   const [status, setStatus] = useState(null);
   const [err, setErr] = useState(null);
@@ -65,7 +71,7 @@ export default function Ontology({ embedded = false }) {
   useEffect(() => {
     let cancelled = false;
     setErr(null);
-    api.ontologyEngineDisproportionality({ topN: 40 })
+    api.ontologyEngineDisproportionality({ topN: 24 })
       .then((d) => { if (!cancelled) setData(d); })
       .catch((e) => {
         if (cancelled) return;
@@ -88,7 +94,8 @@ export default function Ontology({ embedded = false }) {
         <div>
           <h2 className="text-xl font-bold text-slate-100">Ontology</h2>
           <p className="text-sm text-slate-400 mt-1">
-            Organ-class disproportionality and the terminology playground.
+            Hauben 2007 / Trontell “prepared mind”: related PTs in one System Organ Class can strengthen a
+            weak single-term signal. Click a SOC row to open that product in Detect.
           </p>
         </div>
       )}
@@ -127,12 +134,26 @@ export default function Ontology({ embedded = false }) {
                     <p className="mt-1 text-[11px] text-slate-500">
                       Member PTs: {(a.member_pts || []).join(', ') || '—'}
                     </p>
+                    <Link
+                      to={`/signals?drug=${encodeURIComponent(a.product || '')}&soc=${encodeURIComponent(a.soc || '')}`}
+                      className="mt-1 inline-block text-[11px] text-cyan-400 hover:text-cyan-300"
+                    >
+                      Review member PTs in Detect →
+                    </Link>
                   </div>
                 ))}
               </div>
             )}
 
-            <SocTable rows={data.soc_table || []} />
+            <SocTable
+              rows={data.soc_table || []}
+              onOpen={(r) => {
+                const qs = new URLSearchParams();
+                if (r.product) qs.set('drug', r.product);
+                if (r.soc) qs.set('soc', r.soc);
+                nav(`/signals?${qs.toString()}`);
+              }}
+            />
 
             <div className="flex flex-wrap gap-3 pt-2 border-t border-slate-800 text-[11px] text-slate-500">
               <span>{data.totals?.signals ?? 0} signals</span>
@@ -150,7 +171,7 @@ export default function Ontology({ embedded = false }) {
       <Card className="p-4">
         <CardHeader
           title="Terminology playground"
-          subtitle="Type any verbatim — patient wording, brand name, device or software term — and see how the engine codes it."
+          subtitle="Type patient wording, a brand, or a device — this is the same mapper the 4-gate AE detector and Omni-Search use (racing heart → Palpitations PT/SOC)."
         />
         <form
           className="mt-3 flex flex-wrap gap-2"

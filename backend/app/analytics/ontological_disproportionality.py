@@ -23,10 +23,7 @@ from sqlalchemy.orm import Session
 from ..models import Signal
 from ..nlp.ontology_engine import meddra_mapper
 from ..nlp.ontology_engine.models import ONTOLOGY_VERSION, SURROGATE_DISCLAIMER
-from .disproportionality import compute_signals
-
-# Guard so a large workspace cannot expand into an unbounded pair list.
-_MAX_EXPANDED_PAIRS = 200_000
+from .disproportionality import compute_signals_from_counts
 
 # SOC-level roll-up alert gates. A SOC clears "strengthening" when the organ-class
 # 2x2 is a signal of disproportionate reporting while no single member PT is.
@@ -48,19 +45,6 @@ def _chain_for(symptom: str, stored_pt: Optional[str], stored_soc: Optional[str]
     }
 
 
-def _expand(pairs: Counter) -> List[Tuple[str, str]]:
-    """Weighted pair counts → the report list the 2x2 helpers expect."""
-    total = sum(pairs.values())
-    scale = 1.0
-    if total > _MAX_EXPANDED_PAIRS:
-        scale = _MAX_EXPANDED_PAIRS / float(total)
-    out: List[Tuple[str, str]] = []
-    for pair, count in pairs.items():
-        weight = max(1, int(round(count * scale)))
-        out.extend([pair] * weight)
-    return out
-
-
 def compute_ontological_disproportionality(
     db: Session,
     *,
@@ -70,7 +54,13 @@ def compute_ontological_disproportionality(
     top_n: int = 100,
 ) -> dict:
     """PT-level and SOC-level disproportionality plus organ-class alerts."""
-    q = db.query(Signal)
+    q = db.query(
+        Signal.drug,
+        Signal.symptom,
+        Signal.meddra_pt,
+        Signal.meddra_soc,
+        Signal.post_count,
+    )
     if project_id is not None:
         q = q.filter(Signal.project_id == project_id)
     if product:
@@ -112,8 +102,8 @@ def compute_ontological_disproportionality(
             "disclaimer": SURROGATE_DISCLAIMER,
         }
 
-    pt_stats = compute_signals(_expand(pt_pairs))
-    soc_stats = compute_signals(_expand(soc_pairs))
+    pt_stats = compute_signals_from_counts(pt_pairs)
+    soc_stats = compute_signals_from_counts(soc_pairs)
 
     pt_by_key = {(r["drug"], r["symptom"]): r for r in pt_stats}
     pt_table = []

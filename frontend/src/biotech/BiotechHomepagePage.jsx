@@ -13,7 +13,7 @@ async function loadHomepage(focusDrug) {
   } catch {
     const [stats, sigPayload] = await Promise.all([
       api.stats().catch(() => ({})),
-      api.signals(focusDrug ? { drug: focusDrug } : {}).catch(() => ({ signals: [] })),
+      api.signals(focusDrug ? { drug: focusDrug, limit: 40 } : { limit: 40 }).catch(() => ({ signals: [] })),
     ]);
     const signals = Array.isArray(sigPayload) ? sigPayload : (sigPayload.signals || []);
     return buildFallbackHomepage({ stats, signals, focusDrug: focusDrug || undefined });

@@ -41,7 +41,7 @@ function Explorer() {
   const [soc, setSoc] = useState('ALL');
   const [q, setQ] = useState('');
 
-  useEffect(() => { api.signals().then((d) => setSignals(d.signals)).catch(() => setSignals([])); }, []);
+  useEffect(() => { api.signals({ limit: 80, sort: 'prr' }).then((d) => setSignals(d.signals)).catch(() => setSignals([])); }, []);
 
   const { regions, socs } = useMemo(() => {
     const r = new Set(), sc = new Set();
@@ -64,7 +64,7 @@ function Explorer() {
 
   return (
     <Card className="p-4">
-      <CardHeader title="VigiLyze-style exploration" subtitle="Disproportionality drill-down over VigilAI's own signal store (emulates UMC VigiLyze; VigiBase itself is licensed)." />
+      <CardHeader title="VigiLyze-style exploration" subtitle="Top 80 pairs by PRR over VigilAI's own store (emulates UMC VigiLyze; VigiBase itself is licensed). Full register remains in Detect." />
       <div className="mt-3 flex flex-wrap gap-2">
         <select value={product} onChange={(e) => setProduct(e.target.value)} className="rounded-lg bg-slate-800 border border-slate-700 px-2 py-1.5 text-xs text-slate-200">
           {['ALL', 'drug', 'device', 'combination'].map((p) => <option key={p} value={p}>{p === 'ALL' ? 'All products' : p}</option>)}

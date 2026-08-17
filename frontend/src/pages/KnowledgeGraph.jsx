@@ -79,7 +79,7 @@ async function loadFilterOptions(projectId) {
     if (opts?.drugs?.length || opts?.symptoms?.length) return opts;
   } catch { /* fall through */ }
   try {
-    const { signals } = await api.signals();
+    const { signals } = await api.signals({ limit: 80, sort: 'prr' });
     const drugs = new Set();
     const symptoms = new Set();
     const regions = new Set();

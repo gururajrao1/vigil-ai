@@ -368,27 +368,69 @@ def _scoped_signal(q, project_id: int | None):
     return q
 
 
+# Spontaneous/regulatory ICSRs — often ingested with ae_flag forced True (not 4-gate NLP).
+_REGULATORY_PLATFORM_PREFIXES = (
+    "faers",
+    "maude",
+    "vaers",
+    "device_recalls",
+    "mhra_devices",
+    "fda_enforcement",
+)
+
+
+def _is_icsr_platform(platform: str | None) -> bool:
+    p = (platform or "").lower()
+    for pref in _REGULATORY_PLATFORM_PREFIXES:
+        if p == pref or p.startswith(f"{pref}/") or p.startswith(f"{pref}_"):
+            return True
+    return False
+
+
 def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
     """Corpus KPIs via SQL aggregates — few round-trips, no full ORM row loads."""
-    from sqlalchemy import case, func
+    from sqlalchemy import case, func, or_
 
     # --- 1) Headline counts (2 RTs) ---
     total_raw = int(_scoped_raw(db.query(func.count(RawPost.id)), project_id).scalar() or 0)
+
+    icsr_clauses = []
+    for pref in _REGULATORY_PLATFORM_PREFIXES:
+        icsr_clauses.append(RawPost.platform == pref)
+        icsr_clauses.append(RawPost.platform.like(f"{pref}/%"))
+        icsr_clauses.append(RawPost.platform.like(f"{pref}_%"))
+    icsr_pred = or_(*icsr_clauses)
 
     proc_agg = (
         db.query(
             func.count(ProcessedPost.id),
             func.sum(case((ProcessedPost.ae_flag.is_(True), 1), else_=0)),
             func.sum(case((RawPost.translated.is_(True), 1), else_=0)),
+            func.sum(case((icsr_pred, 1), else_=0)),
+            func.sum(case((icsr_pred & ProcessedPost.ae_flag.is_(True), 1), else_=0)),
+            func.sum(case((~icsr_pred, 1), else_=0)),
+            func.sum(case(((~icsr_pred) & ProcessedPost.ae_flag.is_(True), 1), else_=0)),
         )
         .select_from(ProcessedPost)
         .join(RawPost, ProcessedPost.raw_id == RawPost.id)
     )
     proc_agg = _scoped_raw(proc_agg, project_id)
-    total_processed, ae_posts, translated_count = proc_agg.one()
+    (
+        total_processed,
+        ae_posts,
+        translated_count,
+        icsr_posts,
+        icsr_ae_posts,
+        social_posts,
+        social_ae_posts,
+    ) = proc_agg.one()
     total_processed = int(total_processed or 0)
     ae_posts = int(ae_posts or 0)
     translated_count = int(translated_count or 0)
+    icsr_posts = int(icsr_posts or 0)
+    icsr_ae_posts = int(icsr_ae_posts or 0)
+    social_posts = int(social_posts or 0)
+    social_ae_posts = int(social_ae_posts or 0)
 
     # --- 2) One grouped projection — DB returns combo counts, not 28k raw rows ---
     combo = (
@@ -413,6 +455,8 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
     combo = _scoped_raw(combo, project_id)
     platform_counts: Counter = Counter()
     sentiment_counts: Counter = Counter()
+    icsr_sentiment: Counter = Counter()
+    social_sentiment: Counter = Counter()
     region_counts: Counter = Counter()
     country_counts: Counter = Counter()
     language_counts: Counter = Counter()
@@ -420,6 +464,10 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         n = int(n or 0)
         platform_counts[platform or "Unknown"] += n
         sentiment_counts[sentiment or "Unknown"] += n
+        if _is_icsr_platform(platform):
+            icsr_sentiment[sentiment or "Unknown"] += n
+        else:
+            social_sentiment[sentiment or "Unknown"] += n
         region_counts[region or "Global"] += n
         if country:
             country_counts[country] += n
@@ -515,6 +563,19 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         "processed_posts": total_processed,
         "ae_posts": ae_posts,
         "ae_rate": round(ae_posts / total_processed, 3) if total_processed else 0.0,
+        "ae_breakdown": {
+            "icsr_posts": icsr_posts,
+            "icsr_ae_posts": icsr_ae_posts,
+            "icsr_ae_rate": round(icsr_ae_posts / icsr_posts, 3) if icsr_posts else 0.0,
+            "social_posts": social_posts,
+            "social_ae_posts": social_ae_posts,
+            "social_ae_rate": round(social_ae_posts / social_posts, 3) if social_posts else 0.0,
+            "note": (
+                "ICSR rows (faers/maude/vaers/…) are spontaneous reports; bulk FAERS "
+                "sets ae_flag=True without the social 4-gate NLP stack. social_ae_rate "
+                "is the NLP AE rate on Reddit/news/forums only."
+            ),
+        },
         "signal_count": signal_count,
         "alert_count": int(alert_q.scalar() or 0),
         "spike_count": spikes,
@@ -525,6 +586,16 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         "severity_distribution": severity_counts,
         "platform_distribution": dict(platform_counts),
         "sentiment_distribution": dict(sentiment_counts),
+        "sentiment_breakdown": {
+            "icsr": dict(icsr_sentiment),
+            "social": dict(social_sentiment),
+            "meaning": (
+                "NEGATIVE is complaint polarity used as Gate 3 of the 4-gate AE detector "
+                "(VADER/RoBERTa compound ≤ −0.05, or an ICSR source prior). It is not "
+                "ICSR seriousness, not WHO-UMC causality, and not MedDRA coding. FAERS/"
+                "MAUDE rows are already suspected ADRs, so ingest stores NEGATIVE by design."
+            ),
+        },
         "region_distribution": dict(region_counts),
         "country_distribution": dict(country_counts.most_common(12)),
         "language_distribution": dict(language_counts),
@@ -537,6 +608,7 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
 
 def overview_timeseries(db: Session, project_id: int | None = None) -> dict:
     """Daily AE volume, total volume, and sentiment split — SQL GROUP BY date."""
+    from datetime import date as date_cls
     from sqlalchemy import case, func
 
     day = func.date(func.coalesce(RawPost.posted_at, RawPost.ingested_at))
@@ -565,7 +637,34 @@ def overview_timeseries(db: Session, project_id: int | None = None) -> dict:
             "ae": int(ae or 0),
             "negative": int(negative or 0),
         })
-    return {"series": series, "project_id": project_id}
+    grain = "day"
+    if len(series) > 156:
+        grain = "month"
+        buckets: dict[str, dict] = {}
+        for row in series:
+            key = (row["date"] or "")[:7] or row["date"]
+            acc = buckets.setdefault(key, {"date": key, "total": 0, "ae": 0, "negative": 0})
+            acc["total"] += row["total"]
+            acc["ae"] += row["ae"]
+            acc["negative"] += row["negative"]
+        series = [buckets[k] for k in sorted(buckets)]
+    elif len(series) > 90:
+        grain = "week"
+        buckets = {}
+        for row in series:
+            ds = row["date"]
+            try:
+                y, m, d = int(ds[0:4]), int(ds[5:7]), int(ds[8:10])
+                iso = date_cls(y, m, d).isocalendar()
+                key = f"{iso[0]}-W{iso[1]:02d}"
+            except Exception:
+                key = ds
+            acc = buckets.setdefault(key, {"date": key, "total": 0, "ae": 0, "negative": 0})
+            acc["total"] += row["total"]
+            acc["ae"] += row["ae"]
+            acc["negative"] += row["negative"]
+        series = [buckets[k] for k in sorted(buckets)]
+    return {"series": series, "grain": grain, "project_id": project_id}
 
 
 def signal_trend_series(db: Session, sig: Signal) -> List[dict]:

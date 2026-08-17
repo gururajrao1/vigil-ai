@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Badge, Button, Card, CardHeader, Spinner } from './ui';
 import { usePharmacovigilance } from '../context/PharmacovigilanceContext';
 
@@ -17,6 +18,20 @@ export function isDisproportionateHighlight(row) {
         ? Number(row.prr_ci[0])
         : NaN;
   return Number.isFinite(prr) && prr > 2.0 && Number.isFinite(lo) && lo > 1.0;
+}
+
+function foldKey(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function matchDetectRow(row, matches) {
+  const pt = foldKey(row?.meddra_pt || row?.condition_name);
+  if (!pt) return null;
+  return (matches || []).find((s) => {
+    const a = foldKey(s?.meddra?.pt);
+    const b = foldKey(s?.symptom);
+    return a === pt || b === pt || (a && pt.includes(a)) || (b && pt.includes(b));
+  }) || null;
 }
 
 function rowBrandKey(row) {
@@ -42,9 +57,11 @@ export default function SignalDataGrid({
     signalData,
     comparisonBrands,
     omopSignals,
+    detectMatches,
     isLoading,
     executeSearch,
   } = usePharmacovigilance();
+  const nav = useNavigate();
 
   const [viewMode, setViewMode] = useState('universe'); // universe | subset
   const [enabledBrands, setEnabledBrands] = useState(() => new Set());
@@ -155,6 +172,18 @@ export default function SignalDataGrid({
         />
       </div>
 
+      <div className="px-4 mt-2 text-[11px] text-[var(--cds-sys-text-secondary)] space-y-1">
+        <p>
+          Evans 2001 / EMA GVP IX: an SDR row (red) is a <em>signal of disproportionate reporting</em> —
+          PRR &gt; 2 and 95% CI lower bound &gt; 1, not a confirmed ADR. Use it to open a case series in Detect.
+        </p>
+        <p>
+          <strong className="text-[var(--cds-sys-text-primary)]">Universe</strong> = ingredient 2×2 vs the rest of the
+          corpus. <strong className="text-[var(--cds-sys-text-primary)]">Subset</strong> = brand vs peer brands of the
+          same chemical (Hauben: is it the molecule or this product?). Click a PT to jump to the Detect pair.
+        </p>
+      </div>
+
       {(omopSignals?.notes || []).length > 0 && (
         <div className="px-4 mt-2 space-y-1">
           {omopSignals.notes.map((n) => (
@@ -237,6 +266,7 @@ export default function SignalDataGrid({
                 <th className="py-2.5 px-3 text-right font-medium">EB05</th>
                 <th className="py-2.5 px-3 text-right font-medium">χ²</th>
                 <th className="py-2.5 px-4 font-medium">Tier</th>
+                <th className="py-2.5 px-4 font-medium">Review</th>
               </tr>
             </thead>
             <tbody>
@@ -245,17 +275,33 @@ export default function SignalDataGrid({
                 const key = `${r.condition_concept_id || r.condition_name}-${r.n_occurrences}-${idx}`;
                 const ciLo = r.prr_ci_low ?? r.prr_ci?.[0];
                 const ciHi = r.prr_ci_high ?? r.prr_ci?.[1];
+                const hit = matchDetectRow(r, detectMatches);
+                const pt = r.meddra_pt || r.condition_name || '';
+                const openPair = () => {
+                  if (hit?.id) {
+                    nav(`/signals/${hit.id}`);
+                    return;
+                  }
+                  const qs = new URLSearchParams();
+                  if (drugLabel && drugLabel !== 'drug') qs.set('drug', drugLabel);
+                  if (pt) qs.set('symptom', pt);
+                  nav(`/signals?${qs.toString()}`);
+                };
                 return (
                   <tr
                     key={key}
-                    className={`border-t border-[var(--cds-sys-border-subtle)] transition-colors ${
+                    onClick={openPair}
+                    onKeyDown={(e) => { if (e.key === 'Enter') openPair(); }}
+                    tabIndex={0}
+                    role="link"
+                    className={`border-t border-[var(--cds-sys-border-subtle)] transition-colors cursor-pointer ${
                       hot
                         ? 'bg-rose-500/15 text-rose-50 ring-1 ring-inset ring-rose-500/25'
                         : 'hover:bg-[var(--cds-sys-bg-elevated)]/30'
                     }`}
                   >
                     <td className="py-2 px-4 text-[var(--cds-sys-text-primary)]">
-                      {r.meddra_pt || r.condition_name || '—'}
+                      {pt || '—'}
                       {hot && (
                         <span className="ml-2 text-[10px] font-mono uppercase tracking-wide text-rose-200">
                           SDR
@@ -289,6 +335,22 @@ export default function SignalDataGrid({
                         className="text-[10px]"
                       />
                     </td>
+                    <td className="py-2 px-4">
+                      {hit ? (
+                        <span className="flex flex-wrap gap-1">
+                          <Badge
+                            value={hit.label_novelty === 'novel' ? 'novel vs label' : (hit.label_novelty || 'in Detect')}
+                            className={
+                              hit.label_novelty === 'novel'
+                                ? 'bg-amber-500/15 text-amber-100 border-amber-500/30 text-[10px]'
+                                : 'bg-slate-600/25 text-slate-200 border-slate-500/40 text-[10px]'
+                            }
+                          />
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--cds-sys-text-tertiary)]">Open Detect</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -298,8 +360,12 @@ export default function SignalDataGrid({
       )}
 
       <p className="px-4 py-3 text-[10px] text-[var(--cds-sys-text-tertiary)] border-t border-[var(--cds-sys-border-subtle)]">
-        Red rows: PRR &gt; 2.0 and PRR 95% CI lower bound &gt; 1.0 (Evans-style SDR cue). EB05 shown when
-        present on the payload; Phase 4 matview rows may leave EB05 blank until Bayesian overlay is attached.
+        Red rows: PRR &gt; 2.0 and PRR 95% CI lower bound &gt; 1.0 (Evans-style SDR cue). Click a PT to open the
+        matching Detect pair (label novelty when SIDER/label overlay exists). Next:{' '}
+        <Link to="/terminology?tab=ontology" className="text-[var(--cds-sys-accent-primary)] hover:underline">
+          Ontology SOC roll-up
+        </Link>
+        {' '}if no single PT is strong but the organ class is (Hauben/Trontell signal strengthening).
       </p>
     </Card>
   );

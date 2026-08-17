@@ -147,25 +147,35 @@ def _is_sdr(ic025: float, eb05: float, prr_low: float, chi2: float, count: int) 
 # --------------------------------------------------------------------------- #
 # Public entrypoint
 # --------------------------------------------------------------------------- #
-def compute_signals(reports: List[Tuple[str, str]]) -> List[dict]:
-    """reports: list of (product_normalized, event_normalized) pairs from AE posts.
+def compute_signals_from_counts(pair_counts: Counter) -> List[dict]:
+    """Same 2×2 math as ``compute_signals``, but takes already-aggregated (drug, event) counts.
 
-    Returns a list of signal dicts with PRR/ROR (+CIs), Yates chi-square, EBGM/EB05,
-    IC/IC025, strength tier, and an SDR flag.
+    Avoids expanding tens of thousands of FAERS ICSRs into a giant pair list.
+    ``a`` is the observed co-report count (post_count), not a scaled surrogate.
     """
-    if not reports:
+    if not pair_counts:
         return []
 
-    total = len(reports)
-    pair_counts = Counter(reports)
-    drug_counts = Counter(d for d, _ in reports)
-    symptom_counts = Counter(s for _, s in reports)
+    total = int(sum(pair_counts.values()))
+    if total <= 0:
+        return []
+    drug_counts: Counter = Counter()
+    symptom_counts: Counter = Counter()
+    for (drug, symptom), a in pair_counts.items():
+        n = int(a or 0)
+        if n <= 0:
+            continue
+        drug_counts[drug] += n
+        symptom_counts[symptom] += n
 
     # First pass: compute observed + expected for the Gamma prior estimation.
     base: List[dict] = []
     counts: List[float] = []
     expecteds: List[float] = []
-    for (drug, symptom), a in pair_counts.items():
+    for (drug, symptom), a_raw in pair_counts.items():
+        a = int(a_raw or 0)
+        if a <= 0:
+            continue
         drug_total = drug_counts[drug]
         symptom_total = symptom_counts[symptom]
         b = drug_total - a
@@ -176,6 +186,9 @@ def compute_signals(reports: List[Tuple[str, str]]) -> List[dict]:
                      "d": d, "expected": expected})
         counts.append(float(a))
         expecteds.append(expected)
+
+    if not base:
+        return []
 
     alpha, beta = _gamma_prior(counts, expecteds)
 
@@ -217,3 +230,14 @@ def compute_signals(reports: List[Tuple[str, str]]) -> List[dict]:
     signals.sort(key=lambda s: (s["eb05"], s["ic025"], s["prr"], s["post_count"]),
                  reverse=True)
     return signals
+
+
+def compute_signals(reports: List[Tuple[str, str]]) -> List[dict]:
+    """reports: list of (product_normalized, event_normalized) pairs from AE posts.
+
+    Returns a list of signal dicts with PRR/ROR (+CIs), Yates chi-square, EBGM/EB05,
+    IC/IC025, strength tier, and an SDR flag.
+    """
+    if not reports:
+        return []
+    return compute_signals_from_counts(Counter(reports))

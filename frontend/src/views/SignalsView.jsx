@@ -37,7 +37,7 @@ export default function SignalsView({ embedded = false }) {
       <Card className="p-4 border-[var(--cds-sys-border-subtle)]">
         <CardHeader
           title="Omni-Search · OMOP signals"
-          subtitle="Brand / slang / clinical term → concept_id → PRR/ROR from omop_signal_summary. Shared context updates Detect without reload."
+          subtitle="Type a brand → ranked AEs with PRR/ROR. Red SDR rows are the case-series shortlist (Evans / GVP IX), not confirmed ADRs."
           right={
             <div className="flex flex-wrap gap-1.5 justify-end">
               {(resolvedConcept?.rxcui || resolvedRxCUI) && (
@@ -67,6 +67,8 @@ export default function SignalsView({ embedded = false }) {
           <OmniSearchBox />
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[var(--cds-sys-text-tertiary)]">
+          <span>Workflow: resolve → red SDR PTs → click into Detect → if the class is diffuse, open Ontology SOC.</span>
+          <span aria-hidden>·</span>
           <Link
             to="/lenses?tab=omni"
             className="text-[var(--cds-sys-accent-primary)] hover:underline"

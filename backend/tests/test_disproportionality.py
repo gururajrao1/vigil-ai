@@ -53,6 +53,18 @@ def test_empty():
     assert compute_signals([]) == []
 
 
+def test_from_counts_matches_expanded_pairs():
+    from collections import Counter
+    from app.analytics.disproportionality import compute_signals_from_counts
+
+    reports = _demo_reports()
+    expanded = compute_signals(reports)
+    counted = compute_signals_from_counts(Counter(reports))
+    assert [(r["drug"], r["symptom"], r["post_count"], r["prr"], r["sdr_flag"]) for r in expanded] == [
+        (r["drug"], r["symptom"], r["post_count"], r["prr"], r["sdr_flag"]) for r in counted
+    ]
+
+
 if __name__ == "__main__":
     import sys
 

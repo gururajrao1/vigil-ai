@@ -63,6 +63,9 @@ export default function Overview({ embedded = false }) {
   if (!stats) return <Spinner label="Loading dashboard…" />;
 
   const empty = stats.total_posts === 0;
+  const aeBreak = stats.ae_breakdown || {};
+  const socialAeRate = aeBreak.social_ae_rate;
+  const icsrPosts = aeBreak.icsr_posts;
   const sentimentData = Object.entries(stats.sentiment_distribution || {}).map(([k, v]) => ({ name: k, value: v }));
   const strengthData = Object.entries(stats.strength_distribution || {}).map(([k, v]) => ({ name: k, value: v }));
   const drugData = (stats.top_drugs || []).map(([name, value]) => ({ name, value }));
@@ -83,12 +86,50 @@ export default function Overview({ embedded = false }) {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Posts ingested" value={stats.total_posts} sub={`${stats.processed_posts} processed`} />
-        <StatCard label="Adverse events" value={stats.ae_posts} sub={`${(stats.ae_rate * 100).toFixed(1)}% AE rate`} accent="text-rose-300" />
-        <StatCard label="Safety signals" value={stats.signal_count} sub={`${stats.strength_distribution?.STRONG || 0} strong`} accent="text-sky-300" />
+        <StatCard
+          label="Adverse events"
+          value={stats.ae_posts}
+          sub={
+            socialAeRate != null
+              ? `${(stats.ae_rate * 100).toFixed(1)}% overall · ${(socialAeRate * 100).toFixed(1)}% social NLP`
+              : `${(stats.ae_rate * 100).toFixed(1)}% AE rate`
+          }
+          accent="text-rose-300"
+        />
+        <StatCard label="Safety signals" value={stats.signal_count} sub={`${stats.strength_distribution?.STRONG || 0} strong · unique product–event pairs`} accent="text-sky-300" />
         <StatCard label="Active alerts" value={stats.alert_count} accent="text-amber-300" />
         <StatCard label="Spikes detected" value={stats.spike_count} sub="emerging trends" accent="text-violet-300" />
         <StatCard label="Countries" value={stats.country_count || 0} sub={`${stats.language_count || 0} languages`} accent="text-emerald-300" />
       </div>
+
+      {aeBreak.icsr_posts != null && (
+        <Card className="p-4 border-[var(--app-border)] bg-[var(--app-panel)] text-sm text-[var(--app-text-muted)]">
+          <div className="font-medium text-[var(--app-text)] mb-1">AE rate split (why FAERS looks like “everything is AE”)</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <span className="text-rose-300 font-semibold">{aeBreak.icsr_ae_posts?.toLocaleString?.() ?? aeBreak.icsr_ae_posts}</span>
+              {' / '}
+              {(icsrPosts ?? 0).toLocaleString()} regulatory ICSRs
+              {' '}({((aeBreak.icsr_ae_rate || 0) * 100).toFixed(1)}% AE)
+              <div className="text-xs mt-1 opacity-80">
+                FAERS/MAUDE/VAERS etc. — bulk FAERS sets <code>ae_flag=True</code> + NEGATIVE by design (already an adverse-event report), not the social 4-gate NLP stack.
+              </div>
+            </div>
+            <div>
+              <span className="text-sky-300 font-semibold">{(aeBreak.social_ae_posts ?? 0).toLocaleString?.() ?? aeBreak.social_ae_posts}</span>
+              {' / '}
+              {(aeBreak.social_posts ?? 0).toLocaleString()} social/news posts
+              {' '}({((socialAeRate || 0) * 100).toFixed(1)}% AE)
+              <div className="text-xs mt-1 opacity-80">
+                Reddit, news, forums — AE only when 4-gate NLP passes (product + symptom + negative + non-negated).
+              </div>
+            </div>
+          </div>
+          <div className="text-xs mt-3 opacity-70">
+            ~{stats.signal_count} signals ≠ post count: each signal is one unique product–event pair after disproportionality (many FAERS ICSRs collapse into the same drug→PT).
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Critical signals" value={stats.severity_distribution?.Critical || 0} sub="high-severity" accent="text-rose-400" />
@@ -99,7 +140,16 @@ export default function Overview({ embedded = false }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 p-2">
-          <CardHeader title="Signal volume over time" subtitle="Daily total posts, adverse events, and negative-sentiment mentions" />
+          <CardHeader
+            title="Signal volume over time"
+            subtitle={
+              overview?.grain === 'month'
+                ? 'Monthly totals (FAERS spans years — daily points were downsampled so the chart stays fast)'
+                : overview?.grain === 'week'
+                  ? 'Weekly totals — daily buckets rolled up for a large date range'
+                  : 'Daily total posts, adverse events, and negative-sentiment mentions'
+            }
+          />
           <div className="h-64 mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={overview?.series || []} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
@@ -126,7 +176,10 @@ export default function Overview({ embedded = false }) {
         </Card>
 
         <Card className="p-2">
-          <CardHeader title="Sentiment mix" subtitle="Across all processed posts" />
+          <CardHeader
+            title="What “NEGATIVE” means"
+            subtitle="Complaint polarity for Gate 3 — not seriousness or causality"
+          />
           <div className="h-64 mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -138,6 +191,38 @@ export default function Overview({ embedded = false }) {
               </PieChart>
             </ResponsiveContainer>
           </div>
+          {(() => {
+            const br = stats.sentiment_breakdown || {};
+            const social = br.social || {};
+            const icsr = br.icsr || {};
+            const socialN = Object.values(social).reduce((a, b) => a + Number(b || 0), 0);
+            const icsrN = Object.values(icsr).reduce((a, b) => a + Number(b || 0), 0);
+            const icsrNeg = Number(icsr.NEGATIVE || 0);
+            return (
+              <div className="px-3 pb-3 text-[11px] text-[var(--app-text-muted)] space-y-1.5">
+                <p>
+                  Social NLP (Sarker/Gonzalez-style listening): NEGATIVE = the post sounds like a complaint
+                  (VADER/RoBERTa ≤ −0.05). That is Gate 3 of the 4-gate AE detector — it keeps promo/positive
+                  mentions out of the candidate set. It is <strong className="text-[var(--app-text)]">not</strong> death/
+                  hospitalization, <strong className="text-[var(--app-text)]">not</strong> WHO-UMC causality, and{' '}
+                  <strong className="text-[var(--app-text)]">not</strong> a MedDRA code.
+                </p>
+                {icsrN > 0 && (
+                  <p>
+                    {icsrNeg.toLocaleString()} / {icsrN.toLocaleString()} regulatory ICSRs are stored NEGATIVE by design
+                    (FAERS/MAUDE are already suspected ADRs). Use the AE-rate split above; this pie will look red
+                    whenever FAERS dominates.
+                  </p>
+                )}
+                {socialN > 0 && (
+                  <p>
+                    Social/news mix: {Object.entries(social).map(([k, v]) => `${k} ${v}`).join(' · ') || '—'}.
+                    That slice is the actual listening polarity.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </Card>
       </div>
 

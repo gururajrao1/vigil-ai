@@ -35,6 +35,7 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Pharmacogenomics                 | `PGx`, `CPIC`, `PharmGKB`                 | Signal Detail PGx card                       |
 | Inspection / SLA                 | `inspection`, `SJL`, `overdue`            | `/dashboard?tab=governance`                  |
 | FDA COU / credibility            | `COU`, `credibility`, `not validated for` | `/dashboard?tab=governance`                  |
+| Sentiment NEGATIVE (what it is)  | `Gate 3`, `VADER`, `complaint polarity`   | `/dashboard` (Corpus metrics pie)            |
 | Competition bias / remine        | `Remine`, `masking`, `unmask`             | `/lenses?tab=remine`                         |
 | High-risk patient segments / REM | `REM ranking`, `risk populations`         | `/lenses?tab=risk`                           |
 | Predictive feature matrix        | `Predictive intel`, `4-gate`, `OMOP`      | `/lenses?tab=intel`                          |
@@ -402,9 +403,14 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 1. Open **Dashboard** (`/dashboard`).
 2. Stay on **Corpus metrics**.
 3. Read totals: posts, AE rate, platforms, top drugs/events, charts.
-4. Click an AE / product bar if linked — it deep-links into **Detect** with a filter.
+4. Read the **AE rate split** card: **regulatory ICSRs** (FAERS/MAUDE/VAERS…) vs **social NLP** (Reddit/news/forums). Overall AE% is inflated when FAERS bulk ingest force-sets `ae_flag=True`; use **social NLP AE%** for listening yield.
+5. Read **What “NEGATIVE” means**: complaint polarity for **Gate 3** of the 4-gate AE detector (VADER/RoBERTa ≤ −0.05). It is **not** ICSR seriousness, **not** WHO-UMC causality, and **not** MedDRA coding. FAERS/MAUDE rows are stored NEGATIVE *by design* because they are already suspected ADRs (Powell / Sarker social-PV literature: polarity is a listening filter, not a clinical grade).
+6. **Safety signals** count unique product–event pairs after disproportionality — not one signal per post (tens of thousands of FAERS ICSRs collapse into hundreds of drug→PT rows).
+7. Click an AE / product bar if linked — it deep-links into **Detect** with a filter.
 
-**Say:** “This is volume and yield — not yet a regulatory decision.”
+**Say:** “This is volume and yield — not yet a regulatory decision. FAERS rows are already adverse-event reports; social posts still need the 4-gate NLP stack. The red pie is expected on a FAERS-heavy corpus.”
+
+**Empty / confusing:** High overall AE% / mostly NEGATIVE with a large signal register is expected when the corpus is mostly FAERS ICSRs. Check the AE split card and the social-only counts on the sentiment card before assuming NLP is broken. The volume chart may show **weekly or monthly** buckets when the date range is long (FAERS spans years) so the dashboard stays fast — no rows were dropped.
 
 ### 7.2 Dashboard — Ops KPIs
 
@@ -429,10 +435,13 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 ### 7.3 Safety Signals — Detect
 
 1. Open **Safety Signals → Detect**.
-2. In the **jump box**, type a product (`warfarin`, `semaglutide`, `coronary stent`) and press Enter (optional second box for event).
-3. Use strength / product-type / region / SDR / spike / **Novel** / **PGx** filters as needed.
-4. Sort by **PRR**, **EB05**, or **IC025** depending on the story.
-5. Click a **row** → Signal Detail.
+2. In **Omni-Search**, type a brand (`Janumet`, `Ozempic`, a misspelling). The grid is the Evans/GVP IX shortlist: red SDR rows (PRR>2 and CI lower>1) are case-series candidates, not confirmed ADRs.
+3. **Universe** = ingredient vs the rest of the corpus. **Subset** = this brand vs peer brands of the same chemical (molecule vs product).
+4. Click a PT → matching Detect pair (label novelty when SIDER/label overlay exists). If no single PT is strong, open **Terminology → Ontology** and click the SOC row (Hauben/Trontell strengthening).
+5. In the **jump box**, type a product (`warfarin`, `semaglutide`, `coronary stent`) and press Enter (optional second box for event).
+6. Use strength / product-type / region / SDR / spike / **Novel** / **PGx** filters as needed.
+7. Sort by **PRR**, **EB05**, or **IC025** depending on the story.
+8. Click a **row** → Signal Detail.
 
 Row chips you may see: SDR · PGx · Novel / In label · MaxSPRT · HR · Calibrated · geo / vaccine / class.  
 **Note:** the Detect **Novel** chip is **label novelty**, not PrOACT. PrOACT is on Signal Detail.
@@ -729,6 +738,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | Signal conclusions | Deterministic good/bad/mixed verdict from loaded numbers         | Non-technical stakeholders       | Top of Signal Detail                |
 | Signal briefing    | Plain-English worry level + next steps                           | Same audience                    | Signal Detail                       |
 | 4-gate AE          | Explainable gates + confidence                                   | Auditability                     | Supporting posts · Predictive intel |
+| Complaint polarity | NEGATIVE = Gate 3 filter (or ICSR prior on FAERS/MAUDE)          | Exclude promo/positive mentions  | Dashboard pie · 4-gate trace        |
 | Disproportionality | PRR/ROR/χ² + Bayesian EBGM/IC                                    | Regulator-shaped ranking         | Detail + Detect                     |
 | Spike / MaxSPRT    | Time + sequential boundaries                                     | Emerging / repeated-look control | Detail / alerts                     |
 | WHO-UMC cues       | Temporal, de/rechallenge…                                        | Causality language               | Detail                              |
@@ -1110,7 +1120,7 @@ A large gap between the best single name and the pooled count means the safety p
 | **API** | `GET /api/ontology/engine/map` · `meddra-chain` · `hierarchy` · `drug-chemical` · `device` · `disproportionality` · `knowledge-graph` · `status` |
 | **FastMCP** | `map_verbatim_to_full_ontology(verbatim_term, entity_type, failure_mode)` in `app.mcp.risk_server` — returns the same JSON for external AI assistants |
 
-**SOC-level disproportionality.** `analytics/ontological_disproportionality.py` runs the existing PRR / ROR / χ² / EBGM / IC helpers twice: once keyed on the Preferred Term, once with member PTs pooled into their System Organ Class. A `soc_alerts` entry means the organ class cleared SDR gates while no individual PT did — a diffuse class pattern that is easy to dismiss as sparse noise at PT level. It is an overlay for review, not a replacement for the Detect signal table and never auto-escalates.
+**SOC-level disproportionality.** `analytics/ontological_disproportionality.py` runs the existing PRR / ROR / χ² / EBGM / IC helpers twice: once keyed on the Preferred Term, once with member PTs pooled into their System Organ Class. A `soc_alerts` entry means the organ class cleared SDR gates while no individual PT did — a diffuse class pattern that is easy to dismiss as sparse noise at PT level (Hauben 2007 signal strengthening; Trontell 2004 prepared mind). Click a SOC row or alert to open that product+SOC in Detect. It is an overlay for review, not a replacement for the Detect signal table and never auto-escalates. Counts are aggregated in SQL (no 200k pair expansion), so the page stays usable on a large FAERS register.
 
 **Typed knowledge graph.** `graph/knowledge_graph.py` builds a NetworkX heterogeneous graph whose nodes carry an ontology namespace (drug, ATC, ChEBI, MedDRA PT, SOC, device, IMDRF) and whose edges carry a relation: `HAS_ATC_CLASS`, `BELONGS_TO`, `HAS_CHEMICAL_STRUCTURE`, `CAUSES_EVENT`, `MAPPED_TO`. PyTorch Geometric export is attempted only if `torch_geometric` happens to be installed. The older co-occurrence graph in `analytics/knowledge_graph.py` is unchanged and still powers the existing force-directed view.
 
@@ -1144,6 +1154,9 @@ Module 1 of the search stack. **Safety Signals → Detect** (`/signals`) runs Om
 | Brand → chemical card | Brand RxCUI, UMLS CUI, Has_Ingredient chips, manufacturer / status |
 | ATC class explorer | L1–L5 ladder + same-subgroup read-across members |
 | Universe vs Subset panel | Checkbox brands; comparative PRR elevation vs chemical baseline |
+| Disproportionality grid (Detect) | Ranked PTs + Evans SDR highlight; click PT → Detect case; label-novelty overlay |
+
+**How to use it on a shift (Evans 2001 PRR, van Puijenbroek ROR, EMA GVP Module IX):** type the product you are assessing → treat red rows as the *hypothesis list* → open the pair in Detect for WHO-UMC / label novelty / supporting ICSRs → if the pattern is spread across related PTs, jump to Ontology SOC. Universe answers “is the ingredient noisy vs background?”; Subset answers “is this brand different from peers of the same chemical?”
 
 **Data:** `backend/app/data/search/` (`rxe_extension_surrogate`, `micromesh_synonyms_surrogate`, `cadec_smm4h_colloquial_surrogate`, `pharmaconer_substances_surrogate`).  
 **API:** `GET /api/search/omni?q=` · `resolve-brand` · `autocomplete` · `universe-subset` · `status`  
@@ -1237,7 +1250,10 @@ Module 2 of the search / normalization stack. **Not a static city dictionary** �
 | -------- | ------------ |
 | Search `Chennai` | Also matches narratives that say `Madras` (demo pack seeds historical city names in bodies) |
 | Search `diabetic` | Detect / Omni expand to Diabetes mellitus PT + aliases; cohort N collapses fragments |
+| Search `hard to stay awake` | MCN trace → PT (somnolence-class) so Detect `q` does not miss coded rows |
 | Search `Janumet` | Brand→chemical + Universe vs Subset (Module 1) |
+
+**Why this exists in PV:** Medical Concept Normalization (Tutubalina/Miftahutdinov; CADEC; SMM4H; Liu et al. SapBERT) is the difference between a fragmented frequency table and an honest 2×2. After expand, use **Open expanded terms in Detect** — that is the production path, not a playground badge.
 | Spatial country hotspot | Still country/region Kulldorff — city aliases do **not** rename Nigeria→Chennai; see the teaching strip on Geo clusters |
 
 **Data:** `backend/app/data/normalization/` (~55 city aliases + UMLS surrogate catalog).  
@@ -1712,6 +1728,7 @@ Scope boundaries for demos and architecture review (UI footers no longer repeat 
 | **PBRER**           | Periodic Benefit–Risk Evaluation Report (draft export)                                                    |
 | **PGx**             | Pharmacogenomics — gene–drug associations                                                                 |
 | **PRR / ROR**       | Proportional Reporting Ratio / Reporting Odds Ratio                                                       |
+| **NEGATIVE (sentiment)** | Complaint polarity for Gate 3, or an ICSR source prior on FAERS/MAUDE — not seriousness or causality |
 | **PrOACT-URL**      | Problem, Objectives, Alternatives, Consequences, Tradeoffs, Uncertainty, Risk tolerance, Linked decisions |
 | **REM**             | Risk Elevation Multiplier (stratum vs general exposed cohort)                                             |
 | **Remine**          | Recompute DMA after removing competitor (masker) cases                                                    |
@@ -1743,6 +1760,8 @@ Use this section in demos when someone says “is it broken?” Most empty views
 | Panel **absent** on Detail (lot / longitudinal)           | —                                                             | Not relevant for this product/text |
 | PGx card says **Screened · no Level-A match**             | —                                                             | Clean result                       |
 | Detect table empty                                        | Over-filtered search                                          | Clear filters                      |
+| Detect spinner / gateway timeout                          | Client used to download every signal row (~16k after FAERS DMA) | Hard-refresh; list is SQL-paginated (25/page). Filters still search the full register. |
+| Dashboard / Ontology / workflow feel slow                 | Long FAERS date span or full-register paint                     | Volume chart downsamples to week/month; Ontology uses count-based 2×2; workflow/VigiLyze hubs show top 80. Data remains in Detect. |
 
 
 

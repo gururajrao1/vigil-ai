@@ -204,7 +204,7 @@ export default function SignalLifecycle({ embedded = false }) {
 
   useEffect(() => {
     api.lifecycleSummary().then(setSummary).catch(() => setSummary(null));
-    api.signals().then((d) => setSignals(d.signals)).catch(() => setSignals([]));
+    api.signals({ limit: 80, sort: 'priority_score' }).then((d) => setSignals(d.signals)).catch(() => setSignals([]));
   }, [tick]);
 
   const signalsByStatus = STATES.reduce((acc, s) => {
@@ -259,7 +259,7 @@ export default function SignalLifecycle({ embedded = false }) {
           <li><span className="text-slate-300">Not a concern</span> — noise, known label event you won’t escalate, or duplicate. Same outcome as Alert “False alarm”.</li>
         </ol>
         <p className="text-[11px] text-slate-600 pt-1">
-          Under the hood this follows GVP Module IX stage names for audit exports — the board shows everyday labels.
+          Board shows the top 80 pairs by priority so the page stays fast — the full register is still in Detect. Under the hood this follows GVP Module IX stage names for audit exports.
         </p>
       </Card>
 
