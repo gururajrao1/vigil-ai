@@ -84,32 +84,37 @@ def _pillar_rwd(db: Optional[Session], product: str, event: str) -> dict:
     source = "none"
     if db is not None:
         try:
-            from ..db.schemas.omop_cdm import OmopConditionOccurrence, OmopDrugExposure
+            # Use narrow SQL — Neon staging tables are a lean subset of the
+            # full OMOP ORM model; selecting unmapped columns aborts the
+            # session and 500s signal detail when the exception is swallowed.
+            from sqlalchemy import text
 
-            drugs = (
-                db.query(OmopDrugExposure)
-                .filter(OmopDrugExposure.drug_source_value.ilike(f"%{(product or '')[:40]}%"))
-                .limit(500)
-                .all()
-            )
-            if drugs:
-                person_ids = {d.person_id for d in drugs if d.person_id is not None}
-                if person_ids:
-                    conds = (
-                        db.query(OmopConditionOccurrence)
-                        .filter(OmopConditionOccurrence.person_id.in_(list(person_ids)[:200]))
-                        .filter(
-                            OmopConditionOccurrence.condition_source_value.ilike(
-                                f"%{(event or '')[:40]}%"
-                            )
-                        )
-                        .limit(100)
-                        .all()
-                    )
-                    n_support = len(conds)
-                    source = "omop_staging"
+            drug_rows = db.execute(
+                text(
+                    "SELECT person_id FROM omop_drug_exposure "
+                    "WHERE drug_source_value ILIKE :p LIMIT 500"
+                ),
+                {"p": f"%{(product or '')[:40]}%"},
+            ).fetchall()
+            person_ids = [r[0] for r in drug_rows if r[0] is not None]
+            if person_ids:
+                cond_rows = db.execute(
+                    text(
+                        "SELECT condition_occurrence_id FROM omop_condition_occurrence "
+                        "WHERE person_id = ANY(:pids) "
+                        "AND condition_source_value ILIKE :e "
+                        "LIMIT 100"
+                    ),
+                    {"pids": person_ids[:200], "e": f"%{(event or '')[:40]}%"},
+                ).fetchall()
+                n_support = len(cond_rows)
+                source = "omop_staging"
         except Exception:
             logger.debug("OMOP RWD pillar failed", exc_info=True)
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
     # Offline MIMIC-style fixture for demo products when OMOP empty
     if n_support == 0:

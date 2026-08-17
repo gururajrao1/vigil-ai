@@ -1692,13 +1692,25 @@ def get_signal(
         "copilot": copilot,
         "feature_tour": feature_tour,
         "bottom_line": bottom_line,
-        "trend_series": signal_trend_series(db, sig),
+        "trend_series": _safe_trend_series(db, sig),
         "supporting_posts": supporting,
         "evidence_mix": evidence_mix(supporting),
         "thread_score": thread_score,
         "evidence_pending": evidence_pending,
         "briefing": _attach_briefing(sig),
     }
+
+
+def _safe_trend_series(db: Session, sig: Signal) -> list:
+    """Trend helpers must not 500 the detail page if the session was poisoned."""
+    try:
+        return signal_trend_series(db, sig) or []
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return []
 
 
 def _enrich_gvp_modules(db: Session, sig: Signal, payload: dict) -> dict:
@@ -1733,6 +1745,10 @@ def _enrich_gvp_modules(db: Session, sig: Signal, payload: dict) -> dict:
             product_type=sig.product_type or "drug",
         )
     except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         payload.setdefault("label_filter", None)
         payload.setdefault("triangulation", None)
         payload.setdefault("causality_assessment", None)
