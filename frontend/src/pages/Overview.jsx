@@ -7,14 +7,14 @@ import {
 import { api } from '../api';
 import { useRefresh } from '../App';
 import { useProject } from '../projectContext';
-import { Card, CardHeader, StatCard, Spinner } from '../components/ui';
+import { Button, Card, CardHeader, StatCard, Spinner } from '../components/ui';
 
 const SENTIMENT_COLORS = { NEGATIVE: '#f43f5e', NEUTRAL: '#64748b', POSITIVE: '#10b981' };
 const STRENGTH_COLORS = { STRONG: '#f43f5e', MODERATE: '#f59e0b', WEAK: '#64748b' };
 
 export default function Overview({ embedded = false }) {
   const nav = useNavigate();
-  const { tick } = useRefresh();
+  const { tick, bump } = useRefresh();
   const { project } = useProject();
   const [stats, setStats] = useState(null);
   const [overview, setOverview] = useState(null);
@@ -49,9 +49,14 @@ export default function Overview({ embedded = false }) {
   if (loading && !stats) return <Spinner label="Loading dashboard…" />;
   if (loadErr && !stats) {
     return (
-      <Card className="p-4 border-rose-600/40 bg-rose-600/10 text-rose-200 text-sm">
-        {loadErr}
-        <div className="mt-2 text-rose-300/80">Hard-refresh after the API wakes, or retry from the top bar.</div>
+      <Card className="p-4 border-rose-600/40 bg-rose-600/10 text-rose-200 text-sm space-y-3">
+        <div>Dashboard request failed: {loadErr}</div>
+        <div className="text-rose-300/80">
+          Your corpus is still on the server — this is a load error, not data loss.
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={() => bump()}>
+          Retry dashboard
+        </Button>
       </Card>
     );
   }

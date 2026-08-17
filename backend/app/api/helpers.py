@@ -452,25 +452,29 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         ).all()
         if k is not None
     }
-    soc_rows = _scoped_signal(
-        db.query(Signal.meddra_soc, func.count(Signal.id))
-        .filter(Signal.meddra_soc.isnot(None), Signal.meddra_soc != "")
-        .group_by(Signal.meddra_soc)
+    soc_q = db.query(Signal.meddra_soc, func.count(Signal.id)).filter(
+        Signal.meddra_soc.isnot(None), Signal.meddra_soc != ""
+    )
+    soc_q = _scoped_signal(soc_q, project_id)
+    soc_rows = (
+        soc_q.group_by(Signal.meddra_soc)
         .order_by(func.count(Signal.id).desc())
-        .limit(10),
-        project_id,
-    ).all()
+        .limit(10)
+        .all()
+    )
 
     from ..nlp.text_normalize import fold_key, normalize_label
 
-    drug_rows = _scoped_signal(
-        db.query(Signal.drug, func.sum(Signal.post_count))
-        .filter(Signal.drug.isnot(None), Signal.drug != "")
-        .group_by(Signal.drug)
+    drug_q = db.query(Signal.drug, func.sum(Signal.post_count)).filter(
+        Signal.drug.isnot(None), Signal.drug != ""
+    )
+    drug_q = _scoped_signal(drug_q, project_id)
+    drug_rows = (
+        drug_q.group_by(Signal.drug)
         .order_by(func.sum(Signal.post_count).desc())
-        .limit(40),
-        project_id,
-    ).all()
+        .limit(40)
+        .all()
+    )
     top_drugs: Counter = Counter()
     drug_canon: dict[str, str] = {}
     for d_raw, n in drug_rows:
@@ -482,14 +486,16 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         top_drugs[drug_canon[dk]] += int(n or 0)
 
     sym_expr = func.coalesce(Signal.meddra_pt, Signal.symptom)
-    sym_rows = _scoped_signal(
-        db.query(sym_expr, func.sum(Signal.post_count))
-        .filter(sym_expr.isnot(None), sym_expr != "")
-        .group_by(sym_expr)
+    sym_q = db.query(sym_expr, func.sum(Signal.post_count)).filter(
+        sym_expr.isnot(None), sym_expr != ""
+    )
+    sym_q = _scoped_signal(sym_q, project_id)
+    sym_rows = (
+        sym_q.group_by(sym_expr)
         .order_by(func.sum(Signal.post_count).desc())
-        .limit(40),
-        project_id,
-    ).all()
+        .limit(40)
+        .all()
+    )
     top_symptoms: Counter = Counter()
     sym_canon: dict[str, str] = {}
     for s_raw, n in sym_rows:
