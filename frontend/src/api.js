@@ -60,7 +60,15 @@ async function req(path, opts = {}, _attempt = 1) {
       if (d) msg = d;
     } catch { /* ignore */ }
     if ([502, 503, 504].includes(res.status)) {
-      msg = 'API gateway timeout while crawling (Render may still be working). Retry with one source; signals refresh in the background.';
+      const cold = /health|auth|login|register|me\b/i.test(path);
+      const crawl = /ingest|crawl|fetch|stream|reddit|news/i.test(path);
+      if (crawl) {
+        msg = 'API gateway timeout while crawling (Render may still be working). Retry with one source; signals refresh in the background.';
+      } else if (cold) {
+        msg = 'API gateway timeout — Render may be cold-starting. Wait ~30s and retry.';
+      } else {
+        msg = `API timed out (${res.status}) on ${path}. The query is too heavy or the gateway cut it off — retry, or narrow filters.`;
+      }
     } else if (
       (res.status === 404 || /not found/i.test(msg))
       && !/could not resolve|resolved as an adverse|query is required/i.test(msg)

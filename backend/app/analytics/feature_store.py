@@ -69,15 +69,29 @@ def _one_hot_region(region: str) -> Dict[str, int]:
     return {f"region_{r.lower()}": 1 if region == r else 0 for r in _REGION_BUCKETS}
 
 
-def _build_case_rows(db: Session, project_id: Optional[int]) -> List[dict]:
+def _build_case_rows(
+    db: Session,
+    project_id: Optional[int],
+    *,
+    limit: int = 4000,
+    product: Optional[str] = None,
+    event: Optional[str] = None,
+) -> List[dict]:
+    """Build AE case rows. Capped so Render/Vercel gateways do not 504 on large corpora."""
     q = (
         db.query(ProcessedPost, RawPost)
         .join(RawPost, ProcessedPost.raw_id == RawPost.id)
         .filter(ProcessedPost.ae_flag.is_(True))
+        .order_by(ProcessedPost.id.desc())
     )
     if project_id is not None:
         q = q.filter(RawPost.project_id == project_id)
+    # Prefer recent AE posts; hard cap keeps matrix under gateway timeout.
+    cap = max(200, min(int(limit or 4000), 8000))
+    q = q.limit(cap)
     rows = []
+    prod_l = (product or "").strip().lower()
+    event_l = (event or "").strip().lower()
     for processed, raw in q.all():
         ents = entities_from_processed(processed.entities_json)
         drugs = []
@@ -91,6 +105,10 @@ def _build_case_rows(db: Session, project_id: Optional[int]) -> List[dict]:
             if ev:
                 events.append(ev)
         if not drugs or not events:
+            continue
+        if prod_l and not any(prod_l in d for d in drugs):
+            continue
+        if event_l and not any(event_l in e for e in events):
             continue
         text = f"{raw.title or ''} {raw.body or ''}"
         row = row_from_post(
@@ -184,14 +202,18 @@ def build_feature_matrix(
     min_n: int = 1,
     include_gate_traces: bool = False,
     sample_text_limit: int = 0,
+    case_limit: int = 4000,
 ) -> dict:
     """Build Product–Event–Cohort feature matrix X.
 
     Each row is a unique (product, event, age_bracket, sex, region) vector.
     """
-    cases = _build_case_rows(db, project_id)
+    cases = _build_case_rows(
+        db, project_id, limit=case_limit, product=product, event=event,
+    )
     metrics = _signal_metrics(db, project_id)
-    centrality = _centrality_map(metrics)
+    # Skip expensive graph pass when matrix is already large / unfiltered.
+    centrality = _centrality_map(metrics) if len(metrics) <= 2500 else {}
 
     # Aggregate cases into cohort buckets
     buckets: Dict[Tuple[str, str, str], List[dict]] = defaultdict(list)
@@ -320,6 +342,8 @@ def get_normalized_feature_matrix(
     include_explainability: bool = True,
 ) -> dict:
     """FastMCP / API entry — feature vector X + optional 4-gate traces."""
+    # Unfiltered scans are capped tighter so Vercel→Render rewrites stay under gateway limits.
+    filtered = bool((product_id or "").strip() or (target_ae_pt or "").strip())
     out = build_feature_matrix(
         db,
         project_id=project_id,
@@ -327,6 +351,7 @@ def get_normalized_feature_matrix(
         event=target_ae_pt,
         include_gate_traces=include_explainability,
         sample_text_limit=3 if include_explainability else 0,
+        case_limit=4000 if filtered else 1500,
     )
     # Attach a compact 4-gate explainability summary for the top product-event
     explain = None

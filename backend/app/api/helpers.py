@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime
 from typing import List
 
@@ -356,59 +356,151 @@ def _project_scope(col, project_id: int | None):
     return or_(col == project_id, col.is_(None), col == 0)
 
 
+def _scoped_raw(q, project_id: int | None):
+    if project_id is not None:
+        return q.filter(_project_scope(RawPost.project_id, project_id))
+    return q
+
+
+def _scoped_signal(q, project_id: int | None):
+    if project_id is not None:
+        return q.filter(_project_scope(Signal.project_id, project_id))
+    return q
+
+
 def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
-    raw_q = db.query(RawPost)
-    if project_id is not None:
-        raw_q = raw_q.filter(_project_scope(RawPost.project_id, project_id))
-    total_raw = raw_q.count()
+    """Corpus KPIs via SQL aggregates — few round-trips, no full ORM row loads."""
+    from sqlalchemy import case, func
 
-    proc_q = db.query(ProcessedPost).join(RawPost, ProcessedPost.raw_id == RawPost.id)
-    if project_id is not None:
-        proc_q = proc_q.filter(_project_scope(RawPost.project_id, project_id))
-    total_processed = proc_q.count()
-    ae_posts = proc_q.filter(ProcessedPost.ae_flag.is_(True)).count()
+    # --- 1) Headline counts (2 RTs) ---
+    total_raw = int(_scoped_raw(db.query(func.count(RawPost.id)), project_id).scalar() or 0)
 
-    sig_q = db.query(Signal)
-    if project_id is not None:
-        sig_q = sig_q.filter(_project_scope(Signal.project_id, project_id))
-    signals = sig_q.all()
-    strength_counts = Counter(s.strength for s in signals)
-    severity_counts = Counter(s.severity for s in signals)
-    spikes = sum(1 for s in signals if s.spike_flag)
+    proc_agg = (
+        db.query(
+            func.count(ProcessedPost.id),
+            func.sum(case((ProcessedPost.ae_flag.is_(True), 1), else_=0)),
+            func.sum(case((RawPost.translated.is_(True), 1), else_=0)),
+        )
+        .select_from(ProcessedPost)
+        .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+    )
+    proc_agg = _scoped_raw(proc_agg, project_id)
+    total_processed, ae_posts, translated_count = proc_agg.one()
+    total_processed = int(total_processed or 0)
+    ae_posts = int(ae_posts or 0)
+    translated_count = int(translated_count or 0)
 
-    rows_q = db.query(ProcessedPost, RawPost).join(RawPost, ProcessedPost.raw_id == RawPost.id)
-    if project_id is not None:
-        rows_q = rows_q.filter(_project_scope(RawPost.project_id, project_id))
-    rows = rows_q.all()
-    platform_counts = Counter(raw.platform for _, raw in rows)
-    sentiment_counts = Counter(p.sentiment_label for p, _ in rows)
-    region_counts = Counter((raw.region or "Global") for _, raw in rows)
-    country_counts = Counter(raw.country for _, raw in rows if raw.country)
-    language_counts = Counter((raw.lang_name or "English") for _, raw in rows)
-    translated_count = sum(1 for _, raw in rows if raw.translated)
+    # --- 2) One grouped projection — DB returns combo counts, not 28k raw rows ---
+    combo = (
+        db.query(
+            RawPost.platform,
+            ProcessedPost.sentiment_label,
+            RawPost.region,
+            RawPost.country,
+            RawPost.lang_name,
+            func.count(ProcessedPost.id),
+        )
+        .select_from(ProcessedPost)
+        .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+        .group_by(
+            RawPost.platform,
+            ProcessedPost.sentiment_label,
+            RawPost.region,
+            RawPost.country,
+            RawPost.lang_name,
+        )
+    )
+    combo = _scoped_raw(combo, project_id)
+    platform_counts: Counter = Counter()
+    sentiment_counts: Counter = Counter()
+    region_counts: Counter = Counter()
+    country_counts: Counter = Counter()
+    language_counts: Counter = Counter()
+    for platform, sentiment, region, country, lang_name, n in combo.all():
+        n = int(n or 0)
+        platform_counts[platform or "Unknown"] += n
+        sentiment_counts[sentiment or "Unknown"] += n
+        region_counts[region or "Global"] += n
+        if country:
+            country_counts[country] += n
+        language_counts[lang_name or "English"] += n
 
-    soc_counts = Counter(s.meddra_soc for s in signals if s.meddra_soc)
+    # --- 3) Signal aggregates (small table; 3 RTs) ---
+    sig_agg = _scoped_signal(
+        db.query(
+            func.count(Signal.id),
+            func.sum(case((Signal.spike_flag.is_(True), 1), else_=0)),
+        ),
+        project_id,
+    ).one()
+    signal_count = int(sig_agg[0] or 0)
+    spikes = int(sig_agg[1] or 0)
 
-    top_drugs = Counter()
-    top_symptoms = Counter()
+    strength_counts = {
+        k: int(v)
+        for k, v in _scoped_signal(
+            db.query(Signal.strength, func.count(Signal.id)).group_by(Signal.strength),
+            project_id,
+        ).all()
+        if k is not None
+    }
+    severity_counts = {
+        k: int(v)
+        for k, v in _scoped_signal(
+            db.query(Signal.severity, func.count(Signal.id)).group_by(Signal.severity),
+            project_id,
+        ).all()
+        if k is not None
+    }
+    soc_rows = _scoped_signal(
+        db.query(Signal.meddra_soc, func.count(Signal.id))
+        .filter(Signal.meddra_soc.isnot(None), Signal.meddra_soc != "")
+        .group_by(Signal.meddra_soc)
+        .order_by(func.count(Signal.id).desc())
+        .limit(10),
+        project_id,
+    ).all()
+
     from ..nlp.text_normalize import fold_key, normalize_label
-    drug_canon: dict[str, str] = {}
-    sym_canon: dict[str, str] = {}
-    for s in signals:
-        d_raw = s.drug or ""
-        dk = fold_key(d_raw)
-        if dk and dk not in drug_canon:
-            drug_canon[dk] = normalize_label(d_raw, kind="product") or d_raw
-        if dk:
-            top_drugs[drug_canon[dk]] += s.post_count
-        s_raw = s.meddra_pt or s.symptom or ""
-        sk = fold_key(s_raw)
-        if sk and sk not in sym_canon:
-            sym_canon[sk] = normalize_label(s_raw, kind="event") or s_raw
-        if sk:
-            top_symptoms[sym_canon[sk]] += s.post_count
 
-    alert_q = db.query(Alert)
+    drug_rows = _scoped_signal(
+        db.query(Signal.drug, func.sum(Signal.post_count))
+        .filter(Signal.drug.isnot(None), Signal.drug != "")
+        .group_by(Signal.drug)
+        .order_by(func.sum(Signal.post_count).desc())
+        .limit(40),
+        project_id,
+    ).all()
+    top_drugs: Counter = Counter()
+    drug_canon: dict[str, str] = {}
+    for d_raw, n in drug_rows:
+        dk = fold_key(d_raw or "")
+        if not dk:
+            continue
+        if dk not in drug_canon:
+            drug_canon[dk] = normalize_label(d_raw, kind="product") or d_raw
+        top_drugs[drug_canon[dk]] += int(n or 0)
+
+    sym_expr = func.coalesce(Signal.meddra_pt, Signal.symptom)
+    sym_rows = _scoped_signal(
+        db.query(sym_expr, func.sum(Signal.post_count))
+        .filter(sym_expr.isnot(None), sym_expr != "")
+        .group_by(sym_expr)
+        .order_by(func.sum(Signal.post_count).desc())
+        .limit(40),
+        project_id,
+    ).all()
+    top_symptoms: Counter = Counter()
+    sym_canon: dict[str, str] = {}
+    for s_raw, n in sym_rows:
+        sk = fold_key(s_raw or "")
+        if not sk:
+            continue
+        if sk not in sym_canon:
+            sym_canon[sk] = normalize_label(s_raw, kind="event") or s_raw
+        top_symptoms[sym_canon[sk]] += int(n or 0)
+
+    alert_q = db.query(func.count(Alert.id))
     if project_id is not None:
         alert_q = alert_q.filter(_project_scope(Alert.project_id, project_id))
 
@@ -417,20 +509,20 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         "processed_posts": total_processed,
         "ae_posts": ae_posts,
         "ae_rate": round(ae_posts / total_processed, 3) if total_processed else 0.0,
-        "signal_count": len(signals),
-        "alert_count": alert_q.count(),
+        "signal_count": signal_count,
+        "alert_count": int(alert_q.scalar() or 0),
         "spike_count": spikes,
         "translated_posts": translated_count,
         "country_count": len(country_counts),
         "language_count": len(language_counts),
-        "strength_distribution": dict(strength_counts),
-        "severity_distribution": dict(severity_counts),
+        "strength_distribution": strength_counts,
+        "severity_distribution": severity_counts,
         "platform_distribution": dict(platform_counts),
         "sentiment_distribution": dict(sentiment_counts),
         "region_distribution": dict(region_counts),
         "country_distribution": dict(country_counts.most_common(12)),
         "language_distribution": dict(language_counts),
-        "soc_distribution": dict(soc_counts.most_common(10)),
+        "soc_distribution": {k: int(n) for k, n in soc_rows},
         "top_drugs": top_drugs.most_common(8),
         "top_symptoms": top_symptoms.most_common(8),
         "project_id": project_id,
@@ -438,35 +530,36 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
 
 
 def overview_timeseries(db: Session, project_id: int | None = None) -> dict:
-    """Daily AE volume, total volume, and sentiment split."""
-    rows_q = db.query(ProcessedPost, RawPost).join(RawPost, ProcessedPost.raw_id == RawPost.id)
-    if project_id is not None:
-        rows_q = rows_q.filter(_project_scope(RawPost.project_id, project_id))
-    rows = rows_q.all()
-    daily_total = defaultdict(int)
-    daily_ae = defaultdict(int)
-    daily_neg = defaultdict(int)
-    for p, raw in rows:
-        d = (raw.posted_at or datetime.utcnow()).date().isoformat()
-        daily_total[d] += 1
-        if p.ae_flag:
-            daily_ae[d] += 1
-        if p.sentiment_label == "NEGATIVE":
-            daily_neg[d] += 1
+    """Daily AE volume, total volume, and sentiment split — SQL GROUP BY date."""
+    from sqlalchemy import case, func
 
-    dates = sorted(daily_total.keys())
-    return {
-        "series": [
-            {
-                "date": d,
-                "total": daily_total[d],
-                "ae": daily_ae[d],
-                "negative": daily_neg[d],
-            }
-            for d in dates
-        ],
-        "project_id": project_id,
-    }
+    day = func.date(func.coalesce(RawPost.posted_at, RawPost.ingested_at))
+    q = (
+        db.query(
+            day.label("d"),
+            func.count(ProcessedPost.id).label("total"),
+            func.sum(case((ProcessedPost.ae_flag.is_(True), 1), else_=0)).label("ae"),
+            func.sum(case((ProcessedPost.sentiment_label == "NEGATIVE", 1), else_=0)).label("negative"),
+        )
+        .select_from(ProcessedPost)
+        .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+        .group_by(day)
+        .order_by(day)
+    )
+    q = _scoped_raw(q, project_id)
+
+    series = []
+    for d, total, ae, negative in q.all():
+        if d is None:
+            continue
+        date_s = d.isoformat() if hasattr(d, "isoformat") else str(d)
+        series.append({
+            "date": date_s,
+            "total": int(total or 0),
+            "ae": int(ae or 0),
+            "negative": int(negative or 0),
+        })
+    return {"series": series, "project_id": project_id}
 
 
 def signal_trend_series(db: Session, sig: Signal) -> List[dict]:

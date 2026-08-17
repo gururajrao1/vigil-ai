@@ -18,11 +18,27 @@ export default function Overview({ embedded = false }) {
   const { project } = useProject();
   const [stats, setStats] = useState(null);
   const [overview, setOverview] = useState(null);
+  const [loadErr, setLoadErr] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     setStats(null);
-    api.stats().then(setStats).catch(() => setStats(null));
-    api.overview().then(setOverview).catch(() => setOverview(null));
+    setOverview(null);
+    setLoadErr(null);
+    setLoading(true);
+    api.stats()
+      .then((d) => { if (!cancelled) setStats(d); })
+      .catch((e) => {
+        if (!cancelled) setLoadErr(e?.message || 'Dashboard failed to load');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    api.overview()
+      .then((d) => { if (!cancelled) setOverview(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [tick, project?.id]);
 
   const goSignals = (params) => {
@@ -30,6 +46,15 @@ export default function Overview({ embedded = false }) {
     nav(`/signals?${q}`);
   };
 
+  if (loading && !stats) return <Spinner label="Loading dashboard…" />;
+  if (loadErr && !stats) {
+    return (
+      <Card className="p-4 border-rose-600/40 bg-rose-600/10 text-rose-200 text-sm">
+        {loadErr}
+        <div className="mt-2 text-rose-300/80">Hard-refresh after the API wakes, or retry from the top bar.</div>
+      </Card>
+    );
+  }
   if (!stats) return <Spinner label="Loading dashboard…" />;
 
   const empty = stats.total_posts === 0;

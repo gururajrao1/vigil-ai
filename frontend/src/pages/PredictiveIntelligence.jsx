@@ -56,20 +56,22 @@ export default function PredictiveIntelligence({ embedded = false }) {
     })
       .then((d) => {
         setMatrix(d);
-        // Keep chip menu from the broadest view we've seen
         if (!p && !a) {
           const chips = topPairsFromMatrix(d.matrix || [], 12);
           setPairChips(chips);
-          // First visit: auto-focus densest pair so filters aren't blank
+          // Auto-focus densest pair without a second full-corpus matrix build
           if (!bootstrapped && chips[0]) {
             setBootstrapped(true);
             setProductId(chips[0].product_id);
             setTargetAe(chips[0].target_ae_pt);
-            return api.featureStoreMatrix({
-              productId: chips[0].product_id,
-              targetAe: chips[0].target_ae_pt,
-              includeExplainability: false,
-            }).then(setMatrix);
+            setMatrix({
+              ...d,
+              matrix: (d.matrix || []).filter(
+                (r) =>
+                  String(r.product || '').toLowerCase() === String(chips[0].product_id).toLowerCase()
+                  && String(r.event || '').toLowerCase() === String(chips[0].target_ae_pt).toLowerCase()
+              ),
+            });
           }
         } else if (pairChips.length === 0) {
           setPairChips(topPairsFromMatrix(d.matrix || [], 12));
