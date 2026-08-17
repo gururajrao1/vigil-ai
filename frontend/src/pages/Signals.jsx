@@ -135,7 +135,14 @@ export default function Signals({ embedded = false, contextDrug, contextRxcui })
     const load = (attempt = 1) => {
       api.signals(params)
         .then((d) => {
-          if (!cancelled) setSignals(d.signals || []);
+          if (!cancelled) {
+            const list = d.signals || [];
+            setSignals(list);
+            // Surface mismatches (e.g. server total vs pages loaded) in the banner.
+            if (typeof d.total === 'number' && d.total > list.length) {
+              setLoadError(`Loaded ${list.length} of ${d.total} signals — retry if this looks incomplete.`);
+            }
+          }
         })
         .catch((err) => {
           const msg = err?.message || 'Failed to load signals';

@@ -105,11 +105,44 @@ export const api = {
   sources: () => req('/api/sources'),
   sourceStats: () => req('/api/sources/stats'),
 
-  signals: (params = {}) => {
-    const q = new URLSearchParams(
-      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== 'ALL' && v !== false))
-    ).toString();
-    return req(`/api/signals${q ? `?${q}` : ''}`);
+  signals: async (params = {}) => {
+    // Server defaults to limit=200 to avoid multi‑MB timeouts. Unless the caller
+    // asks for a single page (limit/offset), auto-fetch every page so Detect /
+    // Dashboard match signal_count (~900), not just the first 200.
+    const explicitPage = params.limit != null || params.offset != null;
+    const buildQuery = (extra = {}) => {
+      const merged = { ...params, ...extra };
+      return new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(merged).filter(
+            ([, v]) => v !== undefined && v !== '' && v !== 'ALL' && v !== false
+          )
+        )
+      ).toString();
+    };
+    if (explicitPage) {
+      const q = buildQuery();
+      return req(`/api/signals${q ? `?${q}` : ''}`);
+    }
+    const pageSize = 400;
+    let offset = 0;
+    let total = Infinity;
+    const all = [];
+    let compact = true;
+    while (offset < total && all.length < total) {
+      const q = buildQuery({ limit: pageSize, offset });
+      const d = await req(`/api/signals?${q}`);
+      const batch = d.signals || [];
+      compact = d.compact !== false;
+      if (typeof d.total === 'number') total = d.total;
+      all.push(...batch);
+      if (batch.length === 0) break;
+      offset += batch.length;
+      if (batch.length < pageSize) break;
+      // Safety: never spin forever if total is missing/wrong.
+      if (all.length > 20000) break;
+    }
+    return { signals: all, total: typeof total === 'number' ? total : all.length, compact, limit: all.length, offset: 0 };
   },
   drugToEvents: (drug) => req(`/api/analytics/drug-to-events/${encodeURIComponent(drug)}`),
   eventToDrugs: (event) => req(`/api/analytics/event-to-drugs/${encodeURIComponent(event)}`),
