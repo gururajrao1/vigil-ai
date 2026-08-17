@@ -35,6 +35,8 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Pharmacogenomics                 | `PGx`, `CPIC`, `PharmGKB`                 | Signal Detail PGx card                       |
 | Inspection / SLA                 | `inspection`, `SJL`, `overdue`            | `/dashboard?tab=governance`                  |
 | FDA COU / credibility            | `COU`, `credibility`, `not validated for` | `/dashboard?tab=governance`                  |
+| AE rate split / FAERS vs social  | `ae_breakdown`, `ICSR`, `social NLP`      | `/dashboard` (Corpus metrics)                |
+| openFDA CDN stream-ingest        | `stream-ingest`, `download.json`, `FAERS partitions` | CLI `python -m app.etl_pipeline.stream_ingest_openfda` · `POST /api/etl/openfda/stream-ingest` |
 | Competition bias / remine        | `Remine`, `masking`, `unmask`             | `/lenses?tab=remine`                         |
 | High-risk patient segments / REM | `REM ranking`, `risk populations`         | `/lenses?tab=risk`                           |
 | Predictive feature matrix        | `Predictive intel`, `4-gate`, `OMOP`      | `/lenses?tab=intel`                          |
@@ -402,9 +404,13 @@ Each recipe: **where → clicks → what you should see → what to say / watch 
 1. Open **Dashboard** (`/dashboard`).
 2. Stay on **Corpus metrics**.
 3. Read totals: posts, AE rate, platforms, top drugs/events, charts.
-4. Click an AE / product bar if linked — it deep-links into **Detect** with a filter.
+4. Read the **AE rate split** card: **regulatory ICSRs** (FAERS/MAUDE/VAERS…) vs **social NLP** (Reddit/news/forums). Overall AE% is inflated when FAERS bulk ingest force-sets `ae_flag=True`; use **social NLP AE%** for listening yield.
+5. **Safety signals** count unique product–event pairs after disproportionality — not one signal per post (tens of thousands of FAERS ICSRs collapse into hundreds of drug→PT rows).
+6. Click an AE / product bar if linked — it deep-links into **Detect** with a filter.
 
-**Say:** “This is volume and yield — not yet a regulatory decision.”
+**Say:** “This is volume and yield — not yet a regulatory decision. FAERS rows are already adverse-event reports; social posts still need the 4-gate NLP stack.”
+
+**Empty / confusing:** High overall AE% with ~900 signals and ~25k posts is expected when the corpus is mostly FAERS ICSRs. Check platform mix and the AE split card before assuming NLP is broken.
 
 ### 7.2 Dashboard — Ops KPIs
 
@@ -725,6 +731,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 | Feature            | What                                                             | Why                              | Where                               |
 | ------------------ | ---------------------------------------------------------------- | -------------------------------- | ----------------------------------- |
 | Detect table       | Ranked product→event with PRR, EB05, IC025, SDR, filters, search | Hero triage list                 | `/signals`                          |
+| openFDA stream-ingest | CDN partition zip → FAERS/MAUDE posts + OMOP without mirroring ~2k files | Scale ICSRs without filling disk | CLI `stream_ingest_openfda` · ETL API |
 | Jump search        | Type drug / vaccine / device / event                             | Avoid scrolling 300+ rows        | Detect search boxes                 |
 | Signal conclusions | Deterministic good/bad/mixed verdict from loaded numbers         | Non-technical stakeholders       | Top of Signal Detail                |
 | Signal briefing    | Plain-English worry level + next steps                           | Same audience                    | Signal Detail                       |
@@ -1284,6 +1291,7 @@ Offline-first ingestion into OMOP CDM v5.4 staging (`backend/app/etl_pipeline/`)
 | Dataset | What it does | API / MCP |
 | ------- | ------------ | --------- |
 | **faers** | Streams openFDA `drug/event` JSON in page batches → `person` / `drug_exposure` / `condition_occurrence` (fixture fallback) | `GET /api/etl/sync/faers?force_fixture=true` |
+| **openFDA CDN stream-ingest** | HTTP-GET each `download.json` partition zip (no full disk mirror) → FAERS posts+OMOP, MAUDE posts | `POST /api/etl/openfda/stream-ingest` · CLI `python -m app.etl_pipeline.stream_ingest_openfda` |
 | **sider** | SIDER 4.1-style TSV → `omop_drug_condition_baseline` with `is_expected_baseline=TRUE` | `GET /api/etl/sync/sider` |
 | **athena_vocab** | Re-seeds CONCEPT from RxE + MCN surrogates (BIGINT-safe IDs) | `GET /api/etl/sync/athena_vocab` |
 | **MCN gate** | Mantra/CADEC gold strict+relaxed F1; colloquial CADEC/SMM4H reported separately | `GET /api/etl/mcn-benchmark` (gate F1 > 0.85) |
@@ -1304,6 +1312,7 @@ Offline-first ingestion into OMOP CDM v5.4 staging (`backend/app/etl_pipeline/`)
 | If you see… | Why | What to do |
 | ----------- | --- | ---------- |
 | FAERS `mode=fixture` | Live openFDA unreachable | Expected offline; fixtures still populate OMOP |
+| Stream-ingest hangs / Neon SSL drop | Full ~2k partitions or unbounded `recompute_signals` | Cap `--max-partitions` / `--event-limit`; DMA with `fast=True` or `scripts/_run_recompute_offline.py --sqlite …` |
 | SIDER baselines=0 | TSV missing | First sync writes `data/etl/sider_4_1_meddra_all_se_surrogate.tsv` |
 | Benchmark `pass_gate=false` | MCN catalog drift | Re-check Mantra/CADEC sample vs linker |
 | Matview empty after CLI load | Refresh skipped / view on wrong tables | Re-run `run_pipeline` (recreates staging-backed `omop_signal_summary` if needed) |

@@ -368,27 +368,61 @@ def _scoped_signal(q, project_id: int | None):
     return q
 
 
+# Spontaneous/regulatory ICSRs — often ingested with ae_flag forced True (not 4-gate NLP).
+_REGULATORY_PLATFORM_PREFIXES = (
+    "faers",
+    "maude",
+    "vaers",
+    "device_recalls",
+    "mhra_devices",
+    "fda_enforcement",
+)
+
+
 def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
     """Corpus KPIs via SQL aggregates — few round-trips, no full ORM row loads."""
-    from sqlalchemy import case, func
+    from sqlalchemy import case, func, or_
 
     # --- 1) Headline counts (2 RTs) ---
     total_raw = int(_scoped_raw(db.query(func.count(RawPost.id)), project_id).scalar() or 0)
+
+    icsr_clauses = []
+    for pref in _REGULATORY_PLATFORM_PREFIXES:
+        icsr_clauses.append(RawPost.platform == pref)
+        icsr_clauses.append(RawPost.platform.like(f"{pref}/%"))
+        icsr_clauses.append(RawPost.platform.like(f"{pref}_%"))
+    icsr_pred = or_(*icsr_clauses)
 
     proc_agg = (
         db.query(
             func.count(ProcessedPost.id),
             func.sum(case((ProcessedPost.ae_flag.is_(True), 1), else_=0)),
             func.sum(case((RawPost.translated.is_(True), 1), else_=0)),
+            func.sum(case((icsr_pred, 1), else_=0)),
+            func.sum(case((icsr_pred & ProcessedPost.ae_flag.is_(True), 1), else_=0)),
+            func.sum(case((~icsr_pred, 1), else_=0)),
+            func.sum(case(((~icsr_pred) & ProcessedPost.ae_flag.is_(True), 1), else_=0)),
         )
         .select_from(ProcessedPost)
         .join(RawPost, ProcessedPost.raw_id == RawPost.id)
     )
     proc_agg = _scoped_raw(proc_agg, project_id)
-    total_processed, ae_posts, translated_count = proc_agg.one()
+    (
+        total_processed,
+        ae_posts,
+        translated_count,
+        icsr_posts,
+        icsr_ae_posts,
+        social_posts,
+        social_ae_posts,
+    ) = proc_agg.one()
     total_processed = int(total_processed or 0)
     ae_posts = int(ae_posts or 0)
     translated_count = int(translated_count or 0)
+    icsr_posts = int(icsr_posts or 0)
+    icsr_ae_posts = int(icsr_ae_posts or 0)
+    social_posts = int(social_posts or 0)
+    social_ae_posts = int(social_ae_posts or 0)
 
     # --- 2) One grouped projection — DB returns combo counts, not 28k raw rows ---
     combo = (
@@ -515,6 +549,20 @@ def dashboard_stats(db: Session, project_id: int | None = None) -> dict:
         "processed_posts": total_processed,
         "ae_posts": ae_posts,
         "ae_rate": round(ae_posts / total_processed, 3) if total_processed else 0.0,
+        # Split: regulatory ICSRs (FAERS/MAUDE/…) often force ae_flag; social uses 4-gate NLP.
+        "ae_breakdown": {
+            "icsr_posts": icsr_posts,
+            "icsr_ae_posts": icsr_ae_posts,
+            "icsr_ae_rate": round(icsr_ae_posts / icsr_posts, 3) if icsr_posts else 0.0,
+            "social_posts": social_posts,
+            "social_ae_posts": social_ae_posts,
+            "social_ae_rate": round(social_ae_posts / social_posts, 3) if social_posts else 0.0,
+            "note": (
+                "ICSR rows (faers/maude/vaers/…) are spontaneous reports; bulk FAERS "
+                "sets ae_flag=True without the social 4-gate NLP stack. social_ae_rate "
+                "is the NLP AE rate on Reddit/news/forums only."
+            ),
+        },
         "signal_count": signal_count,
         "alert_count": int(alert_q.scalar() or 0),
         "spike_count": spikes,
