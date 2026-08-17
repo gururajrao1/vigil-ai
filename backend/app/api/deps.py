@@ -78,7 +78,7 @@ def init_async_engine(database_url: Optional[str] = None) -> async_sessionmaker[
         "connect_args": _connect_args_for(async_url),
     }
     if not async_url.startswith("sqlite"):
-        kwargs.update(pool_size=5, max_overflow=10, pool_recycle=280)
+        kwargs.update(pool_size=2, max_overflow=1, pool_recycle=280)
 
     _ENGINE = create_async_engine(async_url, **kwargs)
     _SESSION_FACTORY = async_sessionmaker(

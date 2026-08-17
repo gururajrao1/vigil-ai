@@ -15,7 +15,7 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from sqlalchemy import or_
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, load_only
 
 from ..models import Alert, AuditLog, Signal
@@ -58,80 +58,76 @@ def _percentile(sorted_vals: List[float], p: float) -> float:
 
 
 def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
-    sig_q = db.query(Signal)
+    """Ops KPIs via SQL aggregates — never load the full Signal ORM (JSON blobs)."""
+    sig_base = db.query(Signal)
     if project_id is not None:
-        sig_q = sig_q.filter(_project_scope(Signal.project_id, project_id))
-    signals = sig_q.options(load_only(
-        Signal.id,
-        Signal.drug,
-        Signal.symptom,
-        Signal.meddra_pt,
-        Signal.strength,
-        Signal.severity,
-        Signal.sdr_flag,
-        Signal.spike_flag,
-        Signal.prr,
-        Signal.post_count,
-        Signal.completeness,
-        Signal.well_documented,
-        Signal.review_state,
-        Signal.earliest_post_at,
-        Signal.detected_at,
-    )).all()
-    total = len(signals)
+        sig_base = sig_base.filter(_project_scope(Signal.project_id, project_id))
 
-    # --- Latency ---
-    # Historical TTD (detected_at − earliest supporting post) can look huge on
-    # demo corpora where posts are back-dated across months/years. We still
-    # report it, but lead with median + a "fresh detection" window (≤30d).
-    ttd_days: List[float] = []
-    fresh_ttd: List[float] = []
-    for s in signals:
-        if s.earliest_post_at and s.detected_at:
-            delta = (s.detected_at - s.earliest_post_at).total_seconds() / 86400.0
-            if delta >= 0:
-                ttd_days.append(round(delta, 2))
-                if delta <= 30:
-                    fresh_ttd.append(round(delta, 2))
-    ttd_sorted = sorted(ttd_days)
-    fresh_sorted = sorted(fresh_ttd)
+    total = int(sig_base.with_entities(func.count(Signal.id)).scalar() or 0)
 
-    # --- Review funnel ---
-    confirmed = sum(1 for s in signals if s.review_state == "confirmed")
-    dismissed = sum(1 for s in signals if s.review_state == "dismissed")
+    def _count(*clauses) -> int:
+        q = sig_base.with_entities(func.count(Signal.id))
+        for c in clauses:
+            q = q.filter(c)
+        return int(q.scalar() or 0)
+
+    confirmed = _count(Signal.review_state == "confirmed")
+    dismissed = _count(Signal.review_state == "dismissed")
     reviewed = confirmed + dismissed
-    unreviewed = total - reviewed
-    sdr = sum(1 for s in signals if s.sdr_flag)
-    strong = sum(1 for s in signals if s.strength == "STRONG")
-    spike = sum(1 for s in signals if s.spike_flag)
+    unreviewed = max(0, total - reviewed)
+    sdr = _count(Signal.sdr_flag.is_(True))
+    strong = _count(Signal.strength == "STRONG")
+    spike = _count(Signal.spike_flag.is_(True))
+    well_documented = _count(Signal.well_documented.is_(True))
+
+    mean_completeness = float(
+        sig_base.with_entities(func.avg(Signal.completeness)).scalar() or 0.0
+    )
+    mean_completeness = round(mean_completeness, 3)
 
     actionable_rate = round(confirmed / reviewed, 3) if reviewed else None
     false_positive_ratio = round(dismissed / reviewed, 3) if reviewed else None
     backlog_rate = round(unreviewed / total, 3) if total else 0.0
 
-    # --- Documentation quality ---
-    comp_scores = [s.completeness or 0.0 for s in signals]
-    mean_completeness = round(sum(comp_scores) / len(comp_scores), 3) if comp_scores else 0.0
-    well_documented = sum(1 for s in signals if s.well_documented)
+    ttd_q = sig_base.with_entities(Signal.earliest_post_at, Signal.detected_at).filter(
+        Signal.earliest_post_at.isnot(None),
+        Signal.detected_at.isnot(None),
+    )
+    ttd_days: List[float] = []
+    fresh_ttd: List[float] = []
+    for earliest, detected in ttd_q.yield_per(1000):
+        delta = (detected - earliest).total_seconds() / 86400.0
+        if delta >= 0:
+            ttd_days.append(round(delta, 2))
+            if delta <= 30:
+                fresh_ttd.append(round(delta, 2))
+    ttd_sorted = sorted(ttd_days)
+    fresh_sorted = sorted(fresh_ttd)
 
-    # --- Triage queue: what an analyst should open next ---
-    # Presentation-only: suggest SDR / STRONG / spike unreviewed first.
-    # Does not hide WEAK signals elsewhere or mutate review state / DB rows.
-    def _priority(s: Signal) -> tuple:
-        return (
-            0 if s.sdr_flag else 1,
-            0 if s.strength == "STRONG" else 1,
-            0 if s.spike_flag else 1,
-            -(s.prr or 0.0),
-            -(s.post_count or 0),
+    triage_q = (
+        sig_base.options(load_only(
+            Signal.id, Signal.drug, Signal.symptom, Signal.meddra_pt,
+            Signal.strength, Signal.severity, Signal.sdr_flag, Signal.spike_flag,
+            Signal.prr, Signal.post_count, Signal.completeness, Signal.well_documented,
+            Signal.review_state,
+        ))
+        .filter(
+            or_(Signal.review_state == "unreviewed", Signal.review_state.is_(None)),
+            or_(
+                Signal.sdr_flag.is_(True),
+                Signal.strength == "STRONG",
+                Signal.spike_flag.is_(True),
+            ),
         )
-
-    triage_pool = [
-        s for s in signals
-        if (s.review_state or "unreviewed") == "unreviewed"
-        and (s.sdr_flag or s.strength == "STRONG" or s.spike_flag)
-    ]
-    triage_pool.sort(key=_priority)
+        .order_by(
+            case((Signal.sdr_flag.is_(True), 0), else_=1),
+            case((Signal.strength == "STRONG", 0), else_=1),
+            case((Signal.spike_flag.is_(True), 0), else_=1),
+            Signal.prr.desc(),
+            Signal.post_count.desc(),
+        )
+        .limit(12)
+    )
     triage_queue = [
         {
             "id": s.id,
@@ -155,17 +151,17 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
                 else "Highest remaining PRR in backlog"
             ),
         }
-        for s in triage_pool[:12]
+        for s in triage_q.all()
     ]
 
-    # --- SPC over daily alert frequency ---
-    alert_q = db.query(Alert)
+    alert_q = db.query(Alert.created_at)
     if project_id is not None:
         alert_q = alert_q.filter(_project_scope(Alert.project_id, project_id))
-    alerts = alert_q.options(load_only(Alert.id, Alert.created_at)).all()
     per_day: Dict[str, int] = defaultdict(int)
-    for a in alerts:
-        d = (a.created_at or datetime.utcnow()).date().isoformat()
+    alert_count = 0
+    for (created,) in alert_q.yield_per(2000):
+        alert_count += 1
+        d = (created or datetime.utcnow()).date().isoformat()
         per_day[d] += 1
     dates = sorted(per_day.keys())
     counts = [per_day[d] for d in dates]
@@ -176,14 +172,11 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
     ]
     breaches = [row for row in spc_series if row["breach"]]
 
-    # --- Ops readiness score (0–100) for the deliverable headline ---
-    # Weights: backlog cleared, reviews exist, SDR under review, completeness, SPC calm.
     score = 0
     notes: List[str] = []
     if total == 0:
         notes.append("No signals yet — ingest sources or load the demo corpus.")
     else:
-        # Backlog pressure (0–35)
         if backlog_rate <= 0.2:
             score += 35
         elif backlog_rate <= 0.5:
@@ -195,7 +188,6 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
         else:
             notes.append("100% unreviewed - confirm/dismiss from the triage queue to unlock actionable & FP rates.")
 
-        # Review loop alive (0–25)
         if reviewed >= 10:
             score += 25
         elif reviewed >= 3:
@@ -206,25 +198,23 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
         else:
             notes.append("Actionable rate & false-positive ratio stay blank until signals are reviewed.")
 
-        # High-priority coverage (0–20): share of SDR/STRONG that are reviewed
-        priority = [s for s in signals if s.sdr_flag or s.strength == "STRONG"]
-        if priority:
-            pri_reviewed = sum(
-                1 for s in priority if s.review_state in ("confirmed", "dismissed")
+        priority_n = _count(or_(Signal.sdr_flag.is_(True), Signal.strength == "STRONG"))
+        if priority_n:
+            pri_reviewed = _count(
+                or_(Signal.sdr_flag.is_(True), Signal.strength == "STRONG"),
+                Signal.review_state.in_(("confirmed", "dismissed")),
             )
-            pri_rate = pri_reviewed / len(priority)
+            pri_rate = pri_reviewed / priority_n
             score += int(20 * pri_rate)
             if pri_rate < 0.5:
                 notes.append(
-                    f"Only {pri_reviewed}/{len(priority)} SDR/STRONG signals reviewed - prioritize those first."
+                    f"Only {pri_reviewed}/{priority_n} SDR/STRONG signals reviewed - prioritize those first."
                 )
         else:
             score += 10
 
-        # Documentation (0–10)
         score += int(10 * (well_documented / total)) if total else 0
 
-        # SPC calm (0–10)
         if not breaches:
             score += 10
         elif len(breaches) <= 2:
@@ -246,7 +236,7 @@ def compute_kpis(db: Session, project_id: Optional[int] = None) -> dict:
         "sdr_count": sdr,
         "strong_count": strong,
         "spike_count": spike,
-        "alert_count": len(alerts),
+        "alert_count": alert_count,
         "ops_score": score,
         "ops_status": (
             "healthy" if score >= 70 else "needs_attention" if score >= 40 else "blocked"

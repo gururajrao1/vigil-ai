@@ -8,7 +8,7 @@ from collections import Counter
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from datetime import datetime
 
@@ -1455,6 +1455,10 @@ def list_signals(
         qset = qset.filter(Signal.product_type == product_type.lower())
     if sdr:
         qset = qset.filter(Signal.sdr_flag.is_(True))
+    if region and region.lower() != "global":
+        qset = qset.filter(Signal.regions_json.ilike(f"%{region.strip()}%"))
+    if smq:
+        qset = qset.filter(Signal.smq_json.ilike(f"%{smq.strip()}%"))
     # Push text filters into SQL so Neon does not ship the full corpus then filter.
     if drug and drug.strip():
         qset = qset.filter(Signal.drug.ilike(f"%{drug.strip()}%"))
@@ -1497,40 +1501,11 @@ def list_signals(
     }.get((sort or "prr").lower(), Signal.prr)
     ordered = qset.order_by(sort_col.desc(), Signal.post_count.desc())
     to_dict = signal_to_dict if full else signal_list_dict
-    needs_post = bool((region and region.lower() != "global") or smq)
 
-    if not needs_post:
-        # SQL page — do not load/serialize the full register per request.
-        total = qset.count()
-        rows = ordered.offset(offset).limit(limit).all()
-        out = [to_dict(s) for s in rows]
-        if drug:
-            dk = fold_key(drug)
-            out = [s for s in out if dk and (dk in fold_key(s.get("drug") or "") or fold_key(s.get("drug") or "") in dk)]
-        if symptom:
-            sk = fold_key(symptom)
-            out = [
-                s for s in out
-                if sk and (
-                    sk in fold_key(s.get("symptom") or "")
-                    or sk in fold_key((s.get("meddra") or {}).get("pt") or "")
-                    or fold_key(s.get("symptom") or "") in sk
-                )
-            ]
-        return {
-            "signals": out,
-            "compact": not full,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-        }
-
-    signals = ordered.all()
-    out = [to_dict(s) for s in signals]
-    if region and region.lower() != "global":
-        out = [s for s in out if region in (s.get("regions") or {})]
-    if smq:
-        out = [s for s in out if any(m.get("smq") == smq for m in (s.get("smq") or []))]
+    # SQL page — never load/serialize the full register (region/SMQ are ILIKE in SQL).
+    total = qset.count()
+    rows = ordered.offset(offset).limit(limit).all()
+    out = [to_dict(s) for s in rows]
     if drug:
         dk = fold_key(drug)
         out = [s for s in out if dk and (dk in fold_key(s.get("drug") or "") or fold_key(s.get("drug") or "") in dk)]
@@ -1544,10 +1519,8 @@ def list_signals(
                 or fold_key(s.get("symptom") or "") in sk
             )
         ]
-    total = len(out)
-    page = out[offset : offset + limit]
     return {
-        "signals": page,
+        "signals": out,
         "compact": not full,
         "total": total,
         "limit": limit,
@@ -1564,10 +1537,18 @@ def get_label_gap(db: Session = Depends(get_db)):
     list of signals classified as 'novel' — events not found in the drug's
     current FDA label adverse-reactions section.
     """
-    signals = db.query(Signal).filter(Signal.product_type != "device").all()
+    signals = db.query(Signal).options(
+        load_only(
+            Signal.id, Signal.drug, Signal.meddra_pt, Signal.symptom, Signal.strength,
+            Signal.prr, Signal.post_count, Signal.label_novelty, Signal.label_gap_json,
+            Signal.product_type,
+        )
+    ).filter(Signal.product_type != "device").yield_per(400)
     tier_counts = {"novel": 0, "in_label": 0, "boxed": 0, "unknown": 0}
     novel_signals = []
+    total_signals = 0
     for s in signals:
+        total_signals += 1
         tier = s.label_novelty or "unknown"
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         if tier == "novel":
@@ -1584,9 +1565,9 @@ def get_label_gap(db: Session = Depends(get_db)):
     novel_signals.sort(key=lambda x: (x.get("prr") or 0), reverse=True)
     return {
         "tier_counts": tier_counts,
-        "total_signals": len(signals),
+        "total_signals": total_signals,
         "novel_count": tier_counts["novel"],
-        "novel_signals": novel_signals,
+        "novel_signals": novel_signals[:200],
         "note": (
             "novelty_tier is 'novel' when the event is not found in the drug's adverse_reactions "
             "section text from DailyMed (or our offline surrogate). 'boxed' when the boxed "
@@ -3193,18 +3174,39 @@ def lifecycle_summary(db: Session = Depends(get_db)):
     Returns signal counts by lifecycle status and the top 10 signals ranked by
     priority_score (descending) with key fields for triage.
     """
+    from sqlalchemy import func, or_
+
     from ...analytics.lifecycle import gvp_alias_for
+    from ...projects.scope import current_project_id
 
-    signals = db.query(Signal).all()
+    pid = current_project_id()
+    scope = True
+    if pid is not None:
+        scope = or_(Signal.project_id == pid, Signal.project_id.is_(None), Signal.project_id == 0)
+
+    status_col = func.coalesce(Signal.lifecycle_status, "new")
     counts: dict[str, int] = {s: 0 for s in LIFECYCLE_TRANSITIONS}
-    for sig in signals:
-        st = sig.lifecycle_status or "new"
-        counts[st] = counts.get(st, 0) + 1
+    total = 0
+    count_q = db.query(status_col, func.count(Signal.id)).group_by(status_col)
+    if pid is not None:
+        count_q = count_q.filter(scope)
+    for status, n in count_q.all():
+        n = int(n or 0)
+        total += n
+        counts[status] = counts.get(status, 0) + n
 
-    top10 = sorted(signals, key=lambda s: s.priority_score or 0.0, reverse=True)[:10]
+    top_q = db.query(Signal).options(load_only(
+        Signal.id, Signal.drug, Signal.meddra_pt, Signal.symptom,
+        Signal.priority_score, Signal.lifecycle_status, Signal.strength,
+        Signal.severity, Signal.label_novelty, Signal.spike_flag,
+        Signal.maxsprt_crossed, Signal.lifecycle_owner,
+    )).order_by(Signal.priority_score.desc()).limit(10)
+    if pid is not None:
+        top_q = top_q.filter(scope)
+    top10 = top_q.all()
     return {
         "status_counts": counts,
-        "total": len(signals),
+        "total": total,
         "top_by_priority": [
             {
                 "id": s.id,
@@ -3283,7 +3285,9 @@ def get_smq(db: Session = Depends(get_db)):
     """
     from ...analytics.smq import aggregate_smq, reference
 
-    sigs = db.query(Signal).filter(Signal.product_type != "device").all()
+    sigs = db.query(Signal).options(load_only(
+        Signal.drug, Signal.symptom, Signal.meddra_pt, Signal.post_count, Signal.product_type,
+    )).filter(Signal.product_type != "device").yield_per(400)
     signal_dicts = [
         {"drug": s.drug, "symptom": s.symptom, "meddra_pt": s.meddra_pt,
          "post_count": s.post_count}
@@ -3303,7 +3307,12 @@ def get_calibration(db: Session = Depends(get_db)):
     signal's calibrated p-value / E-value live on the signal itself."""
     from ...analytics.calibration import calibration_summary_from_rows
 
-    return calibration_summary_from_rows(db.query(Signal).all())
+    return calibration_summary_from_rows(
+        list(db.query(Signal).options(load_only(
+            Signal.drug, Signal.symptom, Signal.ic, Signal.post_count,
+            Signal.expected, Signal.prr, Signal.prr_ci_low, Signal.calibrated_signal,
+        )).yield_per(400))
+    )
 
 
 # --------------------------- class effect + read-across -------------------- #
@@ -3317,7 +3326,10 @@ def get_class_effect(db: Session = Depends(get_db)):
     """
     from ...analytics.class_effect import aggregate_class, atc_class_key, reference
 
-    sigs = db.query(Signal).filter(Signal.product_type != "device").all()
+    sigs = db.query(Signal).options(load_only(
+        Signal.drug, Signal.drug_atc, Signal.meddra_pt, Signal.symptom,
+        Signal.meddra_soc, Signal.post_count, Signal.product_type,
+    )).filter(Signal.product_type != "device").yield_per(400)
     inputs = [
         {"drug": s.drug, "atc": s.drug_atc, "pt": s.meddra_pt or s.symptom,
          "soc": s.meddra_soc, "post_count": s.post_count}
@@ -3347,8 +3359,12 @@ def get_benefit_risk(db: Session = Depends(get_db)):
 
     sigs = (
         db.query(Signal)
+        .options(load_only(
+            Signal.id, Signal.drug, Signal.symptom, Signal.meddra_pt,
+            Signal.severity, Signal.who_umc, Signal.benefit_risk_json, Signal.product_type,
+        ))
         .filter(Signal.product_type != "device", Signal.benefit_risk_json.isnot(None))
-        .all()
+        .yield_per(400)
     )
     rows = []
     for s in sigs:
@@ -3384,46 +3400,50 @@ def get_spatial(db: Session = Depends(get_db)):
     observed vs expected counts, relative risk (RR) and the Poisson log-likelihood
     ratio (LLR) scan score.
     """
+    from sqlalchemy import func
+
     from ...analytics.spatial import reference, spatial_clusters
 
-    # Corpus baseline geographic distribution from all AE reports.
-    ae_rows = (
-        db.query(RawPost)
+    country_rows = (
+        db.query(RawPost.country, func.count(ProcessedPost.id))
+        .join(ProcessedPost, ProcessedPost.raw_id == RawPost.id)
+        .filter(ProcessedPost.ae_flag.is_(True), RawPost.country.isnot(None), RawPost.country != "")
+        .group_by(RawPost.country)
+        .all()
+    )
+    region_rows = (
+        db.query(func.coalesce(RawPost.region, "Global"), func.count(ProcessedPost.id))
         .join(ProcessedPost, ProcessedPost.raw_id == RawPost.id)
         .filter(ProcessedPost.ae_flag.is_(True))
+        .group_by(func.coalesce(RawPost.region, "Global"))
         .all()
     )
     baseline = {
-        "country": dict(Counter(r.country for r in ae_rows if r.country)),
-        "region": dict(Counter((r.region or "Global") for r in ae_rows)),
+        "country": {k: int(n) for k, n in country_rows if k},
+        "region": {k: int(n) for k, n in region_rows},
     }
 
-    # Per-supporting-post geography, then per-signal observed area counts.
-    post_geo = {
-        p.id: (raw.country, raw.region or "Global")
-        for p, raw in db.query(ProcessedPost, RawPost)
-        .join(RawPost, ProcessedPost.raw_id == RawPost.id)
-        .all()
-    }
     signals_with_geo = []
-    for s in db.query(Signal).all():
-        ids = json.loads(s.supporting_post_ids or "[]")
-        cc: Counter = Counter()
-        rc: Counter = Counter()
-        for pid in ids:
-            geo = post_geo.get(pid)
-            if not geo:
-                continue
-            country, region = geo
-            if country:
-                cc[country] += 1
-            rc[region] += 1
+    for s in db.query(Signal).options(load_only(
+        Signal.drug, Signal.meddra_pt, Signal.symptom, Signal.product_type,
+        Signal.post_count, Signal.regions_json,
+    )).filter(Signal.regions_json.isnot(None), Signal.regions_json != "", Signal.regions_json != "{}").yield_per(400):
+        regions = {}
+        try:
+            parsed = json.loads(s.regions_json or "{}")
+            if isinstance(parsed, dict):
+                regions = parsed
+        except Exception:
+            regions = {}
+        cc = {k: int(v) for k, v in regions.items() if k and not str(k).startswith("_")}
+        if not cc:
+            continue
         signals_with_geo.append({
             "drug": s.drug,
             "event": s.meddra_pt or s.symptom,
             "product_type": s.product_type or "drug",
             "post_count": s.post_count,
-            "area_counts": {"country": dict(cc), "region": dict(rc)},
+            "area_counts": {"country": cc, "region": cc},
         })
 
     clusters = spatial_clusters(signals_with_geo, baseline)
@@ -3448,41 +3468,52 @@ def get_completeness(db: Session = Depends(get_db)):
     """
     from ...analytics.completeness import DIMENSIONS, WELL_DOCUMENTED_THRESHOLD, reference
 
-    signals = db.query(Signal).all()
-    n = len(signals)
-    scores = [s.completeness or 0.0 for s in signals]
-    mean = round(sum(scores) / n, 3) if n else 0.0
-    well = sum(1 for s in signals if s.well_documented)
-
-    # Score histogram in 0.1-wide bands (0.0-1.0).
     bands = [f"{i/10:.1f}-{(i+1)/10:.1f}" for i in range(10)]
     hist = {b: 0 for b in bands}
-    for sc in scores:
-        idx = min(9, int(sc * 10))
-        hist[bands[idx]] += 1
-
-    # Mean per-dimension coverage across all signals (from stored completeness JSON).
     cov_totals: dict[str, float] = {key: 0.0 for key, *_ in DIMENSIONS}
     cov_n = 0
-    for s in signals:
-        detail = json.loads(s.completeness_json or "null")
-        if not detail:
-            continue
-        cov = detail.get("dimension_coverage") or {}
-        for key, *_ in DIMENSIONS:
-            cov_totals[key] += float(cov.get(key, 0.0))
-        cov_n += 1
-    dimension_coverage = {
-        key: round(cov_totals[key] / cov_n, 3) if cov_n else 0.0
-        for key, *_ in DIMENSIONS
-    }
+    n = 0
+    well = 0
+    sum_scores = 0.0
+    best: list[tuple] = []
+    worst: list[tuple] = []
 
-    # Best / worst documented signals (small leaderboard for the UI).
-    ranked = sorted(signals, key=lambda s: s.completeness or 0.0, reverse=True)
     def _brief(s: Signal) -> dict:
         return {"id": s.id, "drug": s.drug, "event": s.meddra_pt or s.symptom,
                 "completeness": s.completeness, "well_documented": bool(s.well_documented),
                 "post_count": s.post_count}
+
+    for s in db.query(Signal).options(load_only(
+        Signal.id, Signal.drug, Signal.meddra_pt, Signal.symptom, Signal.completeness,
+        Signal.well_documented, Signal.post_count, Signal.completeness_json,
+    )).yield_per(400):
+        n += 1
+        sc = float(s.completeness or 0.0)
+        sum_scores += sc
+        if s.well_documented:
+            well += 1
+        hist[bands[min(9, int(sc * 10))]] += 1
+        detail = json.loads(s.completeness_json or "null")
+        if detail:
+            cov = detail.get("dimension_coverage") or {}
+            for key, *_ in DIMENSIONS:
+                cov_totals[key] += float(cov.get(key, 0.0))
+            cov_n += 1
+        brief = _brief(s)
+        best.append((sc, brief))
+        worst.append((sc, brief))
+        if len(best) > 5:
+            best = sorted(best, key=lambda x: x[0], reverse=True)[:5]
+        if len(worst) > 5:
+            worst = sorted(worst, key=lambda x: x[0])[:5]
+
+    mean = round(sum_scores / n, 3) if n else 0.0
+    dimension_coverage = {
+        key: round(cov_totals[key] / cov_n, 3) if cov_n else 0.0
+        for key, *_ in DIMENSIONS
+    }
+    best = sorted(best, key=lambda x: x[0], reverse=True)[:5]
+    worst = sorted(worst, key=lambda x: x[0])[:5]
 
     return {
         "signal_count": n,
@@ -3492,8 +3523,8 @@ def get_completeness(db: Session = Depends(get_db)):
         "threshold": WELL_DOCUMENTED_THRESHOLD,
         "histogram": [{"band": b, "count": hist[b]} for b in bands],
         "dimension_coverage": dimension_coverage,
-        "best_documented": [_brief(s) for s in ranked[:5]],
-        "worst_documented": [_brief(s) for s in ranked[-5:][::-1]] if n else [],
+        "best_documented": [b for _, b in best],
+        "worst_documented": [b for _, b in worst] if n else [],
         "reference": reference(),
     }
 
@@ -3514,8 +3545,11 @@ def get_vaccine(db: Session = Depends(get_db)):
     """
     from ...analytics.vaccine import reference, vaccine_aesi_summary
 
-    sigs = db.query(Signal).filter(Signal.is_vaccine.is_(True)).all()
-    summary = vaccine_aesi_summary([signal_to_dict(s, fda=False) for s in sigs])
+    sigs = db.query(Signal).options(load_only(
+        Signal.id, Signal.drug, Signal.symptom, Signal.meddra_pt, Signal.is_vaccine,
+        Signal.aesi, Signal.vaccine_json, Signal.post_count, Signal.strength, Signal.prr,
+    )).filter(Signal.is_vaccine.is_(True)).all()
+    summary = vaccine_aesi_summary([signal_list_dict(s) for s in sigs])
     return {"reference": reference(), **summary}
 
 

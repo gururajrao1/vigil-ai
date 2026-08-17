@@ -107,7 +107,14 @@ def build_ontology_graph(
     limit: int = 300,
 ) -> dict:
     """Build the typed graph from stored signals and return a JSON projection."""
-    q = db.query(Signal)
+    from sqlalchemy.orm import load_only
+
+    q = db.query(Signal).options(load_only(
+        Signal.id, Signal.drug, Signal.symptom, Signal.meddra_pt, Signal.meddra_soc,
+        Signal.product_type, Signal.device_gmdn, Signal.imdrf_term, Signal.strength,
+        Signal.post_count, Signal.prr, Signal.eb05, Signal.ic025, Signal.sdr_flag,
+        Signal.severity, Signal.project_id,
+    ))
     if project_id is not None:
         q = q.filter(Signal.project_id == project_id)
     if product:

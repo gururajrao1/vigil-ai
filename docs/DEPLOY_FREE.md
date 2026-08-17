@@ -20,6 +20,10 @@ Render free instances **sleep after ~15 minutes idle**. First request can take 3
 
 Postgres on Neon persists across deploys and sleep. Deploys do **not** wipe the corpus.
 
+### Memory (512 MB free plan)
+
+After a large FAERS DMA the API can be killed if a request materializes every Signal ORM row (JSON blobs) or every AE post’s entities into one worker. Production code keeps pools tiny (`pool_size=2`), `WEB_CONCURRENCY=1`, `MALLOC_ARENA_MAX=2`, SQL-paginated Detect, and caps the Evidence RDF graph to the strongest unique pairs. If Render emails “exceeded memory limit,” redeploy `main` — do **not** delete Neon rows to “fix” RAM.
+
 To merge unique rows from a local `backend/vigilai.db` into Neon:
 
 ```powershell

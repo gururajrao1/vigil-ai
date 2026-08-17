@@ -65,15 +65,17 @@ def compute_ontological_disproportionality(
         q = q.filter(Signal.project_id == project_id)
     if product:
         q = q.filter(Signal.drug == product.strip().lower())
-    rows = q.all()
+    rows = q.yield_per(500)
 
     pt_pairs: Counter = Counter()
     soc_pairs: Counter = Counter()
     hierarchy: Dict[str, Dict[str, Optional[str]]] = {}
     members: Dict[Tuple[str, str], Counter] = defaultdict(Counter)
     unmatched_pts: set[str] = set()
+    signal_n = 0
 
     for sig in rows:
+        signal_n += 1
         count = int(sig.post_count or 0)
         if count <= 0:
             continue
@@ -95,7 +97,7 @@ def compute_ontological_disproportionality(
             "pt_table": [],
             "soc_table": [],
             "soc_alerts": [],
-            "totals": {"signals": len(rows), "pt_pairs": 0, "soc_pairs": 0, "reports": 0},
+            "totals": {"signals": signal_n, "pt_pairs": 0, "soc_pairs": 0, "reports": 0},
             "verdict": "No AE-coded signals in scope — run Ingest + Detect first.",
             "how_to_read": _HOW_TO_READ,
             "ontology_version": ONTOLOGY_VERSION,
@@ -200,7 +202,7 @@ def compute_ontological_disproportionality(
         "soc_table": soc_table,
         "soc_alerts": soc_alerts,
         "totals": {
-            "signals": len(rows),
+            "signals": signal_n,
             "pt_pairs": len(pt_pairs),
             "soc_pairs": len(soc_pairs),
             "reports": sum(pt_pairs.values()),

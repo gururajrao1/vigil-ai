@@ -200,11 +200,17 @@ class _FakeQuery:
     def filter(self, *_args, **_kwargs):
         return self
 
+    def options(self, *_args, **_kwargs):
+        return self
+
     def order_by(self, *_args):
         return self
 
     def limit(self, *_args):
         return self
+
+    def yield_per(self, *_args):
+        return iter(self._rows)
 
     def all(self):
         return self._rows

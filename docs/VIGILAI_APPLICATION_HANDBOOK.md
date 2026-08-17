@@ -57,7 +57,8 @@ Use the table below in **Ctrl+F**, the in-app **⌘K / Ctrl+K** palette, or the 
 | Vaccine AESI                     | `vaccine`, `Brighton`, `AESI`             | `/lenses?tab=vaccine`                        |
 | Geography                        | `geo`, `spatial`                          | `/lenses?tab=spatial`                        |
 | Social vs FDA                    | `FAERS`, `divergence`                     | `/lenses?tab=divergence`                     |
-| Knowledge graph                  | `graph`, `story`                          | `/graph`                                     |
+| Knowledge graph                  | `graph`, `story`, `512 MB`                | `/graph`                                     |
+| Render free memory               | `OOM`, `memory limit`, `Render`           | [§15](#15-local-run--deploy) · [§19](#19-when-you-dont-see-expected-output) |
 | Load demo data                   | `PV demo pack`, `FAERS bulk`, `VAERS`     | `/sources`                                   |
 | Narrow what Pathfinder finds     | `keywords`, `project`                     | `/projects`                                  |
 | Synthetic stress data            | `Forge`                                   | `/forge`                                     |
@@ -625,7 +626,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 ### 7.14 Geo clusters
 
 1. **Lenses → Geo clusters**.
-2. Look for regions with concentration beyond expected share.
+2. Look for regions with concentration beyond expected share (from each signal’s stored `regions_json`, not a live join of every post).
 3. Drill into the product–event if linked.
 
 **Say:** “Spatial clustering — hypothesis for quality / batch / reporting artifact.”
@@ -644,6 +645,8 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 2. Filter product / event.
 3. Click a node/edge → inspector.
 4. Use **Signal Story Mode** (isolate → contrast) when available.
+
+On Render free (~512 MB) the in-memory RDF/force graph materializes the **strongest ~1,500 unique drug→AE pairs** (and the NetworkX overlay tops out at ~800 by PRR). The full signal register remains searchable in Detect — the graph is a relationship lens, not a dump of every WEAK pair.
 
 **Say:** “Relationships at a glance — then validate on Signal Detail.”
 
@@ -808,7 +811,7 @@ Inbox → Looking into it → Looks real → High priority → Written up → Do
 
 | Feature             | What                                  | Where                        |
 | ------------------- | ------------------------------------- | ---------------------------- |
-| Knowledge graph     | Drug ↔ AE force graph + inspector     | `/graph`                     |
+| Knowledge graph     | Drug ↔ AE force graph (strongest pairs; full register stays in Detect) | `/graph`                     |
 | Ontology hetero KG  | Typed edges (ATC, ChEBI, PT→SOC, GMDN) | API `ontology/engine/knowledge-graph` |
 | Story mode          | Guided A-vs-B narrative               | `/graph?tab=story`           |
 | Glossary            | Patient slang → PT                    | `/graph` glossary tab        |
@@ -1655,7 +1658,9 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). Prefer an existing DB for presentations — do **not** Reset mid-demo.
 
-Deploy notes: Vercel (frontend) · Render Docker free tier (API) · Neon Postgres. See `docs/DEPLOY_FREE.md`.
+Deploy notes: Vercel (frontend) · Render Docker free tier (API, **~512 MB RAM**) · Neon Postgres. See `docs/DEPLOY_FREE.md`.
+
+After a large FAERS DMA (~tens of thousands of signals), the free API OOMs if endpoints load every Signal ORM row (JSON blobs) or every AE post’s `entities_json` into one process. Production hardening keeps SQL aggregates / `load_only` / pagination, caps the Evidence RDF graph to strongest pairs, and sets `MALLOC_ARENA_MAX=2` + `WEB_CONCURRENCY=1`. Neon rows are **not** deleted.
 
 ---
 
@@ -1762,6 +1767,8 @@ Use this section in demos when someone says “is it broken?” Most empty views
 | Detect table empty                                        | Over-filtered search                                          | Clear filters                      |
 | Detect spinner / gateway timeout                          | Client used to download every signal row (~16k after FAERS DMA) | Hard-refresh; list is SQL-paginated (25/page). Filters still search the full register. |
 | Dashboard / Ontology / workflow feel slow                 | Long FAERS date span or full-register paint                     | Volume chart downsamples to week/month; Ontology uses count-based 2×2; workflow/VigiLyze hubs show top 80. Data remains in Detect. |
+| Render “exceeded memory limit” / API dead                 | Free plan ~512 MB; full-register ORM or RDF of all pairs        | Redeploy API with RAM hardening. Graph shows strongest pairs only; Detect still has the full register. No corpus wipe. |
+| Evidence graph missing many WEAK pairs                    | —                                                               | Intentional RAM cap (~1,500 unique pairs / ~800 NetworkX). Filter or open Detect for the rest. |
 
 
 

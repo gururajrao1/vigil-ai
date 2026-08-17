@@ -832,38 +832,54 @@ def _maybe_alert(db: Session, sig: Signal) -> None:
 # Knowledge graph projection
 # --------------------------------------------------------------------------- #
 def knowledge_graph(db: Session, project_id: int | None = None) -> dict:
-    sig_q = db.query(Signal)
+    from sqlalchemy import func
+    from sqlalchemy.orm import load_only
+
+    sig_q = db.query(Signal).options(load_only(
+        Signal.drug, Signal.symptom, Signal.meddra_pt, Signal.prr,
+        Signal.strength, Signal.post_count, Signal.severity, Signal.meddra_soc,
+    ))
     if project_id is not None:
         sig_q = sig_q.filter(Signal.project_id == project_id)
-    sigs = sig_q.all()
-    signal_dicts = [
-        {
+    signal_dicts = []
+    for s in sig_q.yield_per(400):
+        signal_dicts.append({
             "drug": s.drug, "symptom": s.meddra_pt or s.symptom, "prr": s.prr,
             "strength": s.strength, "post_count": s.post_count, "severity": s.severity,
             "soc": s.meddra_soc,
-        }
-        for s in sigs
-    ]
+        })
+    signal_dicts.sort(key=lambda row: float(row.get("prr") or 0), reverse=True)
+    if len(signal_dicts) > 800:
+        signal_dicts = signal_dicts[:800]
 
-    cond_counter: Dict[Tuple[str, str], int] = {}
-    proc_q = db.query(ProcessedPost, RawPost).join(RawPost, ProcessedPost.raw_id == RawPost.id)
+    # Condition edges used to scan every processed post (OOM on FAERS-scale).
+    # Keep the drug→AE graph complete; skip indication co-occurrence on large corpora.
+    condition_links: List[dict] = []
+    post_n = db.query(func.count(ProcessedPost.id))
     if project_id is not None:
-        proc_q = proc_q.filter(RawPost.project_id == project_id)
-    for processed, _raw in proc_q.all():
-        entities = json.loads(processed.entities_json or "{}")
-        drugs = {
-            canon
-            for d in entities.get("drugs", [])
-            for canon in [canonical_product(d.get("normalized") or d.get("text") or "")]
-            if canon
-        }
-        conds = {c["normalized"] for c in entities.get("conditions", []) if c.get("normalized")}
-        for d in drugs:
-            for c in conds:
-                cond_counter[(d, c)] = cond_counter.get((d, c), 0) + 1
-    condition_links = [
-        {"drug": d, "condition": c, "count": n}
-        for (d, c), n in cond_counter.items() if n >= 2
-    ]
+        post_n = post_n.join(RawPost, ProcessedPost.raw_id == RawPost.id).filter(
+            RawPost.project_id == project_id
+        )
+    if int(post_n.scalar() or 0) <= 1500:
+        cond_counter: Dict[Tuple[str, str], int] = {}
+        proc_q = db.query(ProcessedPost, RawPost).join(RawPost, ProcessedPost.raw_id == RawPost.id)
+        if project_id is not None:
+            proc_q = proc_q.filter(RawPost.project_id == project_id)
+        for processed, _raw in proc_q.yield_per(200):
+            entities = json.loads(processed.entities_json or "{}")
+            drugs = {
+                canon
+                for d in entities.get("drugs", [])
+                for canon in [canonical_product(d.get("normalized") or d.get("text") or "")]
+                if canon
+            }
+            conds = {c["normalized"] for c in entities.get("conditions", []) if c.get("normalized")}
+            for d in drugs:
+                for c in conds:
+                    cond_counter[(d, c)] = cond_counter.get((d, c), 0) + 1
+        condition_links = [
+            {"drug": d, "condition": c, "count": n}
+            for (d, c), n in cond_counter.items() if n >= 2
+        ]
 
     return build_graph(signal_dicts, condition_links)

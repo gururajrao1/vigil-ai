@@ -106,10 +106,21 @@ def prewarm_signals(db: Session, limit: int = 12) -> dict:
     if not settings.use_evidence_enrichment:
         return {"prewarmed": 0, "skipped": "enrichment disabled"}
 
+    from sqlalchemy import case
+
     from .evidence.enrich import enrich_one
 
-    signals = db.query(Signal).all()
-    ranked = sorted(signals, key=_rank_key, reverse=True)[:limit]
+    ranked = (
+        db.query(Signal)
+        .order_by(
+            case((Signal.sdr_flag.is_(True), 1), else_=0).desc(),
+            Signal.eb05.desc(),
+            Signal.prr.desc(),
+            Signal.post_count.desc(),
+        )
+        .limit(max(1, min(int(limit or 12), 25)))
+        .all()
+    )
 
     warmed = 0
     for s in ranked:

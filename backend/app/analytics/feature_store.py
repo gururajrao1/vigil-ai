@@ -11,7 +11,7 @@ import logging
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from ..models import ProcessedPost, RawPost, Signal
 from .disproportionality import compute_signals
@@ -132,11 +132,17 @@ def _build_case_rows(
 
 def _signal_metrics(db: Session, project_id: Optional[int]) -> Dict[Tuple[str, str], dict]:
     """Pull PRR/ROR/χ²/EB05/IC025 from persisted Signal rows, else recompute."""
-    q = db.query(Signal)
+    q = db.query(Signal).options(
+        load_only(
+            Signal.id, Signal.drug, Signal.meddra_pt, Signal.symptom,
+            Signal.prr, Signal.ror, Signal.chi_square, Signal.eb05, Signal.ic025,
+            Signal.ebgm, Signal.ic, Signal.strength, Signal.post_count, Signal.project_id,
+        )
+    )
     if project_id is not None:
         q = q.filter(Signal.project_id == project_id)
     out: Dict[Tuple[str, str], dict] = {}
-    for s in q.all():
+    for s in q.yield_per(400):
         key = ((s.drug or "").lower(), (s.meddra_pt or s.symptom or "").lower())
         out[key] = {
             "prr_score": float(s.prr or 0.0),

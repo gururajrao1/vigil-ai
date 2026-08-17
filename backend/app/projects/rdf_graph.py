@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from ..models import Alert, ProcessedPost, RawPost, Signal
 from ..nlp.drug_norm import canonical_product
@@ -22,7 +22,9 @@ VIG = Namespace("http://vigilai.dev/ontology#")
 REGION = Namespace("http://vigilai.dev/region#")
 
 # Bump when materialization / normalization rules change (busts in-process cache).
-_GRAPH_BUILD_VERSION = 5
+# v7: cap unique drug→AE pairs so rdflib cannot hold the full FAERS register in RAM.
+_GRAPH_BUILD_VERSION = 7
+_MAX_RDF_PAIRS = 1500
 
 _LOCK = threading.Lock()
 _GRAPH_CACHE: Dict[int, Graph] = {}
@@ -87,40 +89,46 @@ def build_rdf_store(db: Session, project_id: Optional[int] = None) -> Graph:
         else:
             prev["regions"] = list(dict.fromkeys(prev.get("regions", []) + regions))
 
-    sig_q = db.query(Signal)
+    sig_q = db.query(Signal).options(load_only(
+        Signal.id, Signal.drug, Signal.meddra_pt, Signal.symptom,
+        Signal.prr, Signal.ror, Signal.strength, Signal.severity,
+        Signal.meddra_soc, Signal.regions_json,
+    )).order_by(Signal.prr.desc(), Signal.post_count.desc())
     if project_id is not None:
         sig_q = sig_q.filter(_legacy_project_clause(Signal.project_id, project_id))
-    for s in sig_q.all():
+    for s in sig_q.yield_per(400):
         _ingest_signal_row(s)
+        if len(pair_metrics) >= _MAX_RDF_PAIRS:
+            break
 
-    # Absolute sync: every Alert must have a corresponding drug→AE edge
-    alert_q = db.query(Alert)
-    if project_id is not None:
-        alert_q = alert_q.filter(_legacy_project_clause(Alert.project_id, project_id))
-    for a in alert_q.all():
-        if a.signal_id:
-            sig = db.query(Signal).filter(Signal.id == a.signal_id).first()
-            if sig:
-                _ingest_signal_row(sig)
+    # Alerts fill gaps only up to the same pair cap (Render free ~512 MB).
+    if len(pair_metrics) < _MAX_RDF_PAIRS:
+        alert_q = db.query(Alert).options(load_only(
+            Alert.drug, Alert.symptom, Alert.severity, Alert.signal_id,
+        ))
+        if project_id is not None:
+            alert_q = alert_q.filter(_legacy_project_clause(Alert.project_id, project_id))
+        for a in alert_q.yield_per(400):
+            drug = canonical_product(a.drug or "") or normalize_label(a.drug or "", kind="product")
+            sym = _symptom_label(a.symptom or "")
+            if not drug or not sym:
                 continue
-        drug = canonical_product(a.drug or "") or normalize_label(a.drug or "", kind="product")
-        sym = _symptom_label(a.symptom or "")
-        if not drug or not sym:
-            continue
-        key = (drug, sym.lower())
-        if key not in pair_metrics:
-            pair_metrics[key] = {
-                "drug": drug,
-                "symptom": sym,
-                "prr": 0.0,
-                "ror": None,
-                "strength": "STRONG" if (a.severity or "") in ("Critical", "High") else "MODERATE",
-                "severity": a.severity,
-                "soc": None,
-                "regions": [],
-                "signal_id": a.signal_id,
-                "from_alert": True,
-            }
+            key = (drug, sym.lower())
+            if key not in pair_metrics:
+                pair_metrics[key] = {
+                    "drug": drug,
+                    "symptom": sym,
+                    "prr": 0.0,
+                    "ror": None,
+                    "strength": "STRONG" if (a.severity or "") in ("Critical", "High") else "MODERATE",
+                    "severity": a.severity,
+                    "soc": None,
+                    "regions": [],
+                    "signal_id": a.signal_id,
+                    "from_alert": True,
+                }
+                if len(pair_metrics) >= _MAX_RDF_PAIRS:
+                    break
 
     for meta in pair_metrics.values():
         drug_uri = _entity_uri("drug", meta["drug"])
@@ -147,59 +155,6 @@ def build_rdf_store(db: Session, project_id: Optional[int] = None) -> Graph:
             g.add((sym_uri, VIG.reportedIn, geo_uri))
             g.add((drug_uri, VIG.reportedIn, geo_uri))
 
-    post_q = (
-        db.query(ProcessedPost, RawPost)
-        .join(RawPost, ProcessedPost.raw_id == RawPost.id)
-        .filter(ProcessedPost.ae_flag.is_(True))
-    )
-    if project_id is not None:
-        post_q = post_q.filter(_legacy_project_clause(RawPost.project_id, project_id))
-
-    for proc, raw in post_q.all():
-        geo = normalize_label(raw.country or raw.region or "Global", kind="region") or "Global"
-        geo_uri = REGION[geo.replace(" ", "_").replace("/", "_")]
-        g.add((geo_uri, RDF.type, VIG.Region))
-        g.add((geo_uri, RDFS.label, Literal(geo)))
-        if raw.country:
-            g.add((geo_uri, VIG.countryCode, Literal(raw.country)))
-
-        try:
-            ent = json.loads(proc.entities_json or "{}")
-        except json.JSONDecodeError:
-            continue
-
-        drugs = []
-        for d in ent.get("drugs", []):
-            canon = canonical_product(d.get("normalized") or d.get("text") or "")
-            if canon:
-                drugs.append(canon)
-        symptoms = [
-            _symptom_label(s.get("normalized") or s.get("pt") or "")
-            for s in ent.get("symptoms", [])
-            if s.get("normalized") or s.get("pt")
-        ]
-        conditions = [c.get("normalized", "") for c in ent.get("conditions", []) if c.get("normalized")]
-
-        for d in drugs:
-            drug_uri = _entity_uri("drug", d)
-            g.add((drug_uri, RDF.type, VIG.Drug))
-            g.add((drug_uri, RDFS.label, Literal(d)))
-            for sym in symptoms:
-                if not sym:
-                    continue
-                sym_uri = _entity_uri("symptom", sym)
-                g.add((sym_uri, RDF.type, VIG.Symptom))
-                g.add((sym_uri, RDFS.label, Literal(sym)))
-                g.add((drug_uri, VIG.caused, sym_uri))
-                g.add((drug_uri, VIG.reportedIn, geo_uri))
-                g.add((sym_uri, VIG.reportedIn, geo_uri))
-            for cond in conditions:
-                cond_uri = _entity_uri("condition", cond)
-                g.add((cond_uri, RDF.type, VIG.Condition))
-                g.add((cond_uri, RDFS.label, Literal(cond)))
-                g.add((drug_uri, VIG.coReportedWith, cond_uri))
-                g.add((cond_uri, VIG.reportedIn, geo_uri))
-
     # STITCH molecular gating — protein/CYP edges with confidence ≥ 0.700
     drug_labels = sorted(
         {
@@ -207,7 +162,7 @@ def build_rdf_store(db: Session, project_id: Optional[int] = None) -> Graph:
             for s, p, o in g.triples((None, RDFS.label, None))
             if (s, RDF.type, VIG.Drug) in g
         }
-    )
+    )[:400]
     n_mol = enrich_graph(g, drug_labels, allow_live=False)
     if n_mol:
         logger.info("STITCH enrichment added %s molecular edges (offline KB)", n_mol)
@@ -237,6 +192,9 @@ def get_graph(db: Session, project_id: Optional[int] = None) -> Graph:
         if pid in _GRAPH_CACHE and _GRAPH_SIG.get(pid) == sig:
             return _GRAPH_CACHE[pid]
         g = build_rdf_store(db, project_id)
+        # One cached graph only — a second project copy of 16k triples OOMs Render free.
+        _GRAPH_CACHE.clear()
+        _GRAPH_SIG.clear()
         _GRAPH_CACHE[pid] = g
         _GRAPH_SIG[pid] = sig
         _FILTER_OPTS_CACHE.pop(pid, None)
@@ -253,14 +211,10 @@ def _legacy_project_clause(col, project_id: Optional[int]):
 
 
 def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str, List[str]]:
-    """Dropdown values that are operable on the KG (have nodes / adverse edges).
+    """Dropdown values operable on the KG (Signal product/event + AE geo).
 
-    Earlier versions harvested every NER hit on every post, so the UI listed drugs
-    that never formed a Signal or AE edge — selecting them showed an empty graph.
-    Options are now limited to:
-      • product / event labels on Signal rows (same strings as global KG nodes)
-      • conditions that co-occur with a signal drug on AE-flagged posts
-      • geo from AE-flagged posts only
+    Options come from Signal columns and distinct AE-post country/region — never
+    a full dump of every NER hit on every post (that OOMed Render free).
     """
     pid = project_id or 0
     sig = _graph_signature(db, project_id)
@@ -276,62 +230,39 @@ def kg_filter_options(db: Session, project_id: Optional[int] = None) -> dict[str
     regions: Set[str] = set()
 
     def _collect(scope: Optional[int]) -> None:
-        sig_q = db.query(Signal)
+        sig_q = db.query(Signal.drug, Signal.meddra_pt, Signal.symptom, Signal.regions_json)
         if scope is not None:
             sig_q = sig_q.filter(_legacy_project_clause(Signal.project_id, scope))
-        for s in sig_q.all():
-            # Exact Signal.drug string — matches pipeline.build_graph node labels.
-            raw_drug = (s.drug or "").strip()
+        for drug, pt, symptom, regions_json in sig_q.yield_per(500):
+            raw_drug = (drug or "").strip()
             if raw_drug:
                 drugs.add(raw_drug)
             canon = canonical_product(raw_drug)
             if canon:
                 drugs.add(canon)
-            ev_raw = (s.meddra_pt or s.symptom or "").strip()
+            ev_raw = (pt or symptom or "").strip()
             if ev_raw:
                 symptoms.add(ev_raw)
             ev = canonical_event(ev_raw)
             if ev:
                 symptoms.add(ev)
+            for r in _parse_regions(regions_json):
+                if r:
+                    regions.add(r)
 
-        # AE-flagged posts: geography + conditions that co-occur with a signal drug.
-        # Product/event dropdowns stay Signal-backed so NER-only ghosts (no KG edge) are excluded.
-        post_q = (
-            db.query(ProcessedPost, RawPost)
-            .join(RawPost, ProcessedPost.raw_id == RawPost.id)
+        geo_q = (
+            db.query(RawPost.country, RawPost.region)
+            .join(ProcessedPost, ProcessedPost.raw_id == RawPost.id)
             .filter(ProcessedPost.ae_flag.is_(True))
+            .distinct()
         )
         if scope is not None:
-            post_q = post_q.filter(_legacy_project_clause(RawPost.project_id, scope))
-        known = {x.lower() for x in drugs}
-        for proc, raw in post_q.all():
-            if raw.country:
-                countries.add(normalize_label(raw.country, kind="region") or raw.country)
-            if raw.region:
-                regions.add(normalize_label(raw.region, kind="region") or raw.region)
-            try:
-                ent = json.loads(proc.entities_json or "{}")
-            except json.JSONDecodeError:
-                continue
-            post_drugs = set()
-            for d in ent.get("drugs", []):
-                text = (d.get("normalized") or d.get("text") or "").strip()
-                if text:
-                    post_drugs.add(text.lower())
-                canon = canonical_product(text)
-                if canon:
-                    post_drugs.add(canon.lower())
-            if not post_drugs.intersection(known):
-                continue
-            for c in ent.get("conditions", []):
-                from ..nlp.condition_norm import canonical_condition
-
-                text = (c.get("normalized") or c.get("text") or "").strip()
-                if text:
-                    conditions.add(text)
-                canon = canonical_condition(text)
-                if canon:
-                    conditions.add(canon)
+            geo_q = geo_q.filter(_legacy_project_clause(RawPost.project_id, scope))
+        for country, region in geo_q.yield_per(200):
+            if country:
+                countries.add(normalize_label(country, kind="region") or country)
+            if region:
+                regions.add(normalize_label(region, kind="region") or region)
 
     _collect(project_id)
     if project_id is not None and not any([drugs, symptoms, conditions, countries, regions]):
@@ -367,10 +298,13 @@ def _label_matches(label: str, param: str) -> bool:
 def _pair_metrics(db: Session, project_id: Optional[int]) -> Dict[tuple, dict]:
     """(drug, symptom_lower) → disproportionality metrics from Signal rows."""
     out: Dict[tuple, dict] = {}
-    q = db.query(Signal)
+    q = db.query(Signal).options(load_only(
+        Signal.id, Signal.drug, Signal.meddra_pt, Signal.symptom,
+        Signal.prr, Signal.ror, Signal.strength, Signal.severity, Signal.post_count,
+    ))
     if project_id is not None:
         q = q.filter(_legacy_project_clause(Signal.project_id, project_id))
-    for s in q.all():
+    for s in q.yield_per(500):
         drug = canonical_product(s.drug or "")
         sym = _symptom_label(s.meddra_pt or s.symptom or "")
         if not drug or not sym:

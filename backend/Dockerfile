@@ -23,6 +23,8 @@ ENV USE_TRANSFORMER_NER=false \
     USE_ONLINE_TRANSLATION=true \
     USE_LLM=true \
     PYTHONUNBUFFERED=1 \
+    MALLOC_ARENA_MAX=2 \
+    WEB_CONCURRENCY=1 \
     PORT=8000
 
 # Expose port (Railway / Render inject $PORT)
@@ -32,4 +34,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD curl -f http://localhost:${PORT}/api/health || exit 1
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --timeout-keep-alive 5"]
